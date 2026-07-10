@@ -53,6 +53,9 @@ sandbox_image_cache.tar
 # ignore the legacy `web` folder
 web/
 
+# Next.js build output
+frontend/.next/
+
 # Deployment artifacts
 backend/Dockerfile.langgraph
 config.yaml.bak

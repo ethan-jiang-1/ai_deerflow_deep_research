@@ -67,3 +67,6 @@ config.yaml.bak
 .codex
 .cursor
 
+# Local symlinks to external knowledge (machine-specific absolute paths)
+_ln_*
+

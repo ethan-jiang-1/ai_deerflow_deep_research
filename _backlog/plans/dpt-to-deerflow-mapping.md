@@ -317,15 +317,19 @@ DeerFlow 已有的保护：
 
 4. **Mode injection 由 JS 运行时完成**（见 [08](details/08-additional-surfaces.md) §6）：DPT 在加载 phase node 后注入 AUTONOMOUS MODE / TERMINAL DELIVERY MODE banner。在 DeerFlow 上，这些行为指令直接写在 phase skill 文件本身即可。
 
-## 已知缺口
+5. **所有 Gate CLI 共享同一个 pipeline**（已验证 wave0/wave1/instantiation/readiness）：`parseArgs → loadGateDefinition → validateNodeGateBinding → checkPhaseHandoffPreflight → rule loop (collect-all-failures) → resolveRouting → buildGateResult → writeGateAttempt → emitGateResult`。每个 gate 的唯一差异是 rule loop 里检查什么。实现时按需参考具体 gate 的 rule set 即可。
 
-以下 DPT surface 目前尚未深入分析，但对完整实现可能有参考价值：
+6. **COMMANDS.md 的核心价值不在命令列表**，而在于定义了 Exit Code Convention (0/1/2)、Phase Boundary Terms、以及 Agent-facing operating contract。这些约定在 DeerFlow 上映射为 gate tool 的返回结构约定而非独立 CLI 脚本。
 
-| Surface | 状态 | 优先级 |
-|---------|------|--------|
-| `DPT_FRAMEWORK/cli/gates/check-gate-*.mjs`（全部 11 个） | 只读了 2 个（wave0, instantiation） | 中 — 实现具体 gate 时需要参考每个的 rule set |
-| `experiments_playbook/exp_*/`（22 个实验） | 未读 | 低 — 是机制验证的历史证据，不是生产代码 |
-| `experiments_env/prototype-*/` | 未读 | 低 — 已冻结原型，仅供参考 |
-| `tests/` 目录 | 未读 | 低 — 回归测试，不直接指导架构映射 |
-| `DPT_FRAMEWORK/COMMANDS.md` | 未读全文 | 中 — 命令索引，实现 CLI 等价物时参考 |
-| `DPT_FRAMEWORK/cli/validate-bundle.mjs`, `inspect-bundle.mjs` | 未深入 | 低 — bundle 校验逻辑，DeerFlow 上用 sandbox 工具替代 |
+## 已知缺口（审查后更新）
+
+以下 DPT surface 经评估后确定为**实现阶段按需参考**，不阻塞架构设计：
+
+| Surface | 状态 | 处置 |
+|---------|------|------|
+| 其余 7 个 gate CLI | Gate pipeline 模式已验证（4 个样本一致），实现时按需读 | ✅ 模式已确认，无需全读 |
+| `DPT_FRAMEWORK/COMMANDS.md` | 已读全文，核心约定已提取到本文 §关键发现 | ✅ 已关闭 |
+| `experiments_playbook/exp_*/`（22 个实验） | 机制验证的历史证据，非生产代码 | ⏭ 跳过 |
+| `experiments_env/prototype-*/` | 已冻结原型 | ⏭ 跳过 |
+| `tests/` 目录 | 回归测试 | ⏭ 跳过 |
+| `validate-bundle.mjs`, `inspect-bundle.mjs` | DeerFlow 上用 sandbox 工具替代 | ⏭ 跳过 |

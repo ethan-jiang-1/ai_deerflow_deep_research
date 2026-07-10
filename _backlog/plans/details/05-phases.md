@@ -2,6 +2,9 @@
 
 > 从 `ai_tool_deepresearch` 分析，用于在 DeerFlow 上重实现。
 > 主控文档: [../dpt-to-deerflow-mapping.md](../dpt-to-deerflow-mapping.md)
+> 相关: [01-execution-model.md](01-execution-model.md) · [03-bundle-structure.md](03-bundle-structure.md) · [06-subagent-roles.md](06-subagent-roles.md)
+>
+> **DPT 源文件**: `DPT_FRAMEWORK/workflows/nodes/phases/phase-*.md` (11 个文件), `DPT_FRAMEWORK/workflows/nodes/shared/shared-*.md`, `DPT_FRAMEWORK/workflows/nodes/brief/`, `DPT_FRAMEWORK/workflows/manifest.json`, `DPT_FRAMEWORK/cli/gates/check-gate-*.mjs`
 
 ## 概述
 

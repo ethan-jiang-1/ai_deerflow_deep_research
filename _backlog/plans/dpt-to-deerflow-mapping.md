@@ -301,5 +301,31 @@ DeerFlow 已有的保护：
 | 05 | [details/05-phases.md](details/05-phases.md) | 11 个 Phase 详解、Execution Contract、Silent Execution、HITL |
 | 06 | [details/06-subagent-roles.md](details/06-subagent-roles.md) | 5 个 Subagent Role、Work-Unit Envelope、委托协议 |
 | 07 | [details/07-guidelines-key-insights.md](details/07-guidelines-key-insights.md) | Guidelines 体系关键设计原则、深层机制 |
+| 08 | [details/08-additional-surfaces.md](details/08-additional-surfaces.md) | Command Playbook、RB Templates、Brief Nodes、Experiments、Mode Injection、关键发现 |
 
-> 以上文档从 `ai_tool_deepresearch` 分析提取，目标是完整理解 DPT 的设计后，在 DeerFlow 上重实现。读的时候对照着看 DPT 源码效果最好。
+> 以上文档从 `ai_tool_deepresearch` 分析提取，目标是完整理解 DPT 的设计后，在 DeerFlow 上重实现。每篇末尾有 "DPT 源文件" 清单，读的时候对照 DPT 源码效果最好。
+
+## 关键跨文档发现
+
+审查全部 8 篇 detail doc 后，有几个极重要的发现直接影响 DeerFlow 实现：
+
+1. **Gate CLI 不使用 checkGate/forkGate**（见 [02](details/02-engine.md) §5-6）：实际的 gate 模块实现了自己的 rule loop——collect-all-failures 而非 first-match-wins，有 fatigue/degradation escalation。DeerFlow 上做 gate tool 时要复刻这个模式，而不是 `gate-loop.mjs` 的简化版本。
+
+2. **Trace 是唯一真相源，status 只是 cache**（见 [02](details/02-engine.md) §6-9）：`rb_status.json` 可以被手改，但 `rb_trace.jsonl` 是 append-only、index-cross-referenced。Reentry 时必须从 trace 重建合法 handoff，不能只读 status。DeerFlow 上做 reentry 逻辑时这是核心原则。
+
+3. **Stop authorization 未强制执行**（见 [02](details/02-engine.md) §6）：DPT 的 engine 计算了 `stop_authorization_state`，但没有任何代码真正读取它来阻止 Agent 停机。在 DeerFlow 上我们可以简化——靠 phase skill 里的 `stop: yes/no` 标记来驱动，不需要单独的 enforcement 层。
+
+4. **Mode injection 由 JS 运行时完成**（见 [08](details/08-additional-surfaces.md) §6）：DPT 在加载 phase node 后注入 AUTONOMOUS MODE / TERMINAL DELIVERY MODE banner。在 DeerFlow 上，这些行为指令直接写在 phase skill 文件本身即可。
+
+## 已知缺口
+
+以下 DPT surface 目前尚未深入分析，但对完整实现可能有参考价值：
+
+| Surface | 状态 | 优先级 |
+|---------|------|--------|
+| `DPT_FRAMEWORK/cli/gates/check-gate-*.mjs`（全部 11 个） | 只读了 2 个（wave0, instantiation） | 中 — 实现具体 gate 时需要参考每个的 rule set |
+| `experiments_playbook/exp_*/`（22 个实验） | 未读 | 低 — 是机制验证的历史证据，不是生产代码 |
+| `experiments_env/prototype-*/` | 未读 | 低 — 已冻结原型，仅供参考 |
+| `tests/` 目录 | 未读 | 低 — 回归测试，不直接指导架构映射 |
+| `DPT_FRAMEWORK/COMMANDS.md` | 未读全文 | 中 — 命令索引，实现 CLI 等价物时参考 |
+| `DPT_FRAMEWORK/cli/validate-bundle.mjs`, `inspect-bundle.mjs` | 未深入 | 低 — bundle 校验逻辑，DeerFlow 上用 sandbox 工具替代 |

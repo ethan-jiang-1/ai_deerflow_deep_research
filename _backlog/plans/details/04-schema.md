@@ -2,6 +2,9 @@
 
 > 从 `ai_tool_deepresearch` 分析，用于在 DeerFlow 上重实现。
 > 主控文档: [../dpt-to-deerflow-mapping.md](../dpt-to-deerflow-mapping.md)
+> 相关: [01-execution-model.md](01-execution-model.md) · [02-engine.md](02-engine.md)
+>
+> **DPT 源文件**: `DPT_FRAMEWORK/schema/enums.mjs`, `DPT_FRAMEWORK/schema/contracts/*.mjs`, `DPT_FRAMEWORK/schema/gate_definitions/*.json`, `DPT_FRAMEWORK/schema/research-styles/`, `DPT_FRAMEWORK/workflows/manifest.json`, `DPT_FRAMEWORK/workflows/transitions.chain.json`
 
 ## 概述
 

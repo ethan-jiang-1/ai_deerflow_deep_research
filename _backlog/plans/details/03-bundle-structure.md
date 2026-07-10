@@ -2,6 +2,9 @@
 
 > 从 `ai_tool_deepresearch` 分析，用于在 DeerFlow 上重实现。
 > 主控文档: [../dpt-to-deerflow-mapping.md](../dpt-to-deerflow-mapping.md)
+> 相关: [01-execution-model.md](01-execution-model.md) · [02-engine.md](02-engine.md) · [05-phases.md](05-phases.md)
+>
+> **DPT 源文件**: `DPT_FRAMEWORK/cli/instantiate-run-bundle.mjs`, `DPT_FRAMEWORK/cli/validate-bundle.mjs`, `DPT_FRAMEWORK/cli/inspect-bundle.mjs`, `DPT_FRAMEWORK/rb_templates/`, `guidelines/framework-runtime-boundary.md`
 
 ## 概述
 

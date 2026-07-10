@@ -2,6 +2,9 @@
 
 > 从 `ai_tool_deepresearch` 分析，用于在 DeerFlow 上重实现。
 > 主控文档: [../dpt-to-deerflow-mapping.md](../dpt-to-deerflow-mapping.md)
+> 相关: [01-execution-model.md](01-execution-model.md) · [02-engine.md](02-engine.md)
+>
+> **DPT 源文件**: `guidelines/project-charter.md`, `guidelines/agentic-execution-model.md`, `guidelines/agentic-workflow-mechanism.md`, `guidelines/agentic-queue-mechanism.md`, `guidelines/agentic-subagent-mechanism.md`, `guidelines/framework-runtime-boundary.md`, `guidelines/command-experiments.md`, `guidelines/logging-conventions.md`
 
 ## Guidelines 全景
 

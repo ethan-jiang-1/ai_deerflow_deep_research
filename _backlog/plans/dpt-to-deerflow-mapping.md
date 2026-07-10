@@ -287,3 +287,19 @@ DeerFlow 已有的保护：
 4. 每轮都以 OpenSpec change 推进
 
 本 plan 的结论确认后，以 `openspec/changes/` 下的 change 落地。
+
+## 详细分析索引
+
+每个子系统有独立的详细分析文档，在 `details/` 子目录下：
+
+| # | 文档 | 内容 |
+|---|------|------|
+| 01 | [details/01-execution-model.md](details/01-execution-model.md) | 三层执行模型 + Agentic Loop + 三权威架构 |
+| 02 | [details/02-engine.md](details/02-engine.md) | Engine: gate-loop, gate-fork, queue-manager, work-unit-lifecycle, trace, consistency |
+| 03 | [details/03-bundle-structure.md](details/03-bundle-structure.md) | Run bundle 目录结构、control files、Framework/Bundle 边界 |
+| 04 | [details/04-schema.md](details/04-schema.md) | Enums、Contracts、Gate Definitions、Research Styles |
+| 05 | [details/05-phases.md](details/05-phases.md) | 11 个 Phase 详解、Execution Contract、Silent Execution、HITL |
+| 06 | [details/06-subagent-roles.md](details/06-subagent-roles.md) | 5 个 Subagent Role、Work-Unit Envelope、委托协议 |
+| 07 | [details/07-guidelines-key-insights.md](details/07-guidelines-key-insights.md) | Guidelines 体系关键设计原则、深层机制 |
+
+> 以上文档从 `ai_tool_deepresearch` 分析提取，目标是完整理解 DPT 的设计后，在 DeerFlow 上重实现。读的时候对照着看 DPT 源码效果最好。

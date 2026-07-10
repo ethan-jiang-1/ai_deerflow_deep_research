@@ -21,7 +21,7 @@ _（暂无活跃 plan。新建时在下表加一行，并用下面的模板建 `
 
 | Plan | 简述 |
 |------|------|
-| — | — |
+| [dpt-to-deerflow-mapping](dpt-to-deerflow-mapping.md) | DPT_FRAMEWORK → DeerFlow 架构映射方案：Phase Chain / Gate / Queue / Work Unit / Run Bundle 如何用 DeerFlow 的 Skills + Subagents + Custom Tools + Sandbox 实现 |
 
 **Next available plan ID: CLS-001**（移入 `_closed_plans/` 时分配）
 

@@ -1,0 +1,112 @@
+schema: spec-driven
+
+context: |
+  ## Project: Deep Research agent ON TOP OF DeerFlow — do NOT fork the framework
+
+  DeerFlow v2.1.0 is a LangGraph-based AI super-agent framework (fork of
+  bytedance/deer-flow). This repo builds a **Deep Research** agent on top of it;
+  `backend/` and `frontend/` are an UNMODIFIED upstream mirror (the `main` branch
+  mirrors upstream 1:1). We build our Deep Research agent as a PURELY ADDITIVE
+  downstream consumer.
+
+  ### Golden rule — never modify upstream source
+  Never edit anything under `backend/` or `frontend/`. Assemble our agent only from:
+    - root `config.yaml`            (models, tools, subagents, memory, sandbox, guardrails, …)
+    - root `extensions_config.json` (MCP servers + skill enable states)
+    - `skills/custom/<skill>/SKILL.md`
+    - per-user `SOUL.md` + per-agent config (custom lead-agent personality)
+    - OUR OWN Python package in a NEW top-level dir (e.g. `agent/`), referenced
+      from config via `use: "module.path:symbol"` reflection paths.
+  Our package MAY `import deerflow.*` (Ring 3/4 consumer); it MUST NOT be imported
+  by the harness, and MUST NOT live under `backend/` or `frontend/`.
+
+  ### Tech stack / version floors (hard)
+  Python >=3.12 (uv), Node via pnpm@10.26.2, TS ^5.8.
+  langgraph>=1.1.9, langchain>=1.2.15 (+anthropic/openai/deepseek/google-genai/mcp-adapters),
+  pydantic>=2.12.5, sqlalchemy[asyncio]>=2.0,<3.0, fastapi>=0.115, next ^16.2 + react ^19,
+  @langchain/langgraph-sdk ^1.5.
+
+  ### Architecture constraints (enforceable)
+  - Concentric rings: inner never imports outer. Harness (deerflow.*) must never
+    `import app.*` (CI: backend/tests/test_harness_boundary.py).
+  - Blocking-IO gate: no synchronous blocking IO on the asyncio event loop
+    (Blockbuster hard-fails CI). Offload file IO via `asyncio.to_thread`.
+  - Single registered graph: `lead_agent = deerflow.agents:make_lead_agent`.
+  - Ports: Nginx 2026 (entry), Gateway 8001, Frontend 3000, Provisioner 8002.
+    GATEWAY_WORKERS>1 requires Postgres.
+
+  ### Extension-surface cheat-sheet (which knob for what)
+  model→models[].use ; tool/provider→tools[].use (dedup by name, first wins) ;
+  MCP→extensions_config.json mcpServers ; skill→skills/custom + extensions skills{} ;
+  subagent→subagents.custom_agents ; lead personality→SOUL.md ;
+  sandbox→sandbox.use (restart) ; memory→memory: ; summarization→summarization: ;
+  guardrail→guardrails.provider.use ; safety detector→safety_finish_reason: .
+  Hot-reload: models/tools/subagents/memory/summarization/SOUL/guardrails.
+  Restart-required: database/checkpointer/run_events/stream_bridge/sandbox.use/log_level/channels.
+
+  ### The ONE non-additive seam
+  General custom middleware has NO config field — it needs code-level embedding via
+  build_middlewares(custom_middlewares=[...]). Treat any need for custom middleware
+  as an explicit escalation, not a routine additive change.
+
+  ### Dev conventions
+  - TDD mandatory. Use FakeToolCallingModel / ReplayChatModel (zero-API); gate
+    real-LLM tests with @requires_llm. Bugs ship as a red-before-fix test.
+  - Format before done: backend `make format` (ruff), frontend `pnpm check`.
+    CI rejects unformatted code and out-of-sync uv.lock.
+  - Conventional commits (feat:/fix:). Keep README + AGENTS.md in sync in the same change set.
+
+  ### Requirement traceability (project governance — MANDATORY, do not skip)
+  Every capability requirement carries a globally-unique, append-only, never-reused ID
+  `{PREFIX}-{NNN}` (e.g. CUT-001). The ID threads the whole chain so any requirement is
+  traceable registry → spec → task → code:
+    - Single registry: `openspec/governance/req-registry.yaml` (append-only; search
+      before allocating; deprecate with a trailing [DEPRECATED], never delete/reuse).
+    - PREFIX = first 2 letters of first word + first letter of second word (custom-tool
+      → CUT); single-word capability → first 3 letters. `prefixes:` block in the registry
+      is the self-documenting map.
+    - Declare ownership with a `> req: XXX-001, XXX-002` line at the TOP of each main spec
+      (before the first `##` heading). Reference elsewhere via tasks `@impl XXX-001`, code
+      comments `# @impl XXX-001`, and our-package module docstrings.
+    - Requirement titles are STABLE SEMANTIC anchors — never embed the ID in the title
+      (write `### Requirement: Tool is exposed`, not `... (CUT-001)`).
+    - Three ID states: alive (in a main spec `> req:`), pending (in an active change delta),
+      retired ([DEPRECATED] in registry). Anything else is an orphan = silent loss.
+
+  ### Governance tooling (`openspec/governance/`, Python stdlib only — this repo's stack)
+  Deterministic, read-only checkers (no semantic judgement) that must PASS before any
+  change is archived:
+    - `python3 openspec/governance/check_project_reqs.py`  — registry consistency:
+      0 duplicate / 0 unregistered / 0 orphan / 0 reusedRetired.
+    - `python3 openspec/governance/check_project_specs.py` — main spec structure:
+      0 deltaHeaderInMain / 0 missingPurpose / 0 missingRequirements / 0 missingReqHeader.
+  These are ported in spirit from an upstream JS project but rewritten in Python; they touch
+  only openspec/specs, openspec/changes, and the registry — never DeerFlow source.
+
+rules:
+  proposal:
+    - "Name every DeerFlow extension surface the change uses (config.yaml section, extensions_config.json, skills/custom, SOUL.md, subagents, MCP, ACP, or our-package use: path). Every capability must map to a sanctioned additive knob."
+    - "Non-goals MUST explicitly state that no files under backend/ or frontend/ are modified."
+    - "If the change needs the non-additive seam (custom middleware, or code inside the harness tree), mark it **BREAKING / escalation** and justify it."
+    - "State the hot-reload vs restart impact of every config field touched."
+    - "For each new capability, allocate its 3-letter PREFIX and register it in openspec/governance/req-registry.yaml (search first to avoid collisions); list the requirement IDs the change will introduce."
+  specs:
+    - "Requirements describe OUR AGENT's observable behavior (skills available, tools exposed, subagent delegation, memory, guardrail decisions) — never DeerFlow framework internals."
+    - "Every scenario must be verifiable with FakeToolCallingModel or ReplayChatModel (zero-API). Include at least one failure / guardrail-denied / refusal scenario per capability."
+    - "Each main spec (openspec/specs/<capability>/spec.md) MUST have a `> req: XXX-001, ...` line before the first `##` heading, plus `## Purpose` and `## Requirements` sections. Delta headers (## ADDED/MODIFIED/REMOVED/RENAMED Requirements) are legal ONLY in openspec/changes/<name>/specs/."
+    - "Requirement titles are stable semantic anchors — never embed the requirement ID in the title; IDs live only in the `> req:` header, the registry, tasks `@impl`, and code comments."
+  design:
+    - "Name exact config keys, files, and use: reflection paths; cite config.example.yaml anchors where relevant."
+    - "Any new code lives in our own top-level package (e.g. agent/), may import deerflow.* only, and must respect the ring boundary and the Blocking-IO gate (asyncio.to_thread for file IO)."
+    - "Pin version floors (py>=3.12, langgraph>=1.1.9, …) and mark each changed field hot-reload vs restart (cite reload_boundary STARTUP_ONLY_FIELDS)."
+  tasks:
+    - "TDD: each behavior task ships a red-before-green test using Fake/Replay models, @requires_llm-gated, Blockbuster-safe."
+    - "Additive file ops only — edit root config.yaml / extensions_config.json, add skills/custom/**/SKILL.md, add SOUL.md, add code under our agent dir. NEVER edit backend/ or frontend/."
+    - "Reference the requirement ID each task implements (e.g. \"implement CUT-001: tool is exposed\"); annotate implementation code with `# @impl CUT-001`."
+    - "Include a format task (backend make format / frontend pnpm check) and a doc-sync task; end with an end-to-end verification via make dev or DeerFlowClient SDK."
+    - |
+      Every change's tasks MUST end with two governance checks as hard done-conditions before archive:
+        1. `python3 openspec/governance/check_project_reqs.py` PASS (0 duplicate / 0 unregistered / 0 orphan / 0 reusedRetired)
+        2. `python3 openspec/governance/check_project_specs.py` PASS (0 deltaHeaderInMain / 0 missingPurpose / 0 missingRequirements / 0 missingReqHeader)
+      This fixes the gate into every change lifecycle — preventing requirement-ID drift, duplication, silent
+      loss, or delta-format pollution of the main specs.

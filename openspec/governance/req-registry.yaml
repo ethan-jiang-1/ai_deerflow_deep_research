@@ -1,0 +1,41 @@
+# Requirement ID Registry
+#
+# 需求 ID 的唯一登记处。借鉴自 deep-research 项目的治理思想，技术栈换成本仓库的
+# Python + OpenSpec；这里只登记「我们在 DeerFlow 之上构建的智能体」的 capability 需求。
+#
+# 规则:
+#   1. 只增不删 — 已分配的 ID 永不复用，废弃的在描述末尾追加 [DEPRECATED]
+#   2. 分配前先查 — 在此文件中搜索确认 ID 未被占用
+#   3. 格式:  PREFIX-NNN: <capability-name> — <description>
+#      - key 是全局唯一 ID，格式 [A-Z]{3}-\d{3}
+#      - value 的 <capability-name> 用 kebab-case
+#   4. 引号:  YAML 值不需要引号，除非值内包含 ": "（冒号+空格）
+#      例:  CUT-001: custom-tool — simple description          （无需引号）
+#           CUT-002: "custom-tool — 含 colon: 需引号包裹"        （需引号）
+#      切勿用单引号——YAML 单引号内无法转义，双引号用 \" 即可。
+#   5. check_project_reqs.py 扫描本文件做一致性校验
+#
+# 三态:
+#   alive   — ID 出现在 openspec/specs/ 某个 main spec 的 > req: 行
+#   pending — ID 出现在 openspec/changes/<active>/specs/ 的 delta spec 中
+#   retired — 本行末尾标了 [DEPRECATED]，ID 占位永不复用
+#
+# 缩写规则: 首单词前 2 字母 + 次单词首字母（如 custom-tool → CUT，memory-policy → MEP）；
+#           单词型 capability 取前 3 字母（如 skills → SKI）。冲突时先查 registry 再定。
+
+# ──────────────────────────────────────────────
+# prefixes: 缩写 → kebab-case capability 全称
+# 此映射块是唯一自文档化来源。key 不匹配 [A-Z]{3}-\d{3}，
+# check_project_reqs.py 自动忽略。首个 capability 落地时在此登记缩写。
+# ──────────────────────────────────────────────
+prefixes: {}
+
+# ──────────────────────────────────────────────
+# Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
+# 示例（待第一个 change 落地时替换）:
+#
+#   # custom-tool
+#   CUT-001: custom-tool — <一句话稳定语义描述>
+#
+# 目前尚无已登记需求。
+# ──────────────────────────────────────────────

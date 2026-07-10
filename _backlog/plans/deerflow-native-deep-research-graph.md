@@ -1,7 +1,7 @@
 # Plan: DeerFlow 原生 Deep Research Graph
 
-> 类型: 设计 / 架构映射 | 更新: 2026-07-10
-> 状态: 待以 Phase 0 spike 验证后拆分为 OpenSpec changes
+> 类型: 设计 / 架构映射 | 更新: 2026-07-11
+> 状态: 已拆分为 00-18 共 19 个 OpenSpec change 计划；按严格串行顺序落地
 > 参考: [`../_reference/dpt/`](../_reference/dpt/) 全部 9 份架构分析，以及 DPT 原始 workflow、gate、queue、work-unit、trace 实现
 
 ## 结论先行
@@ -12,7 +12,7 @@
 2. 每个需要开放式判断的 research node 内运行一个受限 DeerFlow agent loop。
 3. 确定性 gate 是独立 node；失败时把结构化错误和自然语言 `inspect/advice` 写回 state，再路由到同一 phase 的 repair agent loop。
 4. LangGraph state/checkpointer 管小而关键的控制状态；sandbox 管大体积证据和报告文件；通过验证的 submission ledger 管证据权威。
-5. 在当前“只能注册 `lead_agent`、不能修改 `backend/`/`frontend/`”的约束下，先把该 graph 做成顶层自有 Python 包中的 **嵌套 graph**，通过一个 custom tool 接入现有 lead agent。
+5. 在当前“只能注册 `lead_agent`、不能修改 `backend/`/`frontend/`”的约束下，先把该 graph 做成顶层自有 Python 包中的 **嵌套 graph**，通过一个 custom tool 接入现有 lead agent；入口用 public skill + per-user dedicated Agent 引导，但安全边界在 nested graph 和 node policy。
 
 核心架构没有变化，变化的是 controller 的承载方式：
 
@@ -93,7 +93,7 @@ LangGraph 已经原生拥有 state、reducer、edge、checkpoint、interrupt、`
 | custom subagent / `SubagentExecutor` | 可作为 worker 执行后端候选 | 当前 subagent 无 checkpointer，文本返回不是证据权威 |
 | checkpointer | 保存 graph 的小型控制状态和 interrupt | 不存网页正文、大文件或完整证据库 |
 | run events / tracing | 用户进度与运行诊断 | 不直接替代 claim-level provenance ledger |
-| custom Agent + SOUL.md | 强制入口 agent 调用 research tool，而不是自行研究 | 仍需测试 tool-selection 可靠性 |
+| public skill + per-user custom Agent/SOUL | 引导用户入口 agent 调用 research tool，而不是自行研究 | UX/路由提示，不是权限边界；安全由 RuntimeAdapter/node policy/submit/gate 强制 |
 | `Command(goto=END)` + human-input artifact | 把嵌套 graph 的 HITL 映射到现有 UI | 需要 Phase 0 证明恢复链路 |
 
 ### 需要修正的旧 mapping 偏差
@@ -149,6 +149,8 @@ gate node
 
 未来若 DeerFlow 提供 config-driven graph registration，可以把同一个 graph factory 直接注册，以获得原生 subgraph streaming 和 interrupt 展示；phase、state、gate、work-unit 设计无需改变。
 
+嵌套 graph 的源码落点固定在 `agent/src/deerflow_deep_research/`。`graph/nodes/` 只放顶层逻辑 workflow node；可复用内部 critic/diagnostic 子流程放 `graph/components/`，避免把 reusable component 误注册成主图阶段。
+
 ## 目标架构
 
 ```text
@@ -156,7 +158,7 @@ User / UI
     |
     v
 DeerFlow registered lead_agent
-  dedicated deep-research custom Agent + SOUL
+  public entry skill + per-user deep-research Agent/SOUL (UX routing)
     |
     | tool call: deep_research(action=start|resume|status|cancel)
     v
@@ -537,7 +539,7 @@ Semantic critic 只产出 typed findings。是否达到阈值和如何路由仍�
 - 最终报告没有引用 ledger 外的新事实。
 - claim-citation map 与 report 引用双向闭合。
 - 报告结论强度不高于 evidence verdict。
-- final artifacts 存在、hash 固定并通过 `present_files` 暴露。
+- final artifacts 存在、hash 固定，先发布到 `/mnt/user-data/outputs/deep-research/<research_id>/`，再通过 `present_files` 暴露。
 
 ### Gate failure policy
 
@@ -614,20 +616,20 @@ scheduled/non-interactive context 不能卡在 HITL：
 | Sandbox | 所有 worker 共享 outer thread sandbox，但按 research/work/attempt 路径授权 |
 | Tool config/reflection | `deep_research` control tool 由 `tools[].use` 加载；worker tool set 从 AppConfig 筛选 |
 | Models | cheap model 做 intake/format；strong model 做 synthesis/critic/final，可配置 |
-| Skills | 只保留 entry/operator skill；phase contract 由 graph node 按需加载，不把未来 phase 全塞给 lead |
+| Skills | 只保留 public entry/operator skill；phase contract 由 graph node 按需加载，不把未来 phase 全塞给 lead |
 | State/reducers | work results、claims、artifacts 并发合并，terminal 状态单调 |
-| Checkpointer | phase、interrupt、batch cursor、repair attempt 可恢复 |
+| Checkpointer | phase、interrupt、batch cursor、repair attempt 可恢复；SQLite/Postgres 通过官方 per-action context，memory 仅同进程 |
 | `Send` | topic/finding work 的有界 fan-out/fan-in |
 | run events | 发布 phase/batch/gate/usage 进度；不把低层网页噪声塞进 lead messages |
-| Artifacts | final report 和 decision brief 通过已有 artifacts/present_files 通道展示 |
-| Custom agent | dedicated SOUL 强制所有研究控制都进 tool，降低 lead 自行旁路概率 |
+| Artifacts | final report 先从 workspace 验证发布到 `/mnt/user-data/outputs/deep-research/<research_id>/`，再通过 `present_files` 展示 |
+| Custom agent | per-user dedicated Agent/SOUL 降低 lead 自行旁路概率；不能声称隔离全部工具，权限由 nested graph 强制 |
 
 ## Phase 0: 必须先证明的集成门槛
 
 Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 ```text
-00 runtime infrastructure：package、launcher、tool shell、RuntimeAdapter、GraphHost
+00 runtime infrastructure：source-mounted package、launcher、public skill/per-user Agent、tool shell、RuntimeAdapter、GraphHost、node-agent policy
 01 完整 fake graph：全 node、全 edge、HITL、rerun、fake final
 02 typed state/checkpoint：把 fake dict 换成正式控制合同
 03 gate kernel：把直接 fixture outcome 换成通用 fake rules + repair loop
@@ -642,7 +644,7 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 必须在不修改 `backend/`/`frontend/` 的前提下选定并验证一种正式装配方式：
 
-1. project-owned additive launcher / Docker override，把 repo root 加入 `PYTHONPATH`；或
+1. project-owned additive launcher / Docker override，把 `agent/src` 加入 `PYTHONPATH`；或
 2. 将自有包作为正式安装依赖装入 backend venv 的可重复 setup；或
 3. fallback 到 stdio MCP/ACP bridge。
 
@@ -650,9 +652,10 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 ### P0-2 Nested graph checkpoint
 
-- 与 outer graph 使用相同配置的 memory/sqlite/postgres backend。
+- 与 outer graph 使用相同配置的 memory/sqlite/postgres backend，但第一版不假设 reflected tool 有 Gateway lifespan hook。
+- GraphHost 缓存 builder/topology；SQLite/Postgres 每次 tool action 使用官方 `make_checkpointer(app_config)` async context 并确定关闭。
 - 独立 namespace 不污染 lead-agent checkpoint。
-- process restart 后从 interrupt 恢复。
+- process restart 后从 interrupt 恢复仅要求 SQLite/Postgres；memory backend 明确只支持同进程。
 - schema/version mismatch fail closed。
 
 ### P0-3 HITL UI bridge
@@ -668,6 +671,7 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 - 只能写 assigned research/work path。
 - synthesis node 实际拿不到 web tools。
 - worker 拿不到 phase/gate/ledger mutation tools。
+- 外部网页/PDF/snippet/cache 正文只能作为 untrusted data，不能进入 system/developer prompt，也不能发出控制、工具、ledger 或路由指令。
 
 ### P0-5 Fan-out、取消和孤儿清理
 
@@ -686,19 +690,20 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 本主文档只保存总体架构。下面每个子 plan 必须一对一生成一个 OpenSpec change；不再用一个 change 同时实现多个真实 phase。
 
-拆分遵循四条规则：
+拆分遵循六条规则：
 
-1. **先搭 runtime infra。** 00 只解决 package/launcher/tool/context/GraphHost，让“graph 放在哪里运行”不再是 01 的隐含假设。
+1. **先搭 runtime infra。** 00 解决 source package、folder structure、launcher、tool/config、public skill/per-user Agent、RuntimeAdapter、GraphHost、node-agent policy，让“代码放哪、graph 怎么运行、权限怎么控”不再是 01 的隐含假设。
 2. **再搭完整 fake graph。** 01 交付全拓扑、全 edge、两个 HITL、rerun 回边和 fake final，所有节点先返回确定性 fixture。
 3. **逐节点替换，不最后集成。** 后续 change 每替换一个 fake node，全图端到端测试仍必须通过。
 4. **横切内核先于真实 node。** state、gate、work-unit 是所有 phase 的共同依赖，各自独立 change。
 5. **一个 plan 对应一个 change。** 子 plan 的验收边界就是对应 change 的 archive gate，不把未完成工作藏在“后续补齐”里。
+6. **执行上按 00→18 严格串行。** DAG 中存在理论可并行车道，但本项目先按编号顺序一个个建 change、实现、验收，减少 AI Coding 同时修改公共边界的风险。
 
 ### Change 清单
 
 | # | 子 plan / 对应 change | 替换或建立的边界 | 直接依赖 |
 |---:|---|---|---|
-| 00 | [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) | package/launcher/tool shell/RuntimeAdapter/GraphHost | 无 |
+| 00 | [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) | source package/folder structure/launcher/public skill/per-user Agent/tool shell/RuntimeAdapter/GraphHost/node-agent policy | 无 |
 | 01 | [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) | 可 checkpoint、可 HITL 的完整 fake graph | 00 |
 | 02 | [`deep-research-02-state-persistence-contracts.md`](deep-research-02-state-persistence-contracts.md) | typed state、reducers、bundle refs、checkpoint schema | 01 |
 | 03 | [`deep-research-03-gate-kernel.md`](deep-research-03-gate-kernel.md) | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
@@ -758,8 +763,9 @@ flowchart LR
   C17 --> C18[18 evaluation/hardening]
 ```
 
-### 可并行车道
+### 理论可并行车道
 
+- 下面只是依赖分析，不是默认执行策略。当前落地按 00→18 严格串行。
 - 02 完成后，03 的 gate kernel 与 state 相关测试先行；03 完成后 04 和 05 可以并行。
 - 04 完成后，09 可用 fixtures 开发，不必等 Wave0/Wave1 真实 node。
 - 13 完成后，14 rerun 与 15 readiness 可以并行；16 只依赖 15。
@@ -849,10 +855,10 @@ RealNode: 对应 change 落地后的真实实现
   → 建立 tool bridge 合同和集成测试；保留未来迁移到直接 graph registration 的边界。
 
 - **[风险] 外层 lead agent 仍可能不调用 control tool。**  
-  → dedicated custom Agent 只暴露必要 control/file presentation tools，SOUL 明确禁止旁路；用 Replay model 测入口；长期争取 deterministic assistant routing seam。
+  → public skill + per-user dedicated Agent/SOUL 只做入口引导；不能声称它隔离全部工具。用 Replay model 测入口；真正权限由 RuntimeAdapter、nested graph、node tool/path policy 和 submit/gate 强制；长期争取 deterministic assistant routing seam。
 
 - **[风险] nested graph 与 outer checkpointer 的资源生命周期冲突。**  
-  → 复用官方 provider/config，隔离 namespace；不在每个 node 私建无清理连接；Phase 0 做 restart/SQLite/Postgres 验证。
+  → 复用官方 provider/config，隔离 namespace；第一版每次 tool action 打开并关闭官方 async checkpointer context，不假设 reflected tool 拥有 Gateway lifespan hook；Phase 0 做 SQLite/Postgres restart 验证，memory 只算同进程。
 
 - **[风险] `Send` worker 内再次使用 DeerFlow background subagent 会形成双重并发与取消困难。**  
   → 第一优先采用 worker node 内直接 `create_deerflow_agent()`；只有 task UI/step event 确有必要时才适配 `SubagentExecutor`，且并发只由一层拥有。
@@ -882,11 +888,11 @@ RealNode: 对应 change 落地后的真实实现
 
 ## 需要在 Phase 0 后确认的决策
 
-1. 自有顶层包的正式加载方式：additive launcher、可重复安装，还是 MCP/ACP fallback。
-2. nested graph 是否能安全复用 DeerFlow checkpointer provider，还是需要 project-owned provider wrapper。
+1. source-mounted 顶层包在 local/prod/Docker 的 launcher/override 细节是否足够稳定；若不稳定才回退到可重复安装或 MCP/ACP bridge。
+2. 是否能找到真实 Gateway lifespan hook 来复用进程级 provider；00 第一版默认 per-action official context。
 3. worker backend 最终选直接 `create_deerflow_agent()` 还是 `SubagentExecutor` adapter。
 4. nested progress events 能否进入现有 RunJournal；不能时第一版 UI 显示到什么粒度。
-5. submission ledger 使用 JSONL + hash chain，还是独立 SQLite/Postgres 表；在多 worker 前必须定。
+5. submission ledger 使用 JSONL + hash chain，还是独立 SQLite/Postgres 表；04 在多 worker 前必须定。
 6. HITL2 的 `repair` 与 `rerun` 精确语义，以及 generation 失效范围。
 7. semantic critic 的模型隔离和成本预算。
 

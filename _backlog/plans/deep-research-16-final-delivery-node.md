@@ -1,6 +1,6 @@
 # Plan: Deep Research 16 - Final Delivery Node
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-11
 > 对应 OpenSpec change: `implement-deep-research-final-delivery-node`
 > 依赖: 15 Readiness Node
 > 替换范围: fake final writer、integrity gate、artifact publish
@@ -16,13 +16,15 @@
 - final integrity gate 双向检查 report claims/citations/map/submission ledger。
 - 结论强度不得高于 critic verdict；insufficient/uncertain 必须保留限定语。
 - writer gate fail 回同一 writer repair，不回搜索；需要新证据时 blocked 回 readiness 路由。
-- final hash/metadata 固定，publish 通过现有 artifacts/present_files 通道。
+- final hash/metadata 固定；先在 research workspace 验证，再原子发布到 `/mnt/user-data/outputs/deep-research/<research_id>/`。
+- publish 必须 copy verified `report.md`、claim-citation-map 和 metadata 到 outputs path，重新校验 hash/path，再调用现有 `present_files`；不得直接 present workspace path。
 - completed 后 start/status/resume/cancel 行为幂等且不重写报告。
 
 ## 验收
 
 - writer 引入新事实、丢 limitation、悬空 citation、map 不一致、试图 web search 均被拒。
 - final repair 后通过且 report hash 稳定。
+- workspace-to-outputs copy 是 atomic/幂等；hash mismatch、partial copy、outputs 外路径、直接 workspace `present_files` 全部 fail closed。
 - 从真实 bootstrap 到真实 final 的全 real interactive happy path 零 API Replay E2E 通过。
 - artifact 列表和用户最终消息只在 final gate pass 后出现。
 

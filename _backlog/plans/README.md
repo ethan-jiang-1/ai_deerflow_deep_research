@@ -17,11 +17,9 @@
 
 ## 活跃列表
 
-_（暂无活跃 plan。新建时在下表加一行，并用下面的模板建 `<name>.md`。）_
-
 | Plan | 简述 |
 |------|------|
-| — | — |
+| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 将 DPT 的 Markdown-controller agentic graph 同构映射为 Python StateGraph controller + node 内 DeerFlow agent loop 的实施与验证计划 |
 
 **Next available plan ID: CLS-001**（移入 `_closed_plans/` 时分配）
 

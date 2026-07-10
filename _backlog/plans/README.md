@@ -19,7 +19,25 @@
 
 | Plan | 简述 |
 |------|------|
-| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 将 DPT 的 Markdown-controller agentic graph 同构映射为 Python StateGraph controller + node 内 DeerFlow agent loop 的实施与验证计划 |
+| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、18 个 change 的依赖路线图 |
+| [deep-research-01-fake-graph-skeleton.md](deep-research-01-fake-graph-skeleton.md) | 先交付完整可运行的 fake graph、HITL、rerun 和挂载骨架 |
+| [deep-research-02-state-persistence-contracts.md](deep-research-02-state-persistence-contracts.md) | typed ResearchState、reducers、checkpoint 与三种权威边界 |
+| [deep-research-03-gate-kernel.md](deep-research-03-gate-kernel.md) | 通用 gate、repair、retry、fatigue 内核 |
+| [deep-research-04-work-unit-kernel.md](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded Send、submit ledger 与 fake worker |
+| [deep-research-05-bootstrap-node.md](deep-research-05-bootstrap-node.md) | 真实 bootstrap/instantiation/setup node |
+| [deep-research-06-hitl1-node.md](deep-research-06-hitl1-node.md) | 真实 HITL1 profile interrupt/resume node |
+| [deep-research-07-topic-planning-node.md](deep-research-07-topic-planning-node.md) | 真实 topic planning 与 seed materialization node |
+| [deep-research-08-wave0-node.md](deep-research-08-wave0-node.md) | 真实 Wave0 source-intake phase |
+| [deep-research-09-evidence-critic-nodes.md](deep-research-09-evidence-critic-nodes.md) | 独立 source diagnostic 与 claim verifier nodes |
+| [deep-research-10-wave1-node.md](deep-research-10-wave1-node.md) | 真实 Wave1 evidence-depth phase |
+| [deep-research-11-wave2-synthesis-node.md](deep-research-11-wave2-synthesis-node.md) | 无 web 工具的真实 Wave2 pure-synthesis node |
+| [deep-research-12-targeted-evidence-loop.md](deep-research-12-targeted-evidence-loop.md) | gap planner、targeted workers 与 Wave2 convergence gate |
+| [deep-research-13-hitl2-node.md](deep-research-13-hitl2-node.md) | 真实 HITL2 typed decision node |
+| [deep-research-14-rerun-node.md](deep-research-14-rerun-node.md) | rerun generation、scoped invalidation 与 graph 回边 |
+| [deep-research-15-readiness-node.md](deep-research-15-readiness-node.md) | answerability、citation closure 与 readiness gate |
+| [deep-research-16-final-delivery-node.md](deep-research-16-final-delivery-node.md) | final writer、integrity gate 与 artifact publish |
+| [deep-research-17-runtime-operations.md](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress 与 operator recovery |
+| [deep-research-18-evaluation-hardening.md](deep-research-18-evaluation-hardening.md) | 全链路质量评估、故障注入与 production hardening |
 
 **Next available plan ID: CLS-001**（移入 `_closed_plans/` 时分配）
 

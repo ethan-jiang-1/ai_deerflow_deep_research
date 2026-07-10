@@ -624,7 +624,16 @@ scheduled/non-interactive context 不能卡在 HITL：
 
 ## Phase 0: 必须先证明的集成门槛
 
-完整实现前只做最小 graph：`bootstrap -> HITL interrupt -> resume -> one agent node -> gate -> final`。
+Phase 0 对应 01-04 四个 change，期间不实现任何真实研究节点：
+
+```text
+01 完整 fake graph：全 node、全 edge、HITL、rerun、fake final
+02 typed state/checkpoint：把 fake dict 换成正式控制合同
+03 gate kernel：把直接 fixture outcome 换成通用 fake rules + repair loop
+04 work-unit kernel：把 fake phase 内直返换成 bounded Send + fake worker + submit
+```
+
+完成后得到的是“控制面、状态面、门禁面、工作调度面都真实，研究内容仍是 fixture”的完整骨架。05 才开始替换第一个真实业务 node。
 
 ### P0-1 顶层包可加载
 
@@ -670,79 +679,107 @@ scheduled/non-interactive context 不能卡在 HITL：
 - nested graph 能向 outer stream 发布 phase、batch、gate 粒度事件。
 - 若当前 tool/subgraph streaming 无法进入现有 run events，先明确第一版只显示 coarse progress，并记录直接注册 graph 的长期迁移条件。
 
-**Phase 0 任一硬门槛失败，不开始移植 11 phase 内容。** 先改变集成方案，避免在错误 substrate 上堆业务逻辑。
+**01-04 或上述任一硬门槛失败，不开始 05-16 的真实 node 替换。** 先修正 substrate 和公共内核，避免在不稳定骨架上堆业务逻辑。
 
-## 分阶段落地
+## Change 拆分路线图
 
-每阶段独立创建 OpenSpec change，均遵守 requirement registry/TDD/governance gate。
+本主文档只保存总体架构。下面每个子 plan 必须一对一生成一个 OpenSpec change；不再用一个 change 同时实现多个真实 phase。
 
-### Change 1: Research graph foundation
+拆分遵循四条规则：
 
-范围：
+1. **先搭完整 fake graph。** 第一个 change 就交付全拓扑、全 edge、两个 HITL、rerun 回边和 fake final，所有节点先返回确定性 fixture。
+2. **逐节点替换，不最后集成。** 后续 change 每替换一个 fake node，全图端到端测试仍必须通过。
+3. **横切内核先于真实 node。** state、gate、work-unit 是所有 phase 的共同依赖，各自独立 change。
+4. **一个 plan 对应一个 change。** 子 plan 的验收边界就是对应 change 的 archive gate，不把未完成工作藏在“后续补齐”里。
 
-- 解决顶层包加载/启动装配。
-- 建立 package、Pydantic schemas、ResearchState/reducers、nested graph factory。
-- 实现 control tool 的 start/status/resume/cancel。
-- 跑通 HITL1、checkpoint、最小 final artifact。
-- 建立 dedicated custom Agent + SOUL + entry skill。
+### Change 清单
 
-验收重点：不修改 `backend/`/`frontend/`；restart resume；thread/user isolation；错误 resume fail closed。
+| # | 子 plan / 对应 change | 替换或建立的边界 | 直接依赖 |
+|---:|---|---|---|
+| 01 | [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) | 可挂载、可 checkpoint、可 HITL 的完整 fake graph | 无 |
+| 02 | [`deep-research-02-state-persistence-contracts.md`](deep-research-02-state-persistence-contracts.md) | typed state、reducers、bundle refs、checkpoint schema | 01 |
+| 03 | [`deep-research-03-gate-kernel.md`](deep-research-03-gate-kernel.md) | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
+| 04 | [`deep-research-04-work-unit-kernel.md`](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded `Send`、submit ledger、fake worker | 02, 03 |
+| 05 | [`deep-research-05-bootstrap-node.md`](deep-research-05-bootstrap-node.md) | 替换 fake bootstrap | 02, 03 |
+| 06 | [`deep-research-06-hitl1-node.md`](deep-research-06-hitl1-node.md) | 替换 fake HITL1/profile interrupt | 05 |
+| 07 | [`deep-research-07-topic-planning-node.md`](deep-research-07-topic-planning-node.md) | 替换 fake topic planner/seed materialization | 03, 06 |
+| 08 | [`deep-research-08-wave0-node.md`](deep-research-08-wave0-node.md) | 替换 fake Wave0 intake phase | 04, 07 |
+| 09 | [`deep-research-09-evidence-critic-nodes.md`](deep-research-09-evidence-critic-nodes.md) | source diagnostic + claim verifier agent nodes | 03, 04 |
+| 10 | [`deep-research-10-wave1-node.md`](deep-research-10-wave1-node.md) | 替换 fake Wave1 evidence-depth phase | 08, 09 |
+| 11 | [`deep-research-11-wave2-synthesis-node.md`](deep-research-11-wave2-synthesis-node.md) | 替换 fake pure-synthesis node | 10 |
+| 12 | [`deep-research-12-targeted-evidence-loop.md`](deep-research-12-targeted-evidence-loop.md) | 替换 fake gap planner/targeted-search loop + Wave2 gate | 04, 09, 11 |
+| 13 | [`deep-research-13-hitl2-node.md`](deep-research-13-hitl2-node.md) | 替换 fake HITL2 decision node | 03, 12 |
+| 14 | [`deep-research-14-rerun-node.md`](deep-research-14-rerun-node.md) | 替换 fake rerun generation/back edge | 04, 13 |
+| 15 | [`deep-research-15-readiness-node.md`](deep-research-15-readiness-node.md) | 替换 fake readiness gate | 09, 13 |
+| 16 | [`deep-research-16-final-delivery-node.md`](deep-research-16-final-delivery-node.md) | 替换 fake writer/final integrity/publish | 15 |
+| 17 | [`deep-research-17-runtime-operations.md`](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress、operator recovery | 14, 16 |
+| 18 | [`deep-research-18-evaluation-hardening.md`](deep-research-18-evaluation-hardening.md) | 全链路 eval、故障注入、生产 hardening | 17 |
 
-### Change 2: Work protocol + Wave0
+### 依赖关系
 
-范围：
+```mermaid
+flowchart LR
+  C01[01 fake graph skeleton] --> C02[02 state/persistence]
+  C02 --> C03[03 gate kernel]
+  C02 --> C04[04 work-unit kernel]
+  C03 --> C04
 
-- WorkSpec/attempt/result/submission contracts。
-- bounded `Send` fan-out/fan-in。
-- source-intake worker loop。
-- deterministic submit validator + append-only submission ledger。
-- Wave0 gate/repair/retry。
+  C03 --> C05[05 bootstrap]
+  C05 --> C06[06 HITL1]
+  C06 --> C07[07 topic planning]
+  C03 --> C07
 
-验收重点：裸文件和 worker 文本不计 coverage；重复 URL、伪路径、错 work id 被拒绝。
+  C04 --> C08[08 Wave0]
+  C07 --> C08
+  C03 --> C09[09 evidence critics]
+  C04 --> C09
+  C08 --> C10[10 Wave1]
+  C09 --> C10
 
-### Change 3: Wave1 evidence depth
+  C10 --> C11[11 Wave2 synthesis]
+  C11 --> C12[12 targeted evidence]
+  C04 --> C12
+  C09 --> C12
+  C12 --> C13[13 HITL2]
+  C03 --> C13
 
-范围：
+  C13 --> C14[14 rerun]
+  C04 --> C14
+  C13 --> C15[15 readiness]
+  C09 --> C15
+  C15 --> C16[16 final delivery]
 
-- evidence-extractor worker。
-- claims、counterevidence、open-question schemas。
-- Wave0-vs-Wave1 new-source distinction。
-- independent claim critic。
-- Wave1 hard/semantic gates。
+  C14 --> C17[17 runtime operations]
+  C16 --> C17
+  C17 --> C18[18 evaluation/hardening]
+```
 
-验收重点：来源支持关系、反例、争议与深度维度；作者不能自审即通过。
+### 可并行车道
 
-### Change 4: Wave2 synthesis + targeted repair
+- 02 完成后，03 的 gate kernel 与 state 相关测试先行；03 完成后 04 和 05 可以并行。
+- 04 完成后，09 可用 fixtures 开发，不必等 Wave0/Wave1 真实 node。
+- 13 完成后，14 rerun 与 15 readiness 可以并行；16 只依赖 15。
+- 17 必须等待 14 和 16，因为 cancellation/recovery/non-interactive 要覆盖两个终态方向。
 
-范围：
+### Fake graph 的持续合同
 
-- synthesis agent（无 web tools）。
-- finding index / gap planner / claim verifier。
-- targeted gap workers 和循环收敛。
-- Wave2 gate。
-- HITL2 typed decision 和 rerun generation。
+01 之后，graph topology snapshot 成为固定合同。每个 node 至少有两套实现：
 
-验收重点：新证据只能经 targeted submit；纯综合不能暗搜；rerun 不覆盖上一代证据。
+```text
+FakeNode: deterministic fixture，供图级快速测试
+RealNode: 对应 change 落地后的真实实现
+```
 
-### Change 5: Readiness + final delivery
+运行配置允许测试选择 fake/real implementation map。一个 change 只能把自己的目标 node 从 fake 切到 real；未轮到的 node 继续 fake。这样 Wave0 尚未完成时也能测试 HITL2、rerun、readiness 和 final 的控制流，不把集成风险推迟到最后。
 
-范围：
+每个 change 的统一 done 条件：
 
-- answerability、citation closure、readiness gate。
-- final writer 和 claim-citation map。
-- final integrity gate、artifact publish。
-- non-interactive policy。
-
-验收重点：报告不出现 ledger 外重大事实；引用双向闭合；未解决限制显式交付。
-
-### Change 6: Evaluation and production hardening
-
-范围：
-
-- eval corpus、fault injection、quality/cost/latency metrics。
-- cancellation、restart、multi-worker Postgres、concurrency stress。
-- prompt injection/source poisoning tests。
-- migration、support bundle、operator diagnostics。
+- 对应子 plan 的 scope 全部实现；
+- targeted node 的 fake/real contract tests 通过；
+- full fake graph test 通过；
+- “已实现节点为 real、其余为 fake”的 mixed-graph E2E 通过；
+- requirement registry 和两个 governance checker 通过；
+- `backend/`、`frontend/` 无修改。
 
 ## 测试与评估计划
 
@@ -872,7 +909,7 @@ scheduled/non-interactive context 不能卡在 HITL：
 
 ## 落地关联
 
-下一步不是直接写完整 Deep Research，而是创建一个只覆盖 **Phase 0 六项集成门槛** 的 OpenSpec change。该 change 通过后，再按 Change 1-6 拆分能力与 requirement IDs。
+下一步不是直接写完整 Deep Research，而是为 [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) 创建第一个 OpenSpec change。随后严格按 02-18 的依赖关系逐项创建 change；不提前合并真实 nodes，也不把多个子 plan 塞进同一个 change。
 
 在创建第一个 change 前，还应同步修订 `openspec/config.yaml` 中以下旧结论：
 

@@ -5,9 +5,43 @@ context: |
 
   DeerFlow v2.1.0 is a LangGraph-based AI super-agent framework (fork of
   bytedance/deer-flow). This repo builds a **Deep Research** agent on top of it;
-  `backend/` and `frontend/` are an UNMODIFIED upstream mirror (the `main` branch
-  mirrors upstream 1:1). We build our Deep Research agent as a PURELY ADDITIVE
-  downstream consumer.
+  `backend/` and `frontend/` are an UNMODIFIED upstream mirror. We build our
+  Deep Research agent as a PURELY ADDITIVE downstream consumer.
+
+  ### DeerFlow's agent workflow (what we're building on)
+  DeerFlow's core is a LangGraph StateGraph — NOT a hand-written while loop. The
+  Pregel engine drives supersteps: each step calls the LLM, checks for tool_calls,
+  routes to tool execution or END. 29 middleware components plug into LangChain's
+  standard hook points (before_model / after_model / wrap_tool_call / after_step)
+  — middleware IS the loop structure, not a layer outside it.
+
+  Key characteristics relevant to Deep Research:
+  - **Subagents are independent threads**: managed by dual threadpool, LLM triggers
+    via `task` tool, runs `agent.astream()` in its own daemon thread. NOT work-unit
+    mediated like DPT — DeerFlow subagents have their own LangGraph loop.
+  - **Skills are injected into system prompt**: at graph build time, loaded from
+    `skills/` directory, injected as `<skill_index>` blocks. Deferred discovery
+    keeps prompt compact; `describe_skill` loads on demand.
+  - **Memory is automatic**: extraction on after_step, injection on before_model,
+    with staleness review. Facts survive summarization.
+  - **Guardrails are middleware**: loop detection, read-before-write, tool progress,
+    safety termination — all middleware, all hot-reloadable.
+  - **Sandbox is per-thread**: Local/Docker/BoxLite/Provisioner. Filesystem isolation
+    gives us a natural "run bundle" container for research state.
+  - **Extension surfaces are config-driven**: models, tools, subagents, skills,
+    memory, guardrails, summarization — all controlled from config.yaml via `use:`
+    reflection paths. No code change needed for additive extensions.
+
+  This means our Deep Research agent is assembled from:
+    - Phase skills → `skills/custom/dpt/phases/*.md` (deferred, loaded on demand)
+    - Gate tools → Python functions in our `agent/` package, registered via `tools[].use`
+    - Research subagents → `subagents.custom_agents` in config.yaml
+    - Lead agent personality → `SOUL.md`
+    - Research state → sandbox `_bundle/` directory (per-thread isolated)
+    - Deterministic checks → our Python package (imports `deerflow.*`, never imported by it)
+
+  DPT_FRAMEWORK architecture reference: `_backlog/_reference/dpt/` (external analysis,
+  not source code — study before implementing).
 
   ### Golden rule — never modify upstream source
   Never edit anything under `backend/` or `frontend/`. Assemble our agent only from:
@@ -38,11 +72,36 @@ context: |
   ### Extension-surface cheat-sheet (which knob for what)
   model→models[].use ; tool/provider→tools[].use (dedup by name, first wins) ;
   MCP→extensions_config.json mcpServers ; skill→skills/custom + extensions skills{} ;
-  subagent→subagents.custom_agents ; lead personality→SOUL.md ;
-  sandbox→sandbox.use (restart) ; memory→memory: ; summarization→summarization: ;
-  guardrail→guardrails.provider.use ; safety detector→safety_finish_reason: .
-  Hot-reload: models/tools/subagents/memory/summarization/SOUL/guardrails.
+  subagent→subagents.custom_agents (independent thread, own LangGraph loop) ;
+  lead personality→SOUL.md ; sandbox→sandbox.use (restart) ;
+  memory→memory: ; summarization→summarization: ;
+  guardrail→guardrails.provider.use ; safety detector→safety_finish_reason: ;
+  loop detection→loop_detection: ; tool progress→tool_progress: ;
+  read-before-write→read_before_write: .
+  Hot-reload: models/tools/subagents/memory/summarization/SOUL/guardrails/loop_detection/read_before_write.
   Restart-required: database/checkpointer/run_events/stream_bridge/sandbox.use/log_level/channels.
+
+  ### Deep Research specific design rules
+  - **Phase flow is Agent-driven, NOT LangGraph-edge-driven.** The lead Agent reads
+    the current phase skill, executes, calls the gate tool, and only loads the next
+    phase skill when the gate returns `next`. Do NOT encode phase transitions as
+    LangGraph conditional edges — that would turn agentic workflow into scripted
+    workflow, defeating the purpose of having an LLM in the loop.
+  - **Gate tools return natural-language feedback.** Every gate tool returns
+    `{passed, say, next?, inspect?, advice?}` — the `say`/`inspect`/`advice` text
+    goes back into the LLM's context for repair decisions. Gate tools are MD-facing
+    feedback, not graph routers.
+  - **Research state lives in the sandbox.** Each research run = one DeerFlow thread.
+    Bundle files (`_bundle/rb_queue.json`, `rb_status.json`, `rb_trace.jsonl`) live
+    in the sandbox filesystem. Never use DeerFlow's checkpointer for research
+    business state — it's for conversation persistence.
+  - **Delegated evidence work uses DeerFlow subagents.** Unlike DPT's work-unit
+    envelope, DeerFlow subagents are independent LangGraph loops. We still validate
+    their output (file existence, schema, receipt), but the lifecycle is simpler:
+    `task` tool → subagent runs → result returned → Phase Agent validates.
+  - **HITL only at hitl1 and hitl2.** All other phases are `stop: no` — the Agent
+    silently self-drives through gate→repair→retry loops without surfacing to user.
+    Use the phase skill's `stop` field (not code) to control this.
 
   ### The ONE non-additive seam
   General custom middleware has NO config field — it needs code-level embedding via
@@ -86,6 +145,7 @@ context: |
 rules:
   proposal:
     - "Name every DeerFlow extension surface the change uses (config.yaml section, extensions_config.json, skills/custom, SOUL.md, subagents, MCP, ACP, or our-package use: path). Every capability must map to a sanctioned additive knob."
+    - "For Deep Research changes, additionally name: which phase skill(s) are affected, which gate tool(s) are involved, which subagent role(s) are used, what bundle files are read/written."
     - "Non-goals MUST explicitly state that no files under backend/ or frontend/ are modified."
     - "If the change needs the non-additive seam (custom middleware, or code inside the harness tree), mark it **BREAKING / escalation** and justify it."
     - "State the hot-reload vs restart impact of every config field touched."

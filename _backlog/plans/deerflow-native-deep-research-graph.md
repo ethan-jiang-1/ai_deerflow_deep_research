@@ -624,9 +624,10 @@ scheduled/non-interactive context 不能卡在 HITL：
 
 ## Phase 0: 必须先证明的集成门槛
 
-Phase 0 对应 01-04 四个 change，期间不实现任何真实研究节点：
+Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 ```text
+00 runtime infrastructure：package、launcher、tool shell、RuntimeAdapter、GraphHost
 01 完整 fake graph：全 node、全 edge、HITL、rerun、fake final
 02 typed state/checkpoint：把 fake dict 换成正式控制合同
 03 gate kernel：把直接 fixture outcome 换成通用 fake rules + repair loop
@@ -679,7 +680,7 @@ Phase 0 对应 01-04 四个 change，期间不实现任何真实研究节点：
 - nested graph 能向 outer stream 发布 phase、batch、gate 粒度事件。
 - 若当前 tool/subgraph streaming 无法进入现有 run events，先明确第一版只显示 coarse progress，并记录直接注册 graph 的长期迁移条件。
 
-**01-04 或上述任一硬门槛失败，不开始 05-16 的真实 node 替换。** 先修正 substrate 和公共内核，避免在不稳定骨架上堆业务逻辑。
+**00-04 或上述任一硬门槛失败，不开始 05-16 的真实 node 替换。** 先修正 substrate 和公共内核，避免在不稳定骨架上堆业务逻辑。
 
 ## Change 拆分路线图
 
@@ -687,16 +688,18 @@ Phase 0 对应 01-04 四个 change，期间不实现任何真实研究节点：
 
 拆分遵循四条规则：
 
-1. **先搭完整 fake graph。** 第一个 change 就交付全拓扑、全 edge、两个 HITL、rerun 回边和 fake final，所有节点先返回确定性 fixture。
-2. **逐节点替换，不最后集成。** 后续 change 每替换一个 fake node，全图端到端测试仍必须通过。
-3. **横切内核先于真实 node。** state、gate、work-unit 是所有 phase 的共同依赖，各自独立 change。
-4. **一个 plan 对应一个 change。** 子 plan 的验收边界就是对应 change 的 archive gate，不把未完成工作藏在“后续补齐”里。
+1. **先搭 runtime infra。** 00 只解决 package/launcher/tool/context/GraphHost，让“graph 放在哪里运行”不再是 01 的隐含假设。
+2. **再搭完整 fake graph。** 01 交付全拓扑、全 edge、两个 HITL、rerun 回边和 fake final，所有节点先返回确定性 fixture。
+3. **逐节点替换，不最后集成。** 后续 change 每替换一个 fake node，全图端到端测试仍必须通过。
+4. **横切内核先于真实 node。** state、gate、work-unit 是所有 phase 的共同依赖，各自独立 change。
+5. **一个 plan 对应一个 change。** 子 plan 的验收边界就是对应 change 的 archive gate，不把未完成工作藏在“后续补齐”里。
 
 ### Change 清单
 
 | # | 子 plan / 对应 change | 替换或建立的边界 | 直接依赖 |
 |---:|---|---|---|
-| 01 | [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) | 可挂载、可 checkpoint、可 HITL 的完整 fake graph | 无 |
+| 00 | [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) | package/launcher/tool shell/RuntimeAdapter/GraphHost | 无 |
+| 01 | [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) | 可 checkpoint、可 HITL 的完整 fake graph | 00 |
 | 02 | [`deep-research-02-state-persistence-contracts.md`](deep-research-02-state-persistence-contracts.md) | typed state、reducers、bundle refs、checkpoint schema | 01 |
 | 03 | [`deep-research-03-gate-kernel.md`](deep-research-03-gate-kernel.md) | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
 | 04 | [`deep-research-04-work-unit-kernel.md`](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded `Send`、submit ledger、fake worker | 02, 03 |
@@ -719,6 +722,7 @@ Phase 0 对应 01-04 四个 change，期间不实现任何真实研究节点：
 
 ```mermaid
 flowchart LR
+  C00[00 runtime infrastructure] --> C01[01 fake graph skeleton]
   C01[01 fake graph skeleton] --> C02[02 state/persistence]
   C02 --> C03[03 gate kernel]
   C02 --> C04[04 work-unit kernel]
@@ -909,7 +913,7 @@ RealNode: 对应 change 落地后的真实实现
 
 ## 落地关联
 
-下一步不是直接写完整 Deep Research，而是为 [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) 创建第一个 OpenSpec change。随后严格按 02-18 的依赖关系逐项创建 change；不提前合并真实 nodes，也不把多个子 plan 塞进同一个 change。
+下一步不是直接写完整 Deep Research，而是为 [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) 创建第一个 OpenSpec change。00 通过后再做 01 fake graph，随后严格按 02-18 的依赖关系逐项创建 change；不提前合并真实 nodes，也不把多个子 plan 塞进同一个 change。
 
 在创建第一个 change 前，还应同步修订 `openspec/config.yaml` 中以下旧结论：
 

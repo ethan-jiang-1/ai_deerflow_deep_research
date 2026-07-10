@@ -2,7 +2,7 @@
 
 > 类型: 设计 | 更新: 2026-07-10
 > 对应 OpenSpec change: `build-deep-research-fake-graph-skeleton`
-> 依赖: 无
+> 依赖: 00 Runtime Infrastructure
 > 在主图中的作用: 先建立完整拓扑，所有业务 node 使用 deterministic fake
 
 ## 目标
@@ -11,13 +11,12 @@
 
 ## Scope
 
-- 建立顶层自有 Python package、graph factory 和唯一 `deep_research` control tool。
-- 解决 local/dev/prod/Docker 下 `tools[].use` 可重复加载顶层 package 的装配方式。
+- 在 00 的 GraphHost 上建立 Deep Research graph factory，不重新实现 package/launcher/provider lifecycle。
 - 建立全量 fake nodes：bootstrap、HITL1、topic planning、Wave0、Wave1、Wave2 synthesis、targeted evidence、HITL2、rerun、readiness、final。
 - 建立全部 pass/repair/rerun/stop edges；fake gate 由 fixture 控制 outcome。
 - fake Wave0/Wave1 至少包含一次三路 `Send`/fan-in fixture，用于证明并行拓扑和 mixed-node contract；正式 WorkSpec/submit 留到 04。
 - HITL1/HITL2 使用真实 LangGraph interrupt/checkpoint，但问题和答案使用 fixture。
-- control tool 支持 `start | resume | status | cancel` 的最小协议，并从 runtime 派生 user/thread identity。
+- 为 00 的 control tool shell 接入 `start | resume | status | cancel` fake-graph 协议；identity 继续只由 RuntimeAdapter 提供。
 - 产出 graph topology snapshot/diagram，CI 检查不可意外新增 unreachable node 或 edge。
 - 建立 node implementation map，使同一拓扑可选择 fake 或 real node。
 
@@ -33,7 +32,7 @@
 
 ## 验收
 
-- 标准 DeerFlow 启动方式能加载 control tool，不修改 `backend/`/`frontend/`。
+- graph factory/control actions 只使用 00 提供的挂载与上下文合同，不引入第二条启动路径。
 - 全图只用 fixture，不调用真实 LLM、web 或 sandbox research tools。
 - graph checkpoint 与 lead-agent checkpoint namespace 隔离。
 - 错 thread/request id、重复 resume、completed 后 resume 均 fail closed 或幂等。

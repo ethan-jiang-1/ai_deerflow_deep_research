@@ -19,8 +19,9 @@
 
 | Plan | 简述 |
 |------|------|
-| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、18 个 change 的依赖路线图 |
-| [deep-research-01-fake-graph-skeleton.md](deep-research-01-fake-graph-skeleton.md) | 先交付完整可运行的 fake graph、HITL、rerun 和挂载骨架 |
+| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00-18 共 19 个 change 的依赖路线图 |
+| [deep-research-00-runtime-infrastructure.md](deep-research-00-runtime-infrastructure.md) | Canonical folder structure、mount/config、顶层 package、launcher、RuntimeAdapter 与 GraphHost |
+| [deep-research-01-fake-graph-skeleton.md](deep-research-01-fake-graph-skeleton.md) | 在 00 底座上交付完整可运行的 fake graph、HITL 与 rerun |
 | [deep-research-02-state-persistence-contracts.md](deep-research-02-state-persistence-contracts.md) | typed ResearchState、reducers、checkpoint 与三种权威边界 |
 | [deep-research-03-gate-kernel.md](deep-research-03-gate-kernel.md) | 通用 gate、repair、retry、fatigue 内核 |
 | [deep-research-04-work-unit-kernel.md](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded Send、submit ledger 与 fake worker |

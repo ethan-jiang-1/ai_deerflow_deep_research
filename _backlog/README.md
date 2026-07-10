@@ -27,6 +27,7 @@ _backlog/
 ├── bugs/                              # 🐛 活跃 bug → 修完移入 _done/_fixed_bugs/
 ├── todos/                            # 📋 活跃 todo → 做完移入 _done/_done_todos/
 ├── plans/                            # 📐 活跃 plan → 完成移入 _done/_closed_plans/
+├── reference/                        # 📚 外部系统分析资料（消化后产出 plan）
 └── learning/                         # 📖 apply/研究复盘 retro（长期留存）
 ```
 
@@ -110,4 +111,5 @@ git mv plans/<name>.md _done/_closed_plans/<name>.md
 | `openspec/changes/` | 活跃 change |
 | `_digest/` | DeerFlow 源码研究笔记 |
 | `_faq_on_digested/` | 基于 digest 的 FAQ |
+| `_backlog/reference/` | 外部系统分析资料（如 DPT_FRAMEWORK），消化后产出 `_backlog/plans/` |
 | `backend/` `frontend/` | 上游镜像（**禁改**，`main` 分支 1:1 跟踪 bytedance/deer-flow） |

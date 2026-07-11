@@ -114,7 +114,8 @@ openspec/governance/architecture-policy.md
   authority and synchronized-change protocol only
                          |
                          v
-active project-structure main spec --normatively identifies--+
+owning project-structure spec (pending delta -> active main)
+                    --normatively identifies---------------+
                                                               |
                                                               v
                     openspec/governance/project-structure.toml
@@ -301,7 +302,7 @@ Alternative considered: use default `RuntimeFeatures`. Rejected because its feat
 
 The test suite includes:
 
-- permanent-governance manifest schema/path checks, active-main-spec reference checks, and deterministic `agent/AGENTS.md` controlled-block rendering;
+- permanent-governance manifest schema/path checks, lifecycle-appropriate owning-spec reference checks, and deterministic `agent/AGENTS.md` controlled-block rendering;
 - AST import-direction and forbidden-generic-module checks;
 - canonical package/node-shape and stable reflection-path tests;
 - config merge/idempotency/conflict/redaction tests;

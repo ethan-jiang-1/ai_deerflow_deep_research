@@ -1,4 +1,4 @@
-> req: PRS-001, PRS-002, PRS-003
+> req: PRS-001, PRS-002, PRS-003, PRS-004
 
 ## ADDED Requirements
 
@@ -38,3 +38,18 @@ Every top-level workflow node package introduced after change 00 SHALL expose ex
 #### Scenario: Node-to-registry cycle is refused
 - **WHEN** a node package imports `graph.registry` or another graph implementation module to construct its spec
 - **THEN** the import contract fails and directs the node to the pure domain NodeSpec contract
+
+### Requirement: Structural authority survives change archival
+The active `project-structure` main spec SHALL own the semantic structure requirements and SHALL normatively identify `openspec/governance/project-structure.toml` as the single machine-readable registry for their exact repository-relative roots, current required paths, ownership layers, forbidden locations, import boundaries, and top-level node-package grammar. Before the capability's first archive, the one active owning delta SHALL serve as the pending normative reference; after the main spec exists, archived deltas SHALL be historical only and SHALL NOT remain authority. `openspec/governance/architecture-policy.md` SHALL define the authority and synchronized-change protocol without maintaining a competing path enumeration. `agent/AGENTS.md` SHALL contain one bounded checker-rendered structural block derived from the registry plus human-authored operational guidance. Archived proposals, designs, and tasks SHALL be historical context only. A deterministic zero-external-dependency governance checker SHALL reject a missing or invalid registry, a missing lifecycle-appropriate normative spec reference, controlled-block drift, or a mismatch between the registry and the repository.
+
+#### Scenario: Active truth is discoverable after archive
+- **WHEN** change 00 has been archived and a later contributor starts from the active `project-structure` main spec
+- **THEN** the spec identifies the permanent policy, exact structure registry, generated `agent/AGENTS.md` block, and deterministic checker without requiring the archived design
+
+#### Scenario: Synchronized structure passes governance
+- **WHEN** the one pending owning delta before first archive or the active main spec afterward references the valid registry, the controlled `agent/AGENTS.md` block matches its deterministic rendering, and the required repository paths and boundaries conform
+- **THEN** the architecture-governance checker passes without semantic inference
+
+#### Scenario: Structural drift fails governance
+- **WHEN** the registry and repository disagree, the controlled guide block is not the registry's exact rendering, or the lifecycle-appropriate owning spec loses or ambiguously declares its normative registry reference
+- **THEN** the checker fails with the mechanically mismatched authority surface and no archive may complete

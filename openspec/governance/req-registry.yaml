@@ -62,6 +62,7 @@ NOA-006: node-agent-runtime — Phase agents cannot initiate user clarification 
 PRS-001: project-structure — Deep Research code and tests use one canonical downstream package structure
 PRS-002: project-structure — Import directions and shared-code ownership boundaries are enforced mechanically
 PRS-003: project-structure — Top-level workflow nodes expose one stable NodeSpec surface with colocated deterministic fakes
+PRS-004: project-structure — Canonical structural authority remains discoverable and mechanically synchronized after change archival
 
 # runtime-integration
 RUI-001: runtime-integration — DeerFlow exposes one stable Deep Research control tool with an infrastructure probe action

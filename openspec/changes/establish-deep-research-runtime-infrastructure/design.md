@@ -104,6 +104,35 @@ agent/
   tests/{unit,contract,graph,integration,e2e,fixtures}/
 ```
 
+The diagram explains the approved 00 shape but is not the durable enumerated authority after archival. Change 00 adds the following permanent chain:
+
+```text
+OpenSpec config + root/module AGENTS bootstrap pointers
+                         |
+                         v
+openspec/governance/architecture-policy.md
+  authority and synchronized-change protocol only
+                         |
+                         v
+active project-structure main spec --normatively identifies--+
+                                                              |
+                                                              v
+                    openspec/governance/project-structure.toml
+                    exact paths/layers/import and node grammar
+                                      |
+                                      v
+                    check_project_architecture.py
+                         |                         |
+                         v                         v
+              repository contracts     agent/AGENTS.md controlled block
+```
+
+`openspec/governance/` is a project extension rather than an OpenSpec-native automatically loaded directory, so `openspec/config.yaml` keeps only a short bootstrap pointer and archive-gate command instead of repeating the tree. The active main spec owns the normative behavior and explicitly delegates exact enumerable structural data to `project-structure.toml`; the manifest is therefore a subordinate machine-readable registry, not a second prose architecture. `architecture-policy.md` defines this authority table, the controlled-block markers, and the update protocol, but contains no independent directory enumeration. The manifest uses repository-relative normalized paths and stable requirement-owner IDs and separates paths required in the current checkout from later package grammar; it never requires empty 01+ business packages merely to represent a future plan.
+
+The Python 3.12 standard-library checker parses the manifest with `tomllib`, validates its schema and path containment, checks the normative owning spec reference, renders and byte-compares the bounded structural block in `agent/AGENTS.md`, and enforces the current path/layer rules against the repository. Before the first archive it accepts the one active `project-structure` delta that owns the pending requirement IDs; once a main spec exists it requires that active main spec and does not treat an archived delta as authority. Group 3 extends the same contract surface with AST import and node-package checks once those pure contracts exist. Human-authored `agent/AGENTS.md` text may explain commands, ownership rationale, and explicitly labelled future additions, but it cannot override the controlled block. Archived proposal/design/tasks remain useful history and are never needed to discover the current contract.
+
+Every later change that adds, removes, or reassigns a structural path must update its delta spec when semantics change, update the manifest's exact enumeration, regenerate the controlled guide block, update contract fixtures, and pass the checker before archive. A change contained entirely by an existing node-package grammar still adds its current required package path to the manifest; it does not rewrite the grammar unless that contract itself changes.
+
 Later top-level node packages have the fixed surface `__init__.py`, `node.py`, `fake.py`, and `contracts.py`, with optional phase-local `subgraph.py`, planner/worker/materializer modules, gates, and prompts. The package exports only `NODE_SPEC`; the builder never imports node internals. `graph/components/` holds reusable internal subflows and is not top-level topology.
 
 `NodeSpec` and its pure `PolicyRef` live in `domain/node_spec.py`. Its real/fake surfaces are factories that accept pure `NodeBuildDependencies`; those dependencies expose only reduced context and `NodeExecutionCapabilities`, never raw runtime. Node packages import that contract and export a value; `graph/registry.py` loads an explicitly listed package root and reads its public value, but is never imported by a node and never imports a private node module path directly. This removes the otherwise unavoidable `graph -> nodes -> graph` cycle, gives GraphHost one explicit injection point, and prevents filesystem discovery from silently changing topology.
@@ -122,6 +151,8 @@ domain  -> stdlib + pydantic only
 `domain` cannot import outer layers; `engine` can import only domain; `agents` can import domain and public DeerFlow/LangChain APIs but not runtime/graph/nodes; nodes can import domain/engine but not agents, runtime, graph implementation modules, or sibling nodes. Runtime owns the concrete bridge from trusted DeerFlow objects to graph and agent execution. Production downstream source cannot import `app.*`; real Gateway integration tests may launch/import the app as a test fixture only. Neither upstream tree can import the downstream package. Generic `utils.py`, `helpers.py`, and `common.py` modules are forbidden.
 
 Alternative considered: add the package to the backend uv workspace. Rejected because that edits the upstream mirror and reverses ownership.
+
+Alternative considered: keep the complete structure tree in `openspec/config.yaml` or only in `architecture-policy.md`. Rejected because the former turns global prompt context into an ever-growing structural database, while the latter creates unvalidated prose that OpenSpec does not load automatically. The short bootstrap plus main-spec reference, machine-readable registry, controlled guide projection, and checker keep each fact in one owned representation.
 
 ### 3. Package independently and use environment-specific loading
 
@@ -270,6 +301,7 @@ Alternative considered: use default `RuntimeFeatures`. Rejected because its feat
 
 The test suite includes:
 
+- permanent-governance manifest schema/path checks, active-main-spec reference checks, and deterministic `agent/AGENTS.md` controlled-block rendering;
 - AST import-direction and forbidden-generic-module checks;
 - canonical package/node-shape and stable reflection-path tests;
 - config merge/idempotency/conflict/redaction tests;
@@ -283,7 +315,7 @@ The test suite includes:
 - adversarial source fixtures using Replay/Fake models with zero external API;
 - cancellation and progress projection integration probes.
 
-`agent/AGENTS.md` makes these contracts mandatory for later changes. A misplaced node, sibling-node import, reflection drift, or second source tree fails before business behavior is considered.
+`agent/AGENTS.md` makes these contracts operational for later changes, while the active main spec and its normative manifest reference remain authoritative. `openspec/governance/check_project_architecture.py` is the archive-level deterministic gate and the agent-owned contract suite exercises the same repository rules in development. A stale guide block, misplaced node, sibling-node import, reflection drift, or second source tree fails before business behavior is considered.
 
 ## Risks / Trade-offs
 

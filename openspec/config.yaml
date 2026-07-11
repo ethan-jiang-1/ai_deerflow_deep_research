@@ -1,172 +1,336 @@
 schema: spec-driven
 
 context: |
-  ## Project: Deep Research agent ON TOP OF DeerFlow — do NOT fork the framework
+  ## Project: Deep Research on top of DeerFlow
 
-  DeerFlow v2.1.0 is a LangGraph-based AI super-agent framework (fork of
-  bytedance/deer-flow). This repo builds a **Deep Research** agent on top of it;
-  `backend/` and `frontend/` are an UNMODIFIED upstream mirror. We build our
-  Deep Research agent as a PURELY ADDITIVE downstream consumer.
+  This repository carries DeerFlow 2.1.0 and builds a Deep Research system as a
+  downstream consumer. `backend/` and `frontend/` are the upstream mirror and MUST
+  remain unmodified. Deep Research code belongs to the project-owned top-level
+  `agent/` package and may import public `deerflow.*` APIs; DeerFlow MUST NOT import
+  the downstream package.
 
-  ### DeerFlow's agent workflow (what we're building on)
-  DeerFlow's core is a LangGraph StateGraph — NOT a hand-written while loop. The
-  Pregel engine drives supersteps: each step calls the LLM, checks for tool_calls,
-  routes to tool execution or END. 29 middleware components plug into LangChain's
-  standard hook points (before_model / after_model / wrap_tool_call / after_step)
-  — middleware IS the loop structure, not a layer outside it.
+  ### Sources of truth
 
-  Key characteristics relevant to Deep Research:
-  - **Subagents are independent threads**: managed by dual threadpool, LLM triggers
-    via `task` tool, runs `agent.astream()` in its own daemon thread. NOT work-unit
-    mediated like DPT — DeerFlow subagents have their own LangGraph loop.
-  - **Skills are injected into system prompt**: at graph build time, loaded from
-    `skills/` directory, injected as `<skill_index>` blocks. Deferred discovery
-    keeps prompt compact; `describe_skill` loads on demand.
-  - **Memory is automatic**: extraction on after_step, injection on before_model,
-    with staleness review. Facts survive summarization.
-  - **Guardrails are middleware**: loop detection, read-before-write, tool progress,
-    safety termination — all middleware, all hot-reloadable.
-  - **Sandbox is per-thread**: Local/Docker/BoxLite/Provisioner. Filesystem isolation
-    gives us a natural "run bundle" container for research state.
-  - **Extension surfaces are config-driven**: models, tools, subagents, skills,
-    memory, guardrails, summarization — all controlled from config.yaml via `use:`
-    reflection paths. No code change needed for additive extensions.
+  Keep three kinds of statements separate:
 
-  This means our Deep Research agent is assembled from:
-    - Phase skills → `skills/custom/dpt/phases/*.md` (deferred, loaded on demand)
-    - Gate tools → Python functions in our `agent/` package, registered via `tools[].use`
-    - Research subagents → `subagents.custom_agents` in config.yaml
-    - Lead agent personality → `SOUL.md`
-    - Research state → sandbox `_bundle/` directory (per-thread isolated)
-    - Deterministic checks → our Python package (imports `deerflow.*`, never imported by it)
+  1. Current DeerFlow behavior is established by the checked-in source and example
+     configuration, especially `backend/AGENTS.md`, `backend/langgraph.json`,
+     `backend/packages/harness/deerflow/`, `config.example.yaml`, and
+     `extensions_config.example.json`.
+  2. Approved Deep Research architecture is established by
+     `_backlog/plans/deerflow-native-deep-research-graph.md` and the numbered plans
+     under `_backlog/plans/`. These are design decisions to implement, not claims
+     that the implementation already exists.
+  3. `_backlog/_reference/dpt/` is architecture analysis. It explains the DPT
+     semantics being mapped, but it is not executable source and does not override
+     verified DeerFlow behavior or the approved mapping.
 
-  DPT_FRAMEWORK architecture reference: `_backlog/_reference/dpt/` (external analysis,
-  not source code — study before implementing).
+  OpenSpec artifacts MUST label unknowns and proposed behavior. They MUST NOT turn
+  an unverified assumption, planned interface, or DPT-specific mechanism into a
+  statement about the current codebase.
 
-  ### Golden rule — never modify upstream source
-  Never edit anything under `backend/` or `frontend/`. Assemble our agent only from:
-    - root `config.yaml`            (models, tools, subagents, memory, sandbox, guardrails, …)
-    - root `extensions_config.json` (MCP servers + skill enable states)
-    - `skills/custom/<skill>/SKILL.md`
-    - per-user `SOUL.md` + per-agent config (custom lead-agent personality)
-    - OUR OWN Python package in a NEW top-level dir (e.g. `agent/`), referenced
-      from config via `use: "module.path:symbol"` reflection paths.
-  Our package MAY `import deerflow.*` (Ring 3/4 consumer); it MUST NOT be imported
-  by the harness, and MUST NOT live under `backend/` or `frontend/`.
+  ### Verified DeerFlow facts
 
-  ### Tech stack / version floors (hard)
-  Python >=3.12 (uv), Node via pnpm@10.26.2, TS ^5.8.
-  langgraph>=1.1.9, langchain>=1.2.15 (+anthropic/openai/deepseek/google-genai/mcp-adapters),
-  pydantic>=2.12.5, sqlalchemy[asyncio]>=2.0,<3.0, fastapi>=0.115, next ^16.2 + react ^19,
-  @langchain/langgraph-sdk ^1.5.
+  - `backend/langgraph.json` registers one top-level graph:
+    `lead_agent = deerflow.agents:make_lead_agent`.
+  - The lead agent is a LangGraph agent. Its middleware chain is assembled from a
+    required base plus optional/configured components, so the live middleware count
+    varies. Do not describe a fixed count as a runtime invariant.
+  - `deerflow.agents.create_deerflow_agent()` is the SDK factory for an embedded
+    agent loop. Passing `middleware=[...]` is a full takeover of that embedded
+    agent's middleware list and cannot be combined with `features` or
+    `extra_middleware`. Its `checkpointer` is optional.
+  - `config.yaml -> tools[].use` resolves a reflected `BaseTool`. Configured tools
+    are combined with built-in, MCP, and ACP tools and deduplicated by name with
+    configured tools first. A `tool_groups` allowlist narrows configured tools but
+    is not, by itself, a complete security boundary.
+  - `deerflow.runtime.checkpointer.async_provider.make_checkpointer(app_config)` is
+    the official async context manager for memory, SQLite, and Postgres savers. The
+    legacy `checkpointer` section takes precedence over `database`; otherwise the
+    unified `database` selection is used.
+  - Tool runtime context is installed server-side with thread/run/AppConfig data and
+    authenticated Gateway identity. The generic `resolve_runtime_user_id()` helper
+    falls back to `default` when explicit context is absent, so a security-sensitive
+    downstream boundary must require the injected `runtime.context.user_id` instead
+    of treating that fallback as authentication.
+  - `ThreadDataMiddleware` places thread-data paths on runtime state. Sandbox state is
+    lazy and may be absent on a fresh thread until
+    `deerflow.sandbox.tools.ensure_sandbox_initialized_async(runtime)` acquires the
+    parent sandbox. A downstream tool that requires sandbox authority must use and
+    validate that public path rather than create another sandbox lifecycle.
+  - Current custom Agent writes are per-user at
+    `{DEER_FLOW_HOME}/users/{user_id}/agents/{name}/`. The shared
+    `{DEER_FLOW_HOME}/agents/{name}/` layout is a read-only legacy fallback for new
+    work. `POST /api/agents` is available only when `agents_api.enabled=true` and
+    writes through the authenticated effective user.
+  - Public skills are read from the global `skills/public/` tree and their enabled
+    state is stored in `extensions_config.json`. New editable custom skills are
+    per-user; the global `skills/custom/` tree is a legacy fallback.
+  - Skills, memory, summarization, subagents, and most guardrails are configurable
+    features. Their existence in the framework does not mean they are enabled for
+    every agent or selected for Deep Research.
+  - The authoritative restart-required registry is
+    `deerflow.config.reload_boundary.STARTUP_ONLY_FIELDS`. It currently includes
+    `database`, `checkpointer`, `run_events`, `stream_bridge`, `sandbox`,
+    `log_level`, `logging`, `channels`, `channel_connections`, and `scheduler`.
 
-  ### Architecture constraints (enforceable)
-  - Concentric rings: inner never imports outer. Harness (deerflow.*) must never
-    `import app.*` (CI: backend/tests/test_harness_boundary.py).
-  - Blocking-IO gate: no synchronous blocking IO on the asyncio event loop
-    (Blockbuster hard-fails CI). Offload file IO via `asyncio.to_thread`.
-  - Single registered graph: `lead_agent = deerflow.agents:make_lead_agent`.
-  - Ports: Nginx 2026 (entry), Gateway 8001, Frontend 3000, Provisioner 8002.
-    GATEWAY_WORKERS>1 requires Postgres.
+  ### Verified version floors
 
-  ### Extension-surface cheat-sheet (which knob for what)
-  model→models[].use ; tool/provider→tools[].use (dedup by name, first wins) ;
-  MCP→extensions_config.json mcpServers ; skill→skills/custom + extensions skills{} ;
-  subagent→subagents.custom_agents (independent thread, own LangGraph loop) ;
-  lead personality→SOUL.md ; sandbox→sandbox.use (restart) ;
-  memory→memory: ; summarization→summarization: ;
-  guardrail→guardrails.provider.use ; safety detector→safety_finish_reason: ;
-  loop detection→loop_detection: ; tool progress→tool_progress: ;
-  read-before-write→read_before_write: .
-  Hot-reload: models/tools/subagents/memory/summarization/SOUL/guardrails/loop_detection/read_before_write.
-  Restart-required: database/checkpointer/run_events/stream_bridge/sandbox.use/log_level/channels.
+  - Python >=3.12.
+  - Harness: langchain>=1.2.15, langgraph>=1.1.9, pydantic>=2.12.5,
+    sqlalchemy[asyncio]>=2.0,<3.0.
+  - Gateway: fastapi>=0.115.0.
+  - Frontend (not modified by this roadmap): pnpm@10.26.2, TypeScript ^5.8.2,
+    Next ^16.2.6, React ^19.0.0, @langchain/langgraph-sdk ^1.5.3.
 
-  ### Deep Research specific design rules
-  - **Phase flow is Agent-driven, NOT LangGraph-edge-driven.** The lead Agent reads
-    the current phase skill, executes, calls the gate tool, and only loads the next
-    phase skill when the gate returns `next`. Do NOT encode phase transitions as
-    LangGraph conditional edges — that would turn agentic workflow into scripted
-    workflow, defeating the purpose of having an LLM in the loop.
-  - **Gate tools return natural-language feedback.** Every gate tool returns
-    `{passed, say, next?, inspect?, advice?}` — the `say`/`inspect`/`advice` text
-    goes back into the LLM's context for repair decisions. Gate tools are MD-facing
-    feedback, not graph routers.
-  - **Research state lives in the sandbox.** Each research run = one DeerFlow thread.
-    Bundle files (`_bundle/rb_queue.json`, `rb_status.json`, `rb_trace.jsonl`) live
-    in the sandbox filesystem. Never use DeerFlow's checkpointer for research
-    business state — it's for conversation persistence.
-  - **Delegated evidence work uses DeerFlow subagents.** Unlike DPT's work-unit
-    envelope, DeerFlow subagents are independent LangGraph loops. We still validate
-    their output (file existence, schema, receipt), but the lifecycle is simpler:
-    `task` tool → subagent runs → result returned → Phase Agent validates.
-  - **HITL only at hitl1 and hitl2.** All other phases are `stop: no` — the Agent
-    silently self-drives through gate→repair→retry loops without surfacing to user.
-    Use the phase skill's `stop` field (not code) to control this.
+  The downstream `agent/pyproject.toml` MUST pin only dependencies it directly uses
+  while remaining compatible with these floors. Async code MUST keep blocking file
+  IO off the event loop, using `asyncio.to_thread` or an async API.
 
-  ### The ONE non-additive seam
-  General custom middleware has NO config field — it needs code-level embedding via
-  build_middlewares(custom_middlewares=[...]). Treat any need for custom middleware
-  as an explicit escalation, not a routine additive change.
+  ### Approved Deep Research architecture
 
-  ### Dev conventions
-  - TDD mandatory. Use FakeToolCallingModel / ReplayChatModel (zero-API); gate
-    real-LLM tests with @requires_llm. Bugs ship as a red-before-fix test.
-  - Format before done: backend `make format` (ruff), frontend `pnpm check`.
-    CI rejects unformatted code and out-of-sync uv.lock.
-  - Conventional commits (feat:/fix:). Keep README + AGENTS.md in sync in the same change set.
+  This is a DPT-to-DeerFlow mapping, not a choice among unrelated workflows. Both
+  systems are graph-controlled and agent-executed; the controller substrate differs:
 
-  ### Requirement traceability (project governance — MANDATORY, do not skip)
-  Every capability requirement carries a globally-unique, append-only, never-reused ID
-  `{PREFIX}-{NNN}` (e.g. CUT-001). The ID threads the whole chain so any requirement is
-  traceable registry → spec → task → code:
-    - Single registry: `openspec/governance/req-registry.yaml` (append-only; search
-      before allocating; deprecate with a trailing [DEPRECATED], never delete/reuse).
-    - PREFIX = first 2 letters of first word + first letter of second word (custom-tool
-      → CUT); single-word capability → first 3 letters. `prefixes:` block in the registry
-      is the self-documenting map.
-    - Declare ownership with a `> req: XXX-001, XXX-002` line at the TOP of each main spec
-      (before the first `##` heading). Reference elsewhere via tasks `@impl XXX-001`, code
-      comments `# @impl XXX-001`, and our-package module docstrings.
-    - Requirement titles are STABLE SEMANTIC anchors — never embed the ID in the title
-      (write `### Requirement: Tool is exposed`, not `... (CUT-001)`).
-    - Three ID states: alive (in a main spec `> req:`), pending (in an active change delta),
-      retired ([DEPRECATED] in registry). Anything else is an orphan = silent loss.
+  ```text
+  DPT                                    DeerFlow mapping
+  Phase Agent + Markdown controller  -> Python StateGraph + typed routers
+  bundle control state               -> typed ResearchState + checkpointer
+  phase agentic work                 -> bounded DeerFlow agent loop inside a node
+  gate CLI and check.next            -> deterministic gate node + graph edge
+  large evidence/report files        -> per-thread sandbox workspace
+  validated submit                   -> submission ledger as evidence authority
+  ```
 
-  ### Governance tooling (`openspec/governance/`, Python stdlib only — this repo's stack)
-  Deterministic, read-only checkers (no semantic judgement) that must PASS before any
-  change is archived:
-    - `python3 openspec/governance/check_project_reqs.py`  — registry consistency:
-      0 duplicate / 0 unregistered / 0 orphan / 0 reusedRetired.
-    - `python3 openspec/governance/check_project_specs.py` — main spec structure:
-      0 deltaHeaderInMain / 0 missingPurpose / 0 missingRequirements / 0 missingReqHeader.
-  These are ported in spirit from an upstream JS project but rewritten in Python; they touch
-  only openspec/specs, openspec/changes, and the registry — never DeerFlow source.
+  Python controls enumerable phase transitions, gate outcomes, retry limits, fan-out
+  and fan-in, HITL interrupts, and resume. LLM agents decide open-ended research,
+  synthesis, critique, and repair inside their assigned nodes. Node Markdown contains
+  task contracts and prompts; it does not hold the global program counter.
+
+  The first integration shape is a nested Deep Research `StateGraph` exposed through
+  one reflected custom tool on the existing lead agent. A public entry skill and a
+  per-user dedicated Agent route users to that tool. They are UX surfaces, not
+  authorization boundaries.
+
+  Research state has three distinct authorities:
+
+  - typed/checkpointed `ResearchState` stores small control state, artifact refs,
+    phase/gate/work status, and interrupt/resume state;
+  - the per-thread sandbox stores large source, cache, evidence, and report files;
+  - the deterministic submission ledger decides which validated evidence counts.
+
+  Do not replace checkpointed control state with sandbox JSON files. Do not put large
+  evidence bodies into checkpoints. File existence, agent text, or a run event is not
+  equivalent to a validated submission.
+
+  The worker execution path is a bounded agent built with
+  `create_deerflow_agent()` and invoked by a runtime-owned bridge on behalf of the
+  graph node. RuntimeAdapter stops at TrustedRuntimeEnvelope; a registered research
+  handler must validate its opaque scope before runtime projection derives the research
+  root and pure node contexts. The node sees only a pure capability protocol; the bridge
+  alone seeds ephemeral child state/context with the parent sandbox, thread data, runtime
+  attribution, and AppConfig. Raw binding data is never graph state or model input,
+  and the child has no independent checkpointer. DeerFlow's `task` subagent system is
+  a possible future adapter, not the default work-unit executor and not part of
+  change 00.
+
+  HITL occurs only in explicit graph-owned HITL nodes. A phase agent cannot call
+  `ask_clarification`, advance phase, pass a gate, or mutate the ledger.
+
+  ### Canonical downstream surfaces
+
+  - Source root: `agent/src/deerflow_deep_research/`.
+  - Stable reflected tool: `deerflow_deep_research.tool:deep_research_tool`.
+  - Committed public skill source:
+    `agent/config/public-skill/deep-research-controller/SKILL.md`.
+  - Materialized public skill:
+    `skills/public/deep-research-controller/SKILL.md`.
+  - Committed Agent template: `agent/config/agent-template/{config.yaml,SOUL.md}`.
+  - Runtime Agent:
+    `{DEER_FLOW_HOME}/users/{user_id}/agents/deep-research/{config.yaml,SOUL.md}`.
+  - Offline filesystem provisioning is only for synthetic user `default` when
+    `DEER_FLOW_AUTH_DISABLED=1` is active outside production. Authenticated
+    provisioning uses current-user `POST /api/agents`; an
+    arbitrary operator `--user-id` is not an authentication mechanism.
+  - Sandbox research root:
+    `/mnt/user-data/workspace/deep-research/<research_id>/`.
+
+  The research root is created only by runtime projection after a registered research
+  handler validates the opaque research scope. Change 00's infrastructure probe validates
+  its envelope/sandbox and diagnostic checkpoint namespace only; it does not create a
+  research workspace, graph/node context projection, or agent loop.
+
+  New design MUST NOT write Deep Research source under the repository root,
+  `backend/`, or `frontend/`; MUST NOT write new Agent state under the shared legacy
+  Agent path; and MUST NOT use `skills/custom/deep-research-controller/` as the new
+  public entry surface. Phase prompts load from package resources and are not copied
+  into skills.
+
+  ### Configuration and mount contract
+
+  Committed files under `agent/config/` are templates. Runtime truth is the effective
+  `config.yaml` and `extensions_config.json` selected under the launch environment,
+  canonical repo `skills/public/`, per-user Agent files, and `{DEER_FLOW_HOME}`.
+  Configure and doctor must resolve the same config/extensions targets as Gateway and
+  reject root/backend shadowing or inert fallback writes. Change 00 supports only the
+  canonical repo skills root used by its local/Docker mount contract; an effective
+  `skills.path` or `DEER_FLOW_SKILLS_PATH` elsewhere is runtime-not-ready. Agent-owned
+  operations run from the separately locked agent project environment; they never add
+  their operations-only dependencies to the Gateway environment.
+
+  Change 00 adds or materializes only these DeerFlow-facing entries:
+
+  - `config.yaml -> tool_groups[name=deep-research-control]`;
+  - `config.yaml -> tools[name=deep_research]` with group
+    `deep-research-control` and use path
+    `deerflow_deep_research.tool:deep_research_tool`;
+  - `extensions_config.json -> skills.deep-research-controller.enabled`;
+  - the public skill and per-user dedicated Agent files listed above.
+
+  `configure.py` uses a comment/order/style-preserving YAML round-trip parser and a
+  structured JSON parser that preserves unknown data/key order and converges to
+  byte-stable formatting. It is idempotent, supports check/dry-run/backup/redacted-
+  diff plus a hash-guarded rollback manifest, and fails on same-name ownership
+  conflicts. It does not overwrite changes made after its backup. Check/dry-run may
+  run online; mutation and rollback have a stopped-Gateway operational precondition
+  because Gateway APIs are independent config writers. Configured/known local health
+  plus project-owned process/container checks enforce detected cases but cannot prove
+  a remote shared-filesystem writer is absent. Tool/config/skill/Agent changes take
+  effect on the next agent build.
+  Package import path, `PYTHONPATH`, source mounts, and database/checkpointer/sandbox
+  changes require a Gateway restart.
+
+  Project launch assembly captures a secret-free fingerprint of effective
+  database/checkpointer, sandbox, and worker-count startup inputs in
+  `DEER_FLOW_DEEP_RESEARCH_STARTUP_FINGERPRINT`. Prelaunch doctor validates the freshly
+  computed candidate without claiming to inspect a running process; runtime diagnostics,
+  RuntimeAdapter, and GraphHost compare live request AppConfig to the fingerprint inherited
+  by the process and never silently recompute a missing expected value. Drift fails
+  `restart_required` before sandbox/provider access, preventing request-time config reload
+  from splitting outer and nested runtime singletons. The wire value is strict
+  `v1:<64 lowercase hex>` over a canonical typed snapshot; missing/malformed/unknown
+  versions fail closed, and launchers assign structured output without shell evaluation.
+
+  Gateway source is host-side only. Current upstream local launchers run exact
+  `uv sync` and then set inline `PYTHONPATH=.`. For start/restart, the project launcher
+  loads root `.env`, establishes the same runtime-path defaults and Gateway `backend/`
+  working directory (which controls relative SQLite resolution), and performs
+  config/prerequisite read-only preflight. The AppConfig path and current upstream
+  config-upgrade target must resolve to the same canonical file; root/backend shadowing
+  fails closed. Missing, invalid, older, or newer config versions are refused before
+  shared backend-environment mutation. The launcher then delegates upstream stop before touching the shared backend
+  environment, syncs dependencies, installs `agent/` editable, computes and validates the
+  startup candidate, and delegates upstream start with `UV_NO_SYNC=1` plus
+  `--skip-install`; stop delegates immediately without preflight or installation.
+  A post-stop preparation/doctor failure leaves the stack stopped and is retried through
+  locked exact preparation; it never claims environment rollback or restarts an old process.
+  Docker uses a read-only source mount plus an explicit Gateway command override whose
+  container prelude computes/exports the candidate and passes prelaunch doctor before
+  unchanged uvicorn tokens; only runtime-not-ready blocks startup.
+  `agent/src` is never mounted into the research sandbox; only DeerFlow's existing
+  user-data/skills capabilities are visible there.
+
+  A reflected tool has no project-owned Gateway lifespan hook. Therefore the initial
+  `GraphHost` caches builders/topology, not live SQL resources. SQLite/Postgres actions
+  open the official async checkpointer context, compile/invoke or inspect inside it,
+  and close it deterministically. Effective-provider classification follows the same
+  legacy `checkpointer`-over-`database` precedence as the official factory. A process-
+  local memory saver and SQLite memory-mode connection can support same-process probes
+  only; restart recovery is guaranteed only for file-backed SQLite/valid Postgres.
+
+  Change 00 exposes only `deep_research(action="infra_probe")`. Its repeated invocation
+  proves checkpoint write/read and provider reopen; it is not a fake research resume.
+  GraphHost exposes a generic typed action-handler registry, not named research
+  lifecycle methods. Change 01 adds the public `start | resume | status | cancel`
+  fake-graph handlers in a separate research topology/checkpoint namespace; the
+  infrastructure probe remains a distinct diagnostic topology.
+
+  Doctor keeps `runtime_ready`, tri-state `entry_ready`, and `durability` separate.
+  Known skill/Agent defects make entry not ready; unknown is reserved for an otherwise
+  valid authenticated entry whose Agent cannot be attributed offline. Launchers and the
+  blocking CLI exit status gate only on runtime readiness, so entry warnings cannot make
+  the globally configured control tool unavailable. Change 00 normalizes missing/empty `GATEWAY_WORKERS` to the upstream
+  default integer 1 and supports only that value; malformed, zero, negative, or greater
+  values fail readiness rather than claiming process-local serialization is sufficient.
+
+  ### Security boundaries
+
+  Security is enforced in code by `RuntimeAdapter`, checkpoint namespace derivation,
+  node-agent tool/path policy, deterministic submit, and gate validation. The public
+  skill, dedicated Agent, SOUL, prompts, and tool groups only guide behavior.
+
+  Identity, outer thread/run attribution, host/virtual paths, sandbox handles, and
+  application configuration come from trusted runtime context/state. Runtime-only raw
+  data lives in `TrustedRuntimeEnvelope`, runtime projection, and the concrete runtime
+  node-agent bridge; graph nodes consume a pure domain capability protocol; model-facing
+  `NodeAgentContext` contains only opaque refs, canonical virtual paths, and explicit
+  policy. Tool schemas forbid caller-supplied authority fields. External source content
+  is untrusted data: never place
+  it in system/developer prompts or interpret embedded instructions as tool, control,
+  gate, or ledger authority.
+
+  Custom middleware passed only to the downstream embedded phase-agent factory is an
+  additive use of `create_deerflow_agent()`. Modifying the lead-agent middleware chain,
+  `backend/`, `frontend/`, or the registered lead graph is a separate explicit
+  escalation and is forbidden by the current roadmap.
+
+  ### Development conventions
+
+  - Execute changes strictly in numbered order `00 -> 01 -> ... -> 18`.
+  - TDD is mandatory. Infrastructure and policy behavior uses deterministic fakes;
+    model-facing behavior uses `FakeToolCallingModel` or `ReplayChatModel`; real-LLM
+    coverage is optional and must be marked `@requires_llm`.
+  - Tests live under `agent/tests/` and mirror package ownership. Change 00 creates
+    project-owned `agent/Makefile` format, lint, test, configure, doctor, and launch
+    commands. Do not run or require frontend checks when frontend is untouched.
+  - Add concise `@impl XXX-001` traceability at the owning implementation surface.
+  - Keep `agent/README.md`, `agent/AGENTS.md`, plans, and OpenSpec artifacts aligned
+    with stable architecture decisions.
+
+  ### Requirement traceability
+
+  Every capability requirement has a globally unique, append-only ID
+  `{PREFIX}-{NNN}`:
+
+  - Registry: `openspec/governance/req-registry.yaml`.
+  - Prefix: first two letters of the first word plus first letter of the second;
+    a single-word capability uses its first three letters. Record the mapping in
+    `prefixes:` and search before allocation.
+  - Each active delta spec and each main spec declares owned IDs in one
+    `> req: XXX-001, ...` line before the first `##` heading.
+  - Requirement titles are stable semantic anchors and never contain IDs.
+  - States: alive in a main spec, pending in an active delta, retired with
+    `[DEPRECATED]` in the registry. IDs are never deleted or reused.
+
+  Before archive, both governance checks MUST pass:
+
+  - `python3 openspec/governance/check_project_reqs.py`
+  - `python3 openspec/governance/check_project_specs.py`
 
 rules:
   proposal:
-    - "Name every DeerFlow extension surface the change uses (config.yaml section, extensions_config.json, skills/custom, SOUL.md, subagents, MCP, ACP, or our-package use: path). Every capability must map to a sanctioned additive knob."
-    - "For Deep Research changes, additionally name: which phase skill(s) are affected, which gate tool(s) are involved, which subagent role(s) are used, what bundle files are read/written."
-    - "Non-goals MUST explicitly state that no files under backend/ or frontend/ are modified."
-    - "If the change needs the non-additive seam (custom middleware, or code inside the harness tree), mark it **BREAKING / escalation** and justify it."
-    - "State the hot-reload vs restart impact of every config field touched."
-    - "For each new capability, allocate its 3-letter PREFIX and register it in openspec/governance/req-registry.yaml (search first to avoid collisions); list the requirement IDs the change will introduce."
+    - "Name every DeerFlow extension surface used: exact config.yaml section, extensions_config.json key, public/custom skill path, per-user Agent/SOUL, MCP, ACP, subagent, or downstream use: reflection path. State explicitly when a surface is unused."
+    - "For Deep Research changes, name the graph nodes/components affected, typed state/checkpoint data affected, node-agent roles used, and sandbox artifacts read or written. Do not assume phase skills, DeerFlow task subagents, or DPT bundle control files."
+    - "Non-goals MUST state that no files under backend/ or frontend/ are modified. Any exception is a separate BREAKING escalation."
+    - "State next-agent-build versus Gateway-restart impact for every runtime configuration or mount change. Use reload_boundary.STARTUP_ONLY_FIELDS as the restart authority."
+    - "For each new capability, allocate and register requirement IDs, then list them in the proposal."
+    - "Describe approved future behavior as scope, not as behavior already present in the repository."
   specs:
-    - "Requirements describe OUR AGENT's observable behavior (skills available, tools exposed, subagent delegation, memory, guardrail decisions) — never DeerFlow framework internals."
-    - "Every scenario must be verifiable with FakeToolCallingModel or ReplayChatModel (zero-API). Include at least one failure / guardrail-denied / refusal scenario per capability."
-    - "Each main spec (openspec/specs/<capability>/spec.md) MUST have a `> req: XXX-001, ...` line before the first `##` heading, plus `## Purpose` and `## Requirements` sections. Delta headers (## ADDED/MODIFIED/REMOVED/RENAMED Requirements) are legal ONLY in openspec/changes/<name>/specs/."
-    - "Requirement titles are stable semantic anchors — never embed the requirement ID in the title; IDs live only in the `> req:` header, the registry, tasks `@impl`, and code comments."
+    - "Requirements describe observable or mechanically verifiable behavior of the downstream Deep Research package, runtime integration, configuration, and user entry surfaces; they do not redefine DeerFlow internals."
+    - "Every scenario MUST be zero-API and deterministic. Use FakeToolCallingModel or ReplayChatModel when a model interaction is involved; use focused fakes/fixtures for non-model infrastructure. Include at least one failure, denial, or fail-closed scenario per capability."
+    - "Each active delta spec and each main spec MUST declare its owned IDs in a `> req: XXX-001, ...` line before the first `##` heading. Main specs additionally require `## Purpose` and `## Requirements`; delta operation headers are legal only under openspec/changes/<name>/specs/."
+    - "Requirement titles are stable semantic anchors and never include requirement IDs."
   design:
-    - "Name exact config keys, files, and use: reflection paths; cite config.example.yaml anchors where relevant."
-    - "Any new code lives in our own top-level package (e.g. agent/), may import deerflow.* only, and must respect the ring boundary and the Blocking-IO gate (asyncio.to_thread for file IO)."
-    - "Pin version floors (py>=3.12, langgraph>=1.1.9, …) and mark each changed field hot-reload vs restart (cite reload_boundary STARTUP_ONLY_FIELDS)."
+    - "Separate verified current behavior, approved decisions, and unresolved questions. Cite exact files, config keys, reflection paths, and config.example.yaml anchors for integration claims."
+    - "New code lives under agent/, may import public deerflow.* APIs, and MUST NOT be imported by or modify backend/ or frontend/. Keep blocking IO off the async event loop."
+    - "Pin only directly used dependency floors compatible with the verified stack. Mark each changed field as next-agent-build or restart-required, citing reload_boundary.STARTUP_ONLY_FIELDS."
+    - "Define ownership for typed state, sandbox artifacts, checkpoints, and submission authority; do not create two controllers or two persistent business-state authorities."
   tasks:
-    - "TDD: each behavior task ships a red-before-green test using Fake/Replay models, @requires_llm-gated, Blockbuster-safe."
-    - "Additive file ops only — edit root config.yaml / extensions_config.json, add skills/custom/**/SKILL.md, add SOUL.md, add code under our agent dir. NEVER edit backend/ or frontend/."
-    - "Reference the requirement ID each task implements (e.g. \"implement CUT-001: tool is exposed\"); annotate implementation code with `# @impl CUT-001`."
-    - "Include a format task (backend make format / frontend pnpm check) and a doc-sync task; end with an end-to-end verification via make dev or DeerFlowClient SDK."
+    - "TDD: pair each behavior implementation with a red-before-green deterministic test. Use Fake/Replay only for model behavior and gate any real-LLM test with @requires_llm."
+    - "Implementation is additive under agent/, skills/public/deep-research-controller/, OpenSpec/docs, and structured runtime materialization. NEVER edit backend/ or frontend/."
+    - "Reference requirement IDs in task text and annotate the owning implementation surface with `@impl XXX-001`."
+    - "Include agent-owned format/lint/test, documentation sync, config/doctor checks, and an environment-appropriate end-to-end infra probe. Do not require frontend checks when frontend is unchanged."
     - |
-      Every change's tasks MUST end with two governance checks as hard done-conditions before archive:
-        1. `python3 openspec/governance/check_project_reqs.py` PASS (0 duplicate / 0 unregistered / 0 orphan / 0 reusedRetired)
-        2. `python3 openspec/governance/check_project_specs.py` PASS (0 deltaHeaderInMain / 0 missingPurpose / 0 missingRequirements / 0 missingReqHeader)
-      This fixes the gate into every change lifecycle — preventing requirement-ID drift, duplication, silent
-      loss, or delta-format pollution of the main specs.
+      Every change MUST end with these hard done-conditions before archive:
+        1. `python3 openspec/governance/check_project_reqs.py` PASS with no duplicate, unregistered, orphan, or reused-retired IDs.
+        2. `python3 openspec/governance/check_project_specs.py` PASS with no delta headers in main specs and no missing purpose, requirements, or requirement-ID header.

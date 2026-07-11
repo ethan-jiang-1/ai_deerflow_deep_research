@@ -28,7 +28,11 @@
 # 此映射块是唯一自文档化来源。key 不匹配 [A-Z]{3}-\d{3}，
 # check_project_reqs.py 自动忽略。首个 capability 落地时在此登记缩写。
 # ──────────────────────────────────────────────
-prefixes: {}
+prefixes:
+  DEC: deployment-configuration
+  NOA: node-agent-runtime
+  PRS: project-structure
+  RUI: runtime-integration
 
 # ──────────────────────────────────────────────
 # Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
@@ -37,5 +41,31 @@ prefixes: {}
 #   # custom-tool
 #   CUT-001: custom-tool — <一句话稳定语义描述>
 #
-# 目前尚无已登记需求。
 # ──────────────────────────────────────────────
+
+# deployment-configuration
+DEC-001: deployment-configuration — Deep Research source loads through project-owned local, production, and Docker launch paths
+DEC-002: deployment-configuration — Structured configuration materialization is idempotent and rejects ownership conflicts
+DEC-003: deployment-configuration — The public entry skill is materialized and enabled from committed source
+DEC-004: deployment-configuration — The dedicated Deep Research Agent is provisioned in the effective user's scope without legacy shared paths
+DEC-005: deployment-configuration — Diagnostics separate runtime, entry, worker-count, provider durability, reload, and restart readiness without exposing secrets
+
+# node-agent-runtime
+NOA-001: node-agent-runtime — A runtime-owned bridge gives phase agents the parent sandbox and trusted ephemeral context without leaking authority or adding a checkpointer
+NOA-002: node-agent-runtime — Phase-agent execution is bounded by explicit model-call, tool-call, token, output, result-size, and wall-time policy
+NOA-003: node-agent-runtime — Phase-agent tool and filesystem access fails closed outside the active attempt policy
+NOA-004: node-agent-runtime — External source content remains untrusted data and cannot change control instructions or authority
+NOA-005: node-agent-runtime — Phase-agent results, progress, cancellation, and failures are normalized for the parent graph
+NOA-006: node-agent-runtime — Phase agents cannot initiate user clarification outside graph-owned HITL nodes
+
+# project-structure
+PRS-001: project-structure — Deep Research code and tests use one canonical downstream package structure
+PRS-002: project-structure — Import directions and shared-code ownership boundaries are enforced mechanically
+PRS-003: project-structure — Top-level workflow nodes expose one stable NodeSpec surface with colocated deterministic fakes
+
+# runtime-integration
+RUI-001: runtime-integration — DeerFlow exposes one stable Deep Research control tool with an infrastructure probe action
+RUI-002: runtime-integration — Explicit server identity and parent thread/sandbox resources are validated and authority-reduced from trusted DeerFlow context
+RUI-003: runtime-integration — Deep Research checkpoints use versioned collision-resistant namespaces with supported single-worker mutation serialization
+RUI-004: runtime-integration — GraphHost manages a typed action registry and effective per-action checkpointer lifecycle without a Gateway lifespan hook
+RUI-005: runtime-integration — Probe persistence behavior is explicit and verifiable for memory, SQLite, and Postgres backends

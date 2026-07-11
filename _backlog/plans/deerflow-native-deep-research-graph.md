@@ -86,11 +86,11 @@ LangGraph 已经原生拥有 state、reducer、edge、checkpoint、interrupt、`
 
 | DeerFlow 能力 | 映射用途 | 边界 |
 |---|---|---|
-| `create_deerflow_agent()` | 在 research worker/synthesis/report node 内建立受限 agent loop | node 内无独立业务控制权 |
+| `create_deerflow_agent()` | runtime-owned bridge 代表 research node 建立/调用受限 agent loop | node 只见 capability protocol，无 raw runtime 或独立业务控制权 |
 | sandbox + thread isolation | 存证据缓存、结构化产物、报告 | 不把“文件存在”直接当提交成功 |
 | model/tool config | 不同 node 选择模型、工具白名单 | 由 graph/node policy 决定，不由 worker 自选 |
 | middleware | tool error、guardrail、read-before-write、loop detection、预算 | 不能替代 research gate |
-| custom subagent / `SubagentExecutor` | 可作为 worker 执行后端候选 | 当前 subagent 无 checkpointer，文本返回不是证据权威 |
+| custom subagent / `SubagentExecutor` | 未来可选 adapter，不是当前 worker backend | 当前 subagent 文本返回不是证据权威，也会引入第二层并发/取消 |
 | checkpointer | 保存 graph 的小型控制状态和 interrupt | 不存网页正文、大文件或完整证据库 |
 | run events / tracing | 用户进度与运行诊断 | 不直接替代 claim-level provenance ledger |
 | public skill + per-user custom Agent/SOUL | 引导用户入口 agent 调用 research tool，而不是自行研究 | UX/路由提示，不是权限边界；安全由 RuntimeAdapter/node policy/submit/gate 强制 |
@@ -355,13 +355,15 @@ delivery
 
 ### Context 与 state 分离
 
-以下运行时对象通过 LangGraph context 传入，不进入 checkpoint：
+以下运行时对象只存在于 `TrustedRuntimeEnvelope`/runtime-owned execution bridge，不进入 checkpoint，也不直接暴露给 node 或 model：
 
 - parent sandbox state / thread data；
 - resolved AppConfig、model/tool handles；
 - authenticated user/run attribution；
-- stream writer、cancellation signal；
+- supported stream writer；取消只使用 outer asyncio task cancellation/`CancelledError` 传播，不虚构 runtime cancellation signal；
 - secret/provider credentials。
+
+RuntimeAdapter 只产出 `TrustedRuntimeEnvelope`；registered research handler 先验证 opaque scope，`runtime/projection.py` 才派生 research root 和 pure views。node 只看到 `GraphContextView`/`NodeAgentContext` 和 `NodeExecutionCapabilities` protocol；bridge 在 ephemeral child state/context 中复用 parent sandbox/thread data/identity/AppConfig。00 `infra_probe` 不走 research projection。
 
 ## 权威数据模型
 
@@ -611,7 +613,7 @@ scheduled/non-interactive context 不能卡在 HITL：
 
 | DeerFlow 特点 | 具体用法 |
 |---|---|
-| Node 内 agent loop | planner/worker/critic/synthesis/writer 都由 `create_deerflow_agent()` 建立 bounded loop |
+| Node 内 agent loop | planner/worker/critic/synthesis/writer 通过 runtime bridge 调用 `create_deerflow_agent()` bounded loop |
 | Middleware | 每个 loop 复用 tool error、guardrail、read-before-write、loop detection、token budget |
 | Sandbox | 所有 worker 共享 outer thread sandbox，但按 research/work/attempt 路径授权 |
 | Tool config/reflection | `deep_research` control tool 由 `tools[].use` 加载；worker tool set 从 AppConfig 筛选 |
@@ -629,7 +631,7 @@ scheduled/non-interactive context 不能卡在 HITL：
 Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 ```text
-00 runtime infrastructure：source-mounted package、launcher、public skill/per-user Agent、tool shell、RuntimeAdapter、GraphHost、node-agent policy
+00 runtime infrastructure：local editable/Docker source-mounted package、launcher、public skill/per-user Agent、tool shell、RuntimeAdapter/bridge、GraphHost、node-agent policy
 01 完整 fake graph：全 node、全 edge、HITL、rerun、fake final
 02 typed state/checkpoint：把 fake dict 换成正式控制合同
 03 gate kernel：把直接 fixture outcome 换成通用 fake rules + repair loop
@@ -642,21 +644,19 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 现状实测：标准 Gateway 从 `backend/` 以 `PYTHONPATH=.` 启动，`sys.path` 不包含 repo root。当前“顶层 `agent/` 可直接被 `tools[].use` 反射加载”的项目假设并不成立。
 
-必须在不修改 `backend/`/`frontend/` 的前提下选定并验证一种正式装配方式：
+已选定的正式装配是环境对应、同一源码真相：local dev/prod 先做 root `.env`、runtime-path defaults、AppConfig/config-upgrade canonical target 和 exact current config-version 的只读 preflight，再委托 upstream stop；确认 quiescence 后执行上游等价 exact sync，把 `agent/` editable install 到 backend environment，计算并通过 prelaunch doctor 验证 effective provider/sandbox/worker 的 secret-free startup candidate，最后用 `UV_NO_SYNC=1 --skip-install` 委托上游 start。Docker 用 base-first/override-second 的只读 `agent/src` mount，并在 container-effective Gateway prelude 中计算/export 同一 canonical candidate、通过 prelaunch doctor 后才进入 unchanged uvicorn tokens。两条路径都只由 runtime-not-ready 阻断，entry warning 保持可见但不禁用全局 tool；都解析到同一个 `agent/src`，不修改 `backend/`/`frontend/`，也不把 source mount 进 research sandbox。MCP/ACP 不作为 change 00 fallback。
 
-1. project-owned additive launcher / Docker override，把 `agent/src` 加入 `PYTHONPATH`；或
-2. 将自有包作为正式安装依赖装入 backend venv 的可重复 setup；或
-3. fallback 到 stdio MCP/ACP bridge。
-
-完成标准：local dev、prod 和 Docker 使用同一种声明式安装/加载路径；重启和 `uv sync` 后仍可加载。
+完成标准：local dev、prod、Docker 都能由 project-owned doctor 证明 module origin/version；重启和 local `uv sync` 后按规定装配仍可加载。
 
 ### P0-2 Nested graph checkpoint
 
 - 与 outer graph 使用相同配置的 memory/sqlite/postgres backend，但第一版不假设 reflected tool 有 Gateway lifespan hook。
 - GraphHost 缓存 builder/topology；SQLite/Postgres 每次 tool action 使用官方 `make_checkpointer(app_config)` async context 并确定关闭。
+- effective provider 遵循 legacy `checkpointer` 优先于 `database`，GraphHost 与 doctor 共用一个 classifier。
 - 独立 namespace 不污染 lead-agent checkpoint。
 - process restart 后从 interrupt 恢复仅要求 SQLite/Postgres；memory backend 明确只支持同进程。
 - schema/version mismatch fail closed。
+- change 00 只支持 upstream 默认单 Gateway worker；同 namespace 进程内串行，多 worker 在引入分布式协调前 fail readiness。
 
 ### P0-3 HITL UI bridge
 
@@ -821,7 +821,7 @@ RealNode: 对应 change 落地后的真实实现
 - worker timeout/cancel/late result。
 - 同 batch 并行写不同 work path。
 - 同 work 冲突结果 reducer fail closed。
-- SQLite 单 worker、Postgres 多 worker。
+- SQLite 单 worker；Postgres 多 worker 只在后续 change 明确加入 distributed action coordination 后验收，00 对多 worker fail readiness。
 
 ### 质量 eval corpus
 
@@ -861,7 +861,7 @@ RealNode: 对应 change 落地后的真实实现
   → 复用官方 provider/config，隔离 namespace；第一版每次 tool action 打开并关闭官方 async checkpointer context，不假设 reflected tool 拥有 Gateway lifespan hook；Phase 0 做 SQLite/Postgres restart 验证，memory 只算同进程。
 
 - **[风险] `Send` worker 内再次使用 DeerFlow background subagent 会形成双重并发与取消困难。**  
-  → 第一优先采用 worker node 内直接 `create_deerflow_agent()`；只有 task UI/step event 确有必要时才适配 `SubagentExecutor`，且并发只由一层拥有。
+  → 当前固定由 runtime bridge 直接调用 `create_deerflow_agent()`；只有 task UI/step event 确有必要时才另立 change 适配 `SubagentExecutor`，且并发只由一层拥有。
 
 - **[风险] graph state 变成第二个大数据库。**  
   → state 只存 ref/hash/status/短摘要；大内容一律 sandbox；加 checkpoint size test。
@@ -888,13 +888,13 @@ RealNode: 对应 change 落地后的真实实现
 
 ## 需要在 Phase 0 后确认的决策
 
-1. source-mounted 顶层包在 local/prod/Docker 的 launcher/override 细节是否足够稳定；若不稳定才回退到可重复安装或 MCP/ACP bridge。
-2. 是否能找到真实 Gateway lifespan hook 来复用进程级 provider；00 第一版默认 per-action official context。
-3. worker backend 最终选直接 `create_deerflow_agent()` 还是 `SubagentExecutor` adapter。
-4. nested progress events 能否进入现有 RunJournal；不能时第一版 UI 显示到什么粒度。
-5. submission ledger 使用 JSONL + hash chain，还是独立 SQLite/Postgres 表；04 在多 worker 前必须定。
-6. HITL2 的 `repair` 与 `rerun` 精确语义，以及 generation 失效范围。
-7. semantic critic 的模型隔离和成本预算。
+change 00 已定死 local editable/Docker source override 和 runtime bridge 直接调用 `create_deerflow_agent()`；`SubagentExecutor` 只保留为未来 adapter，不再是当前实现分叉。Phase 0 后仍需确认：
+
+1. 是否出现可依赖的 public Gateway lifespan hook 来优化进程级 provider；00 合同保持 per-action official context。
+2. nested progress events 能否进入现有 RunJournal；不能时第一版 UI 显示到什么粒度。
+3. submission ledger 使用 JSONL + hash chain，还是独立 SQLite/Postgres 表；04 在多 worker 前必须定。
+4. HITL2 的 `repair` 与 `rerun` 精确语义，以及 generation 失效范围。
+5. semantic critic 的模型隔离和成本预算。
 
 ## 成功标准
 

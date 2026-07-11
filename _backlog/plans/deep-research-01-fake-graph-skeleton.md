@@ -11,13 +11,13 @@
 
 ## Scope
 
-- 在 00 的 GraphHost 上建立 Deep Research graph factory，不重新实现 package/launcher/provider lifecycle；GraphHost 只消费 00 的 per-action `make_checkpointer()` contract。
+- 在 00 的 GraphHost generic action registry 上增加独立 Deep Research graph factory/handlers，不重新实现 package/launcher/effective-provider lifecycle，也不替换 00 的 infra-probe topology/namespace。
 - 建立全量 fake nodes：bootstrap、HITL1、topic planning、Wave0、Wave1、Wave2 synthesis、targeted evidence、HITL2、rerun、readiness、final。
 - 建立全部 pass/repair/rerun/stop edges；fake gate 由 fixture 控制 outcome。
 - fake Wave0/Wave1 至少包含一次三路 `Send`/fan-in fixture，用于证明并行拓扑和 mixed-node contract；正式 WorkSpec/submit 留到 04。
 - HITL1/HITL2 使用真实 LangGraph interrupt/checkpoint，但问题和答案使用 fixture；nested interrupt 必须桥接到外层 DeerFlow 的 human-input artifact/ToolMessage。
 - resume 时从 runtime 最新真实 `HumanMessage` 读取原文，不接受 tool payload 中伪造的用户答案。
-- 为 00 的 control tool shell 接入 `start | resume | status | cancel` fake-graph 协议；identity 继续只由 RuntimeAdapter 提供。
+- 为 00 的 control tool shell 注册 `start | resume | status | cancel` fake-graph handlers；identity 继续只由 RuntimeAdapter 提供，00 的 `infra_probe` 仍是独立诊断 action。
 - 产出 graph topology snapshot/diagram，CI 检查不可意外新增 unreachable node 或 edge。
 - 建立 node implementation map，使同一拓扑可选择 fake 或 real node。
 

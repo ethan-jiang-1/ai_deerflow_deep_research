@@ -84,3 +84,9 @@ REG-002: research-graph-lifecycle — Deterministic fake nodes exercise routing,
 REG-003: research-graph-lifecycle — Graph-owned HITL requests bridge to the existing human-input message contract and resume only from the matching latest HumanMessage response
 REG-004: research-graph-lifecycle — Start, resume, status, and cancel enforce typed lifecycle transitions, idempotency, and fail-closed scope checks
 REG-005: research-graph-lifecycle — Fake graph checkpoints, restart recovery, topology snapshots, and end-to-end paths remain isolated and deterministic
+REG-006: research-graph-lifecycle — One typed versioned ResearchState is the canonical checkpointed control authority replacing the temporary skeleton state
+REG-007: research-graph-lifecycle — State reducers enforce terminal monotonicity, duplicate-hash idempotency, different-hash conflict, ref dedupe, and sole-writer ownership
+REG-008: research-graph-lifecycle — Large research content stays out of the checkpoint as path, hash, schema-version, and short-summary refs under a hard size bound
+REG-009: research-graph-lifecycle — Checkpointed control state, the validated submission ledger, and sandbox artifact files remain three distinct authorities
+REG-010: research-graph-lifecycle — A minimal research bundle layout and path-containment contract scope every sandbox write to its research and attempt root
+REG-011: research-graph-lifecycle — A versioned ResearchState schema fails closed on incompatible versions and never silently resets or auto-migrates

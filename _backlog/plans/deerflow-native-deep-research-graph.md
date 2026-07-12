@@ -919,13 +919,11 @@ change 00 已定死 local editable/Docker source override 和 runtime bridge 直
 
 ## 落地关联
 
-下一步不是直接写完整 Deep Research，而是为 [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) 创建第一个 OpenSpec change。00 通过后再做 01 fake graph，随后严格按 02-18 的依赖关系逐项创建 change；不提前合并真实 nodes，也不把多个子 plan 塞进同一个 change。
+00 runtime substrate 已完成并归档；launcher、Docker live smoke 与 Postgres profile
+已明确转入 deployment follow-up，不阻塞 graph 路线。当前已创建
+[`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md)
+对应的 `build-deep-research-fake-graph-skeleton` OpenSpec change；下一步是 apply
+该 change，完成并归档后再严格按 02-18 的依赖关系逐项推进。不提前合并真实
+nodes，也不把延期的 deployment 工作塞入 01。
 
-在创建第一个 change 前，还应同步修订 `openspec/config.yaml` 中以下旧结论：
-
-- “Phase flow is Agent-driven, NOT LangGraph-edge-driven”；
-- “Never use DeerFlow's checkpointer for research business state”；
-- “Use phase skill stop field, not code”；
-- 11 phase skills 是默认主体实现。
-
-修订后的原则应是：**graph 控制确定性流程与小型控制 state，agent loop 控制开放式研究判断，sandbox/ledger 控制大内容与证据权威。**
+当前稳定原则是：**graph 控制确定性流程与小型控制 state，agent loop 控制开放式研究判断，sandbox/ledger 控制大内容与证据权威。**

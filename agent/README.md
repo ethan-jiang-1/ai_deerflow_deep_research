@@ -5,9 +5,10 @@ for DeerFlow 2.1. Its controller is a nested Python `StateGraph`; bounded agent
 loops execute inside graph nodes. DeerFlow remains the host runtime and does not
 import this package.
 
-Change 00 is currently establishing the package, runtime integration, and
-deterministic infrastructure probe. The public research lifecycle and business
-nodes are intentionally not available until their later numbered changes.
+Change 00's runtime substrate is complete and archived: the package, runtime
+integration, and deterministic infrastructure probe are available. The public
+research lifecycle and business nodes remain intentionally unavailable until
+their later numbered changes.
 
 ## Requirements
 

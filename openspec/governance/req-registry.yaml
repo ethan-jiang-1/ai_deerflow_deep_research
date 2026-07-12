@@ -32,6 +32,7 @@ prefixes:
   DEC: deployment-configuration
   NOA: node-agent-runtime
   PRS: project-structure
+  REG: research-graph-lifecycle
   RUI: runtime-integration
 
 # ──────────────────────────────────────────────
@@ -70,3 +71,11 @@ RUI-002: runtime-integration — Explicit server identity and parent thread/sand
 RUI-003: runtime-integration — Deep Research checkpoints use versioned collision-resistant namespaces with supported single-worker mutation serialization
 RUI-004: runtime-integration — GraphHost manages a typed action registry and effective per-action checkpointer lifecycle without a Gateway lifespan hook
 RUI-005: runtime-integration — Probe persistence behavior is explicit and verifiable for memory, SQLite, and Postgres backends
+RUI-006: runtime-integration — The reflected Deep Research tool dispatches authority-reduced research lifecycle actions while preserving the independent infrastructure probe
+
+# research-graph-lifecycle
+REG-001: research-graph-lifecycle — One explicit topology and implementation map assemble every stable Deep Research phase from registered NodeSpec packages
+REG-002: research-graph-lifecycle — Deterministic fake nodes exercise routing, repair, rerun, and parallel Send fan-in without models, web access, or sandbox research tools
+REG-003: research-graph-lifecycle — Graph-owned HITL requests bridge to the existing human-input message contract and resume only from the matching latest HumanMessage response
+REG-004: research-graph-lifecycle — Start, resume, status, and cancel enforce typed lifecycle transitions, idempotency, and fail-closed scope checks
+REG-005: research-graph-lifecycle — Fake graph checkpoints, restart recovery, topology snapshots, and end-to-end paths remain isolated and deterministic

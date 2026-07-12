@@ -1,8 +1,9 @@
 # Plan: Deep Research 01 - Fake Graph Skeleton
 
-> 类型: 设计 | 更新: 2026-07-11
+> 类型: 设计 | 更新: 2026-07-12
+> 状态: OpenSpec proposal ready；等待 apply
 > 对应 OpenSpec change: `build-deep-research-fake-graph-skeleton`
-> 依赖: 00 Runtime Infrastructure
+> 依赖: 已归档的 00 Runtime Infrastructure runtime substrate
 > 在主图中的作用: 先建立完整拓扑，所有业务 node 使用 deterministic fake
 
 ## 目标
@@ -29,7 +30,7 @@
 - gate repair：Wave0 fake fail → repair → pass；
 - rerun：HITL2 rerun → topic planning/Wave0 回边 → 第二代完成；
 - stop：HITL2 stop → typed terminal；
-- process restart：HITL interrupt 后重启再 resume；仅要求 SQLite/Postgres checkpointer 通过，memory backend 明确标记为同进程能力。
+- process restart：HITL interrupt 后重启再 resume；01 必须以 file-SQLite 通过，memory backend 明确标记为同进程能力；Postgres profile 与 live deployment smoke 继续留在 deployment follow-up，不是 01 gate。
 
 ## 验收
 
@@ -40,6 +41,7 @@
 - nested HITL suspension 先 checkpoint 再向外层返回 human-input artifact；fault-injection 覆盖“返回前崩溃”和“resume 前重启”。
 - raw HumanMessage resume、错 thread resume、旧 answer replay 都有 contract test。
 - topology snapshot 和四条 E2E 路径全部通过。
+- 运行基线保持 00 已验证的单 Gateway worker；01 不引入跨进程 action coordination，也不重开 launcher、Docker live smoke 或 Postgres profile 的延期范围。
 
 ## Non-Goals
 

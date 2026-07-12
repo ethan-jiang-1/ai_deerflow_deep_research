@@ -1,11 +1,18 @@
 # Plan: Deep Research 00 - Runtime Infrastructure
 
-> 类型: 设计 / 基础设施 | 更新: 2026-07-11
+> 类型: 设计 / 基础设施 | 更新: 2026-07-12
+> 状态: runtime substrate 已完成并归档；launcher/Docker live smoke/Postgres profile 已转入 deployment follow-up
 > 对应 OpenSpec change: `establish-deep-research-runtime-infrastructure`
 > 依赖: 无
 > 在主图中的作用: 提供 01 及以后所有 graph/node 共用的源码落点、加载方式、挂载配置、上下文、权限和资源生命周期底座
 
 ## 目标
+
+> 完成说明：本计划的 runtime substrate 已由归档 change 交付并通过 zero-API、
+> file-SQLite provider reopen 与 subprocess restart 验证。未交付的本地 launcher、
+> Docker live smoke 和 Postgres profile 不再属于 00/01 的完成门槛，分别记录在
+> `_backlog/todos/deferred_deep-research-00-launcher-and-docker.md` 与
+> `_backlog/todos/deferred_deep-research-00-postgres-profile.md`。
 
 00 先回答“Deep Research graph 最终怎样架到 DeerFlow 上、代码放哪里、后续 node 怎么补”。本 change 不搭业务 graph，但必须交付一个能被 DeerFlow 标准运行环境稳定加载的最小纵切面：local editable/Docker source-mounted Python package、reflected control tool、trusted runtime context、官方 checkpointer 使用方式、node-agent runtime 基座、folder-shape/import/config/mount contract tests。
 

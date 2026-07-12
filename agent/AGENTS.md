@@ -79,10 +79,11 @@ Registry: `openspec/governance/project-structure.toml`
 
 ## Current Status
 
-The current checkout contains the independent package and its ownership roots.
-Change 00 adds runtime integration modules incrementally through its ordered
-tasks. Empty business topology is intentionally absent. Treat any tree below
-labelled "later" as a placement rule, not as implemented behavior.
+The current checkout contains the completed, archived change 00 runtime
+substrate: the independent package, ownership roots, runtime integration,
+infrastructure probe, and bounded node-agent base. Empty business topology is
+intentionally absent until change 01. Treat any tree below labelled "later" as
+a placement rule, not as implemented behavior.
 
 ## Ownership
 

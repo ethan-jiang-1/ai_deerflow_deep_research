@@ -25,14 +25,16 @@ filesystem behavior is introduced.
   mixed-mode tests may inject an explicit test implementation without changing the
   topology.
 - Add a request-independent graph recipe plus an implementation map. Runtime-scoped
-  `GraphContextView`, per-node reduced dependencies, and capabilities are passed through
-  non-checkpointed LangGraph invocation context; no `TrustedRuntimeEnvelope`, sandbox
-  handle, host path, AppConfig, or checkpointer identity enters graph state.
+  `GraphContextView` and a runtime-owned reduced dependency resolver are passed through
+  non-checkpointed LangGraph invocation context. The resolver creates the correct
+  per-node/per-attempt `NodeBuildDependencies` when a node actually runs; no
+  `TrustedRuntimeEnvelope`, sandbox handle, host path, AppConfig, or checkpointer
+  identity enters graph state.
 - Add a minimal, versioned skeleton state containing only lifecycle status, stable
-  phase/generation counters, deterministic fixture controls, fan-out results, pending
-  HITL correlation, consumed response ids, and a bounded execution trace. Full
-  `ResearchState`, evidence, work-unit, submission-ledger, and delivery schemas remain
-  owned by changes 02 and later.
+  start-message correlation/digest, phase/generation counters, validated deterministic
+  fixture controls, fan-out results, pending HITL correlation, consumed response ids,
+  and a bounded execution trace. Full `ResearchState`, evidence, work-unit,
+  submission-ledger, and delivery schemas remain owned by changes 02 and later.
 - Add deterministic Wave0/Wave1 `Send` fan-out and reducer-based fan-in fixtures, plus
   repair and rerun loops with explicit bounded counters.
 - Add graph-owned HITL1/HITL2 interrupts. A suspended action returns an outer
@@ -45,13 +47,24 @@ filesystem behavior is introduced.
   supplied control-tool field.
 - Extend the reflected tool and generic host registration with typed `start`, `resume`,
   `status`, and `cancel` handlers while preserving the independent `infra_probe`
-  topology and namespace. `start` creates a server-generated opaque research id;
-  subsequent actions require that id but derive authority from the trusted user and
-  outer thread. `cancel` is a durable terminal transition for a checkpointed research
-  lifecycle; cancellation of an actively executing outer tool task continues to use
-  DeerFlow/asyncio cancellation from change 00 rather than a second run-control system.
+  topology and namespace. `start` accepts no caller-selected id or question: it binds
+  the latest eligible real `HumanMessage`, then derives a collision-resistant opaque
+  research id from trusted user/thread scope plus that stable message id. Retrying the
+  same start after a failure therefore reopens or reprojects the same lifecycle instead
+  of orphaning a randomly named checkpoint. Subsequent actions require the returned id
+  but still derive authority from trusted user/thread context. `cancel` is a durable
+  terminal transition for a checkpointed research lifecycle; cancellation of an
+  actively executing outer tool task continues to use DeerFlow/asyncio cancellation
+  from change 00 rather than a second run-control system.
+- Define one bounded version-1 control-result envelope for suspended, running,
+  completed, stopped, cancelled, unavailable, and denied outcomes. A suspended
+  `ToolMessage` carries the same envelope as text fallback plus the human-input
+  artifact, so the lead agent can reliably retain the opaque research id and request
+  id without parsing UI prose.
 - Add deterministic topology snapshots and zero-API E2E paths for happy completion,
-  Wave0 repair, HITL2 rerun, HITL2 stop, cancellation, invalid/replayed resume, and
+  Wave0/Wave1 repair, targeted-evidence convergence, every HITL2 decision
+  (`proceed | revise_view | repair | rerun | stop`), readiness/final repair,
+  cancellation, invalid/replayed resume, idempotent start-result reprojection, and
   file-SQLite process-restart resume. Memory remains explicitly same-process only.
 - Update the committed public entry skill and dedicated Agent/SOUL guidance to describe
   the newly available lifecycle actions without moving graph logic into prompts.
@@ -84,8 +97,9 @@ The new requirement IDs are `RUI-006` and `REG-001` through `REG-005`.
   topology snapshot, restart-subprocess, reflected-command viability, and requirement
   traceability coverage. No real LLM or network API is used.
 - **Checkpoint data:** one new versioned research namespace and minimal skeleton-state
-  schema. The existing infra-probe topology, checkpoint namespace, and durability
-  behavior are unchanged.
+  schema, including only an opaque start-message reference/digest rather than raw
+  runtime authority. The existing infra-probe topology, checkpoint namespace, and
+  durability behavior are unchanged.
 - **Sandbox data:** runtime projection derives the canonical research root, but fake
   nodes do not call sandbox research tools and write no evidence, cache, ledger, or
   report artifacts. Large business data remains out of checkpoints.

@@ -54,7 +54,8 @@
 - Bridge a nested interrupt to DeerFlow's existing outer human-input card contract and
   resume only from the matching latest `HumanMessage` in trusted runtime state.
 - Prove checkpoint isolation, duplicate/replay defenses, status/cancel semantics,
-  same-process memory behavior, and file-SQLite process-restart recovery.
+  idempotent start/result reprojection, same-process memory behavior, and file-SQLite
+  process-restart recovery.
 - Keep the graph recipe request-independent and keep all request authority outside
   checkpointed state.
 
@@ -79,25 +80,30 @@ control flow is:
 
 ```text
 START -> bootstrap -> hitl1 -> topic_planning -> wave0
-                                              ^       |
-                                              | repair|
-                                              +-------+
-wave0(pass) -> wave1 -> wave2_synthesis
-                            | targeted-needed
-                            v
-                    targeted_evidence --repair--> wave2_synthesis
-                            |
-                            v
-                          hitl2
-             approve ------+------ rerun ------> rerun -> topic_planning
-                |           |
-                v           +------ stop -------> END(stopped)
-            readiness
-            |       |
-       repair       ready
-            |       |
-            v       v
- targeted_evidence  final_delivery -> END(completed)
+                                   ^             |  |
+                                   |      repair-+  +--pass--> wave1
+                                   |                         |  |
+                                   |                  repair-+  +--pass
+                                   |                                |
+                                   |                                v
+                                   |                         wave2_synthesis
+                                   |                          |            |
+                                   |          evidence_needed |            | pass
+                                   |                          v            v
+                                   |                 targeted_evidence -> hitl2
+                                   |                          |             | | | | |
+                                   |                          +-> wave2     | | | | +-> stop -> END
+                                   |                                        | | | +---> rerun -> topic_planning
+                                   |                                        | | +-----> repair -> targeted_evidence
+                                   |                                        | +-------> revise_view -> wave2_synthesis
+                                   |                                        +---------> proceed -> readiness
+                                   |                                                       | | | |
+                                   |                         repair_targeted ---------------+ | | |
+                                   |                         repair_synthesis ----------------+ | |
+                                   |                         repair_hitl2 ----------------------+ |
+                                   |                                                           +-> pass -> final_delivery
+                                   |                                                                         |  |
+                                   |                                                                  repair-+  +-> pass -> END(completed)
 ```
 
 `graph/routing.py` reads typed verdict fields only. It never performs model judgment,
@@ -120,6 +126,13 @@ with a typed `implementation_unavailable` error. Mixed-mode tests provide an exp
 test-owned NodeSpec/factory override; production code does not pretend an unavailable
 real node exists.
 
+The pure NodeSpec layer exposes one canonical `UNAVAILABLE_REAL_FACTORY` sentinel that
+still satisfies the existing one-argument factory contract. Change-01 node packages
+point `real_factory` at that sentinel. The implementation map checks the sentinel
+before graph invocation; node packages do not invent eleven slightly different
+raising placeholders and callers never need to execute a fake dependency binding just
+to discover that real behavior is absent.
+
 Alternative considered: omit `node.py` or real factories until later. Rejected because
 it violates the permanent node-package grammar and would force structural churn on
 every replacement change.
@@ -130,16 +143,21 @@ The cached `StateGraph` recipe uses a public LangGraph `context_schema`. Generic
 wrappers read a domain-owned, frozen invocation context containing only:
 
 - the pure `GraphContextView`;
-- one reduced `NodeBuildDependencies` entry per logical node/attempt;
+- a domain protocol for resolving reduced `NodeBuildDependencies` from a logical node,
+  stable attempt id, and declared `PolicyRef` at the moment that node executes;
 - deterministic fake fixture controls;
-- protocol-typed capabilities (unused by the fakes).
+- no raw DeerFlow runtime object.
 
 The research action handler constructs that context after `RuntimeAdapter` and
 `project_research_scope()` validate the trusted scope, then passes it through the
 public `context=` invocation argument. It is not part of graph state and is therefore
-not checkpointed. At node execution, the wrapper selects the implementation, invokes
-the NodeSpec factory with that node's reduced dependencies, and calls the resulting
-node callable.
+not checkpointed. A runtime-owned resolver closes over the already reduced
+`GraphContextView` and `NodeExecutionCapabilities` protocol only. At node execution,
+the wrapper derives a deterministic attempt id from checkpointed generation/counters,
+asks the resolver for fresh dependencies, selects the implementation, invokes the
+NodeSpec factory, and calls the resulting node callable. This supports multiple repair
+or rerun attempts within one action; a precomputed per-node map would incorrectly reuse
+the first attempt id.
 
 `TrustedRuntimeEnvelope`, AppConfig, parent sandbox objects, host paths, raw identity,
 outer run ids, and internal checkpoint keys never enter the invocation context.
@@ -155,6 +173,8 @@ business state.
 `domain/skeleton_state.py` will define only fields needed to prove control flow:
 
 - `schema_version`, opaque `research_id`, lifecycle `status`, current `phase`;
+- opaque `start_message_id`, a domain-separated request digest, and a bounded exact
+  fake-request text used only to keep the skeleton bootstrap contract testable;
 - `generation`, bounded repair/rerun counters, deterministic route fixture keys;
 - reducer-backed Wave0/Wave1 branch result tuples;
 - pending HITL descriptor (`request_id`, phase, generation, input mode/options, and
@@ -162,8 +182,10 @@ business state.
 - consumed response request/message ids for replay defense;
 - typed terminal reason and a bounded logical execution trace.
 
-No source body, user identity, host path, sandbox handle, AppConfig, checkpointer key,
-evidence payload, or report body is stored. Unknown schema versions fail closed before
+No source document body, user identity, host path, sandbox handle, AppConfig,
+checkpointer key, evidence payload, or report body is stored. The bounded start request
+is user-authored lifecycle input, not runtime authority, and its digest anchors
+idempotent bootstrap/future migration tests. Unknown schema versions fail closed before
 resume or mutation. Change 02 may replace/extend this schema under an explicit
 migration design.
 
@@ -178,7 +200,12 @@ three `Send` branches, a reducer-backed result collection, and one join. The top
 logical topology still sees only `wave0` and `wave1`; dispatch/join workers are internal
 components and never become top-level phases.
 
-The fake branch result contains only a stable branch id and fixture verdict. Result
+The fake branch result contains only a stable branch id and fixture verdict. The
+validated fixture plan is a closed deterministic data contract selected by a
+test/handler factory (the production default is the happy profile), never a public tool
+argument or model-controlled value. The selected plan/route sequence is copied into the
+initial skeleton state so resume and subprocess restart do not depend on retaining the
+original Python fixture object. Result
 ordering is normalized before it re-enters the parent state so scheduling order cannot
 make snapshots flaky. Phase-local subgraphs use no independent persistent business
 state or checkpointer; restart durability in this change is proven at graph-owned HITL
@@ -224,36 +251,79 @@ could forge it. Alternative considered: reuse `ask_clarification`. Rejected beca
 phase agents are forbidden to own HITL and the nested graph needs its own checkpointed
 suspension/correlation semantics.
 
-### 7. Four lifecycle actions share one research namespace
+### 7. Start correlation, lifecycle actions, and control results are one protocol
 
 The strict tool schema remains `extra="forbid"` and uses bounded action-specific
 validation:
 
 - `infra_probe`: optional `probe_id`, no `research_id`;
-- `start`: neither id is caller-supplied; the server generates at least 128 bits of
-  URL-safe entropy for `research_id`;
+- `start`: neither id nor question is caller-supplied; runtime code selects the latest
+  eligible visible user `HumanMessage`, rejects a human-input response/synthetic
+  message, requires its stable message id, and reads its bounded exact text;
 - `resume | status | cancel`: require one bounded opaque `research_id` and reject
   `probe_id`;
 - unknown bounded actions still return redacted `action_unavailable` before adapter or
   sandbox access.
 
+Start computes `research_id` as a URL-safe domain-separated SHA-256 digest over trusted
+effective user, trusted outer thread, and the stable start `HumanMessage.id`. The id is
+opaque and collision-resistant but is not treated as authorization; later namespace
+derivation still includes trusted user/thread scope. This deterministic derivation is
+required for at-least-once delivery: retrying the same start after the nested checkpoint
+was written but before the outer ToolMessage was delivered finds the same lifecycle and
+reprojects its pending result. A different eligible user message produces a different
+research id. An existing checkpoint whose stored start correlation does not match fails
+`scope_conflict`; it is never reset.
+
 All research handlers derive the same versioned namespace from trusted user, outer
-thread, and research id. `start` refuses an existing namespace rather than resetting
-it. `status` uses `aget_state()` only. `resume` requires one pending interrupt.
+thread, and research id. `status` uses `aget_state()` only. `resume` requires one pending interrupt.
 `cancel` resumes a pending HITL with an internal typed cancel decision so normal graph
 routing records a terminal `cancelled` state; completed/stopped/cancelled calls are
 idempotent reads, while missing or unsupported states fail closed.
+
+Every action emits a bounded version-1 `DeepResearchControlResult` with `action`,
+`code`, `research_id` when applicable, lifecycle `status`, `phase`, `generation`,
+provider durability, and an optional pending `request_id`; terminal results may add a
+typed terminal reason. It never includes user/thread identity, internal namespace,
+host paths, raw fixture plans, or checkpoint values. Normal actions serialize it as
+the tool result. A suspended action serializes the same envelope into the outer
+ToolMessage content and adds `artifact.human_input`, giving both non-UI clients and the
+lead model a stable machine-readable reference. Reprojection after a delivery failure
+uses the same research/request ids but the current outer `tool_call_id`.
 
 Same-namespace actions remain serialized by GraphHost's single-worker lock. If an outer
 tool task is actively executing, DeerFlow run cancellation/ordinary asyncio
 `CancelledError` remains the mechanism that aborts it; the control `cancel` action does
 not claim cross-task or cross-worker preemption.
 
-Alternative considered: let cancel rewrite checkpoint values with `aupdate_state()`.
+Alternative considered: generate a random research id. Rejected because a crash after
+checkpoint commit but before result delivery would leave an unreachable orphan and a
+retry would create a second lifecycle. Alternative considered: let the model pass the
+question or research id. Rejected because start input must come from the actual user
+message and identity/scope must remain server-bound. Alternative considered: let cancel rewrite checkpoint values with `aupdate_state()`.
 Rejected because it could bypass the topology and create a state the graph never
 transitioned through.
 
-### 8. One process-local combined GraphHost preserves memory semantics
+### 8. HITL2, readiness, and final repair routes remain explicit
+
+HITL2 uses the same closed decisions planned for its later real node:
+`proceed`, `revise_view`, `repair`, `rerun`, and `stop`. `revise_view` returns to
+`wave2_synthesis`; `repair` enters `targeted_evidence`; `rerun` increments generation
+through the `rerun` node before `topic_planning`; `proceed` enters readiness; and stop
+records a typed terminal.
+
+`targeted_evidence` always returns to `wave2_synthesis`, which alone decides whether
+another targeted round is needed or Wave2 may pass to HITL2. Readiness uses a typed
+repair target (`targeted_evidence | wave2_synthesis | hitl2`) or pass. Final delivery
+uses a bounded self-repair/pass route. Wave0 and Wave1 likewise have independent bounded
+repair loops. These edges are part of the semantic snapshot even though all verdicts
+are fixtures in change 01.
+
+Alternative considered: send targeted evidence directly to HITL2 or collapse all
+repairs into one generic back edge. Rejected because it bypasses synthesis/gate
+reprojection and would make later real-node replacement change the top-level topology.
+
+### 9. One process-local combined GraphHost preserves memory semantics
 
 `runtime/control.py` will build a combined host registering `InfraProbeHandler` plus
 the four research handlers. `tool.py` resolves one lazily created process-local host by
@@ -269,7 +339,7 @@ Alternative considered: construct a host per tool invocation. Rejected because m
 checkpoints would be discarded between actions and `resume/status/cancel` could not
 work in the supported same-process memory mode.
 
-### 9. Snapshot and E2E contracts are deterministic
+### 10. Snapshot and E2E contracts are deterministic
 
 `graph/topology.py` exposes a normalized node/edge representation used both to build
 the graph and to render a committed Mermaid/text snapshot. Contract tests reject
@@ -279,17 +349,20 @@ changes, or internal Wave dispatch components appearing as top-level phases.
 E2E tests run the same public handler/tool surfaces with fixtures for:
 
 1. happy path with two HITL suspensions;
-2. Wave0 repair then pass;
-3. HITL2 rerun to a second generation;
-4. HITL2 stop;
-5. durable cancel;
-6. stale/wrong-thread/replayed response denial;
-7. file-SQLite subprocess restart between interrupt and resume.
+2. Wave0 and Wave1 repair then pass;
+3. targeted-evidence convergence plus HITL2 revise/repair routes;
+4. HITL2 rerun to a second generation and HITL2 stop;
+5. readiness repair targets and final-delivery repair;
+6. durable cancel;
+7. stale/wrong-thread/replayed response denial;
+8. failure after start checkpoint but before result delivery followed by idempotent
+   reprojection;
+9. file-SQLite subprocess restart between interrupt and resume.
 
 Memory tests remain same-process and explicitly assert that restart recovery is not
 claimed. No Postgres or Docker daemon is required.
 
-### 10. Entry/configuration impact stays within existing surfaces
+### 11. Entry/configuration impact stays within existing surfaces
 
 No `config.yaml` or `extensions_config.json` key changes. The reflection path remains
 `deerflow_deep_research.tool:deep_research_tool`; MCP, ACP, `task` subagents, phase
@@ -304,8 +377,13 @@ changes use the existing change-00 source-loading/restart boundary. No new
   Make reflected-command/artifact propagation the first hard viability gate and stop
   before topology work if it fails.
 - **[Risk] Latest HumanMessage selection consumes hidden synthetic context.** → Filter
-  summary/dynamic-context markers, require post-suspension ordering, prefer matching
-  structured response metadata, and record consumed message ids.
+  start and resume through separate selectors; reject response/synthetic messages for
+  start, filter summary/dynamic-context markers for resume, require post-suspension
+  ordering, prefer matching structured response metadata, and record consumed ids.
+- **[Risk] Start result delivery fails after checkpoint commit.** → Derive the research
+  id deterministically from trusted scope plus the stable start HumanMessage id, store
+  the start correlation, and make repeat start reproject the existing pending/terminal
+  result rather than invoke a second lifecycle.
 - **[Risk] Phase-local Send subgraphs do not prove crash recovery mid-wave.** → State
   this boundary explicitly; change 04 owns durable work units. Change 01 proves Send
   semantics and restart only at graph-owned HITL checkpoints.
@@ -324,13 +402,14 @@ changes use the existing change-00 source-loading/restart boundary. No new
 
 ## Migration Plan
 
-1. Add red viability tests for reflected `Command`/human-input artifacts and retained
-   process-local host behavior.
+1. Add red viability tests with a dedicated reflected fixture for
+   `Command`/human-input artifacts, plus retained process-local infra-probe host behavior.
 2. Add the minimal skeleton contracts, implementation map, topology model, and
    structural registry entries; regenerate the controlled `agent/AGENTS.md` block.
 3. Add node packages and deterministic phase-local Wave subgraphs.
-4. Add the research graph recipe, lifecycle handlers, latest-HumanMessage correlation,
-   and combined host/tool schema.
+4. Add the research graph recipe, separate start/resume HumanMessage selectors,
+   deterministic start correlation, lifecycle handlers/result envelope, and combined
+   host/tool schema.
 5. Update public skill/Agent guidance and run unit/contract/graph/integration/E2E,
    file-SQLite subprocess restart, lint/format/lock, architecture, requirement, spec,
    and strict OpenSpec validation.

@@ -19,6 +19,6 @@ plan 完成后从 `_backlog/plans/` 通过 `git mv` 移入本目录：
 
 | ID | Date | File | Summary |
 |----|------|------|---------|
-| — | — | — | — |
+| CLS-001 | 2026-07-13 | [deep-research-tui-hitl-terminal-workbench.md](deep-research-tui-hitl-terminal-workbench.md) | HITL in Terminal Workbench — demo TUI split to `add-deep-research-lifecycle-demo-tui`; formal integration deferred to backlog |
 
-**Next available plan ID: CLS-001**
+**Next available plan ID: CLS-002**

@@ -27,7 +27,7 @@ _done/
 | `_fixed_bugs/` | 0 | BUG-001 |
 | `_suspened_bugs/` | 0 | — |
 | `_done_todos/` | 0 | DONE-001 |
-| `_closed_plans/` | 0 | CLS-001 |
+| `_closed_plans/` | 1 | CLS-002 |
 
 _（尚无已完成项。每次搬迁按 `../README.md` 的 ritual 更新对应计数与 Next ID。）_
 

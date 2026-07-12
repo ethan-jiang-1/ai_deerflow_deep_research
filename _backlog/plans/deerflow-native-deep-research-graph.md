@@ -1,7 +1,7 @@
 # Plan: DeerFlow 原生 Deep Research Graph
 
-> 类型: 设计 / 架构映射 | 更新: 2026-07-11
-> 状态: 已拆分为 00-18 共 19 个 OpenSpec change 计划；按严格串行顺序落地
+> 类型: 设计 / 架构映射 | 更新: 2026-07-13
+> 状态: 00 ✅ · 01 ✅ · 02 ⬜ ← 当前 · 03-18 ⬜
 > 参考: [`../_reference/dpt/`](../_reference/dpt/) 全部 9 份架构分析，以及 DPT 原始 workflow、gate、queue、work-unit、trace 实现
 
 ## 结论先行
@@ -708,27 +708,27 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 ### Change 清单
 
-| # | 子 plan / 对应 change | 替换或建立的边界 | 直接依赖 |
-|---:|---|---|---|
-| 00 | [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) | source package/folder structure/preparation + source-mount contract/public skill/per-user Agent/tool shell/RuntimeAdapter/GraphHost/node-agent policy；launcher/live smoke 延期 | 无 |
-| 01 | [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) | 可 checkpoint、可 HITL 的完整 fake graph | 00 |
-| 02 | [`deep-research-02-state-persistence-contracts.md`](deep-research-02-state-persistence-contracts.md) | typed state、reducers、bundle refs、checkpoint schema | 01 |
-| 03 | [`deep-research-03-gate-kernel.md`](deep-research-03-gate-kernel.md) | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
-| 04 | [`deep-research-04-work-unit-kernel.md`](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded `Send`、submit ledger、fake worker | 02, 03 |
-| 05 | [`deep-research-05-bootstrap-node.md`](deep-research-05-bootstrap-node.md) | 替换 fake bootstrap | 02, 03 |
-| 06 | [`deep-research-06-hitl1-node.md`](deep-research-06-hitl1-node.md) | 替换 fake HITL1/profile interrupt | 05 |
-| 07 | [`deep-research-07-topic-planning-node.md`](deep-research-07-topic-planning-node.md) | 替换 fake topic planner/seed materialization | 03, 06 |
-| 08 | [`deep-research-08-wave0-node.md`](deep-research-08-wave0-node.md) | 替换 fake Wave0 intake phase | 04, 07 |
-| 09 | [`deep-research-09-evidence-critic-nodes.md`](deep-research-09-evidence-critic-nodes.md) | source diagnostic + claim verifier agent nodes | 03, 04 |
-| 10 | [`deep-research-10-wave1-node.md`](deep-research-10-wave1-node.md) | 替换 fake Wave1 evidence-depth phase | 08, 09 |
-| 11 | [`deep-research-11-wave2-synthesis-node.md`](deep-research-11-wave2-synthesis-node.md) | 替换 fake pure-synthesis node | 10 |
-| 12 | [`deep-research-12-targeted-evidence-loop.md`](deep-research-12-targeted-evidence-loop.md) | 替换 fake gap planner/targeted-search loop + Wave2 gate | 04, 09, 11 |
-| 13 | [`deep-research-13-hitl2-node.md`](deep-research-13-hitl2-node.md) | 替换 fake HITL2 decision node | 03, 12 |
-| 14 | [`deep-research-14-rerun-node.md`](deep-research-14-rerun-node.md) | 替换 fake rerun generation/back edge | 04, 13 |
-| 15 | [`deep-research-15-readiness-node.md`](deep-research-15-readiness-node.md) | 替换 fake readiness gate | 09, 13 |
-| 16 | [`deep-research-16-final-delivery-node.md`](deep-research-16-final-delivery-node.md) | 替换 fake writer/final integrity/publish | 15 |
-| 17 | [`deep-research-17-runtime-operations.md`](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress、operator recovery | 14, 16 |
-| 18 | [`deep-research-18-evaluation-hardening.md`](deep-research-18-evaluation-hardening.md) | 全链路 eval、故障注入、生产 hardening | 17 |
+| # | 状态 | 子 plan / 对应 change | 替换或建立的边界 | 直接依赖 |
+|---:|:---:|---|---|---|
+| 00 | ✅ | [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) | source package/folder structure/preparation + source-mount contract/public skill/per-user Agent/tool shell/RuntimeAdapter/GraphHost/node-agent policy；launcher/live smoke 延期 | 无 |
+| 01 | ✅ | [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) | 可 checkpoint、可 HITL 的完整 fake graph | 00 |
+| 02 | ⬜ | [`deep-research-02-state-persistence-contracts.md`](deep-research-02-state-persistence-contracts.md) | typed state、reducers、bundle refs、checkpoint schema | 01 |
+| 03 | ⬜ | [`deep-research-03-gate-kernel.md`](deep-research-03-gate-kernel.md) | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
+| 04 | ⬜ | [`deep-research-04-work-unit-kernel.md`](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded `Send`、submit ledger、fake worker | 02, 03 |
+| 05 | ⬜ | [`deep-research-05-bootstrap-node.md`](deep-research-05-bootstrap-node.md) | 替换 fake bootstrap | 02, 03 |
+| 06 | ⬜ | [`deep-research-06-hitl1-node.md`](deep-research-06-hitl1-node.md) | 替换 fake HITL1/profile interrupt | 05 |
+| 07 | ⬜ | [`deep-research-07-topic-planning-node.md`](deep-research-07-topic-planning-node.md) | 替换 fake topic planner/seed materialization | 03, 06 |
+| 08 | ⬜ | [`deep-research-08-wave0-node.md`](deep-research-08-wave0-node.md) | 替换 fake Wave0 intake phase | 04, 07 |
+| 09 | ⬜ | [`deep-research-09-evidence-critic-nodes.md`](deep-research-09-evidence-critic-nodes.md) | source diagnostic + claim verifier agent nodes | 03, 04 |
+| 10 | ⬜ | [`deep-research-10-wave1-node.md`](deep-research-10-wave1-node.md) | 替换 fake Wave1 evidence-depth phase | 08, 09 |
+| 11 | ⬜ | [`deep-research-11-wave2-synthesis-node.md`](deep-research-11-wave2-synthesis-node.md) | 替换 fake pure-synthesis node | 10 |
+| 12 | ⬜ | [`deep-research-12-targeted-evidence-loop.md`](deep-research-12-targeted-evidence-loop.md) | 替换 fake gap planner/targeted-search loop + Wave2 gate | 04, 09, 11 |
+| 13 | ⬜ | [`deep-research-13-hitl2-node.md`](deep-research-13-hitl2-node.md) | 替换 fake HITL2 decision node | 03, 12 |
+| 14 | ⬜ | [`deep-research-14-rerun-node.md`](deep-research-14-rerun-node.md) | 替换 fake rerun generation/back edge | 04, 13 |
+| 15 | ⬜ | [`deep-research-15-readiness-node.md`](deep-research-15-readiness-node.md) | 替换 fake readiness gate | 09, 13 |
+| 16 | ⬜ | [`deep-research-16-final-delivery-node.md`](deep-research-16-final-delivery-node.md) | 替换 fake writer/final integrity/publish | 15 |
+| 17 | ⬜ | [`deep-research-17-runtime-operations.md`](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress、operator recovery | 14, 16 |
+| 18 | ⬜ | [`deep-research-18-evaluation-hardening.md`](deep-research-18-evaluation-hardening.md) | 全链路 eval、故障注入、生产 hardening | 17 |
 
 ### 依赖关系
 
@@ -926,12 +926,10 @@ change 00 已定死 local editable/Docker source override 和 runtime bridge 直
 
 ## 落地关联
 
-00 runtime substrate 已完成并归档；launcher、Docker live smoke 与 Postgres profile
-已明确转入 deployment follow-up，不阻塞 graph 路线。当前已创建
-[`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md)
-对应的 `build-deep-research-fake-graph-skeleton` OpenSpec change；下一步是 apply
-该 change，完成并归档后再严格按 02-18 的依赖关系逐项推进。不提前合并真实
-nodes，也不把延期的 deployment 工作塞入 01。
+00 runtime substrate 与 01 fake graph skeleton 已完成并归档；launcher、Docker live
+smoke 与 Postgres profile 已明确转入 deployment follow-up，不阻塞 graph 路线。
+下一步严格按 02→18 的依赖关系逐项推进，不提前合并真实 nodes，也不把延期的
+deployment 工作塞入未完成的 change。
 
 当前稳定原则是：**graph 控制确定性流程与小型控制 state，agent loop 控制开放式研究判断，sandbox/ledger 控制大内容与证据权威。**
 
@@ -989,7 +987,7 @@ nodes，也不把延期的 deployment 工作塞入 01。
 |---|---|---|
 | 08 Wave0 | 高 | **第一个真实 evidence 节点**。web search/fetch 的 adversarial source、URL canonicalization、snippet-vs-cache、worker tool policy。每个 edge case 都可能是新 attack surface |
 | 10 Wave1 | 高 | 比 Wave0 更深：claim extraction、counterevidence、open question state machine。**质量保证的第一个真正关口** |
-| TUI Workbench | 高 | 跨 backend/frontend 边界。embedded client 消息合同、stream artifact 保留、TUI view-state、向后兼容。**组织复杂度**大于纯技术复杂度 |
+| TUI Workbench | 高 → CLS-001 | demo TUI 已分流完成（`b8753be`）；正式集成延期，plan 已关闭归档 |
 
 ### 关键观察
 

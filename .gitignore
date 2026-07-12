@@ -39,6 +39,8 @@ coverage/
 .deer-flow/
 .claude/
 skills/custom/*
+# Deep Research: runtime-materialized public skill (source of truth: agent/config/public-skill/). Never commit into DeerFlow's skill tree.
+skills/public/deep-research-controller/
 logs/
 log/
 debug.log

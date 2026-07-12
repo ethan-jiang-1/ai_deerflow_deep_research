@@ -87,6 +87,25 @@ context: |
   while remaining compatible with these floors. Async code MUST keep blocking file
   IO off the event loop, using `asyncio.to_thread` or an async API.
 
+  ### Deep Research tech-stack decisions
+
+  - **Durable checkpoint store = file-backed SQLite.** Deep Research is a long,
+    intermittent ("silent") task: a run may pause and resume much later, spanning
+    Gateway restarts. The graph control state (phase/gate/HITL suspension point)
+    therefore MUST survive a process restart, so the `memory` checkpointer is not
+    acceptable as the default. SQLite is chosen: it is a single on-disk file, needs
+    no database server and no Docker, and is restart-durable. This is separate from
+    research artifacts/evidence/ledger, which live in the sandbox file system
+    (`/mnt/user-data/workspace/deep-research/<id>/...`), not in any database.
+  - **Postgres and Docker-based provider verification are deferred.** Postgres is a
+    later-change option for multi-worker/production; its Compose test profile and
+    `make test-postgres` are out of scope for change 00. SQLite provider-reopen and
+    real subprocess-restart durability are the change-00 durability gate and MUST
+    pass without any database server or container.
+  - **`memory` remains a valid dev/test provider** (same-process only, explicitly
+    non-durable); `:memory:` SQLite is likewise classified same-process. Durability
+    is claimed only for file-backed SQLite (and, later, Postgres).
+
   ### Approved Deep Research architecture
 
   This is a DPT-to-DeerFlow mapping, not a choice among unrelated workflows. Both

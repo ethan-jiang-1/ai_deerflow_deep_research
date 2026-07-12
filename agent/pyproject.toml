@@ -1,0 +1,59 @@
+[project]
+name = "deerflow-deep-research"
+description = "Graph-controlled deep research runtime for DeerFlow"
+requires-python = ">=3.12"
+dynamic = ["version"]
+dependencies = [
+    "deerflow-harness>=2.1.0,<2.2",
+    "langchain>=1.2.15",
+    "langgraph>=1.1.9",
+    "pydantic>=2.12.5",
+]
+
+[project.optional-dependencies]
+operations = [
+    "python-dotenv>=1.2,<2",
+    "ruamel.yaml>=0.18,<0.19",
+]
+postgres-test = ["deerflow-harness[postgres]>=2.1.0,<2.2"]
+
+[dependency-groups]
+dev = [
+    "blockbuster>=1.5.26,<1.6",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "ruff>=0.14.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/deerflow_deep_research/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deerflow_deep_research"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "requires_llm: tests that require an explicitly configured real model API",
+    "postgres: tests that require the isolated Postgres test service",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.uv]
+index-url = "https://pypi.org/simple"
+
+[tool.uv.sources]
+deerflow-harness = { path = "../backend/packages/harness", editable = true }

@@ -1,0 +1,264 @@
+schema_version = 1
+contract = "project-structure"
+requirement_ids = ["PRS-001", "PRS-002", "PRS-003", "PRS-004"]
+
+[guide]
+path = "agent/AGENTS.md"
+begin_marker = "<!-- BEGIN GENERATED: PROJECT-STRUCTURE -->"
+end_marker = "<!-- END GENERATED: PROJECT-STRUCTURE -->"
+
+[package]
+source_root = "agent/src/deerflow_deep_research"
+test_root = "agent/tests"
+ownership_layers = ["runtime", "domain", "engine", "agents", "graph"]
+forbidden_source_roots = ["backend", "frontend"]
+forbidden_shared_modules = ["utils", "helpers", "common"]
+
+[[required_paths]]
+path = "agent/AGENTS.md"
+kind = "file"
+owner = "PRS-004"
+
+[[required_paths]]
+path = "agent/README.md"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/Makefile"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/pyproject.toml"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/uv.lock"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/__about__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime/checkpoint.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime/startup_snapshot.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/domain"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/context.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/enums.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/node_spec.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/engine"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/engine/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/agents"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/agents/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/registry.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/resources"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/config"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/config/deerflow.fragment.yaml"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/config/extensions.fragment.json"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/config/agent-template"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/config/agent-template/config.yaml"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/config/agent-template/SOUL.md"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/config/public-skill"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/config/public-skill/deep-research-controller"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/config/public-skill/deep-research-controller/SKILL.md"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/scripts"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/scripts/configure.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/scripts/prepare.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/docker"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/tests/unit"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/tests/contract"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/tests/graph"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/tests/integration"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/tests/e2e"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/tests/fixtures"
+kind = "directory"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "openspec/governance/architecture-policy.md"
+kind = "file"
+owner = "PRS-004"
+
+[[required_paths]]
+path = "openspec/governance/project-structure.toml"
+kind = "file"
+owner = "PRS-004"
+
+[[required_paths]]
+path = "openspec/governance/check_project_architecture.py"
+kind = "file"
+owner = "PRS-004"
+
+[imports]
+domain = ["stdlib", "pydantic"]
+engine = ["domain"]
+agents = ["domain", "deerflow", "langchain"]
+graph = ["domain", "nodes", "langgraph"]
+nodes = ["domain", "engine"]
+runtime = ["domain", "graph", "agents", "deerflow", "langchain", "langgraph"]
+
+[node_packages]
+root = "agent/src/deerflow_deep_research/graph/nodes"
+required_files = ["__init__.py", "node.py", "fake.py", "contracts.py"]
+optional_files = ["subgraph.py"]
+public_export = "NODE_SPEC"

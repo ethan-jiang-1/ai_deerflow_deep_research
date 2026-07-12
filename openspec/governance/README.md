@@ -6,7 +6,7 @@
 > 定位：让"我们在 DeerFlow 之上构建的智能体"的每条需求都有永久身份、全程可追溯，
 > 并用小巧的确定性脚本在归档前机器强制纪律——纪律从"自觉"变"门禁"。
 
-## 三根支柱
+## 四根支柱
 
 1. **需求身份系统** —— 每条 capability 需求一个全局唯一、只增不删、永不复用的 ID
    `{PREFIX}-{NNN}`（如 `CUT-001`）。ID 贯穿全链路：
@@ -17,11 +17,17 @@
    - ID 按 capability 分组、组按字母序、组内按数字序。
    - 废弃只在行末标 `[DEPRECATED]`，**永不删除、永不复用**。
 
-3. **两个确定性校验脚本**（只读、零语义判断、归档前必须 PASS）：
+3. **结构权威链** —— [`architecture-policy.md`](architecture-policy.md) 定义 active spec、
+   [`project-structure.toml`](project-structure.toml)、`agent/AGENTS.md` 受控区块和实际仓库的
+   权威分工。精确目录、import 和节点包规则只在 TOML registry 中枚举。
+
+4. **三个确定性校验脚本**（只读、零语义判断、归档前必须 PASS）：
    - [`check_project_reqs.py`](check_project_reqs.py) —— registry 一致性 4 查：
      `duplicate` / `unregistered` / `orphan` / `reusedRetired`。
    - [`check_project_specs.py`](check_project_specs.py) —— main spec 结构 4 查：
      `deltaHeaderInMain` / `missingPurpose` / `missingRequirements` / `missingReqHeader`。
+   - [`check_project_architecture.py`](check_project_architecture.py) —— 结构治理检查：
+     manifest schema/path、spec 生命周期引用、`agent/AGENTS.md` 受控区块和实际目录一致性。
 
 ## 怎么用
 
@@ -29,10 +35,11 @@
 # 在 repo 根运行（默认扫当前目录；也可传 projectRoot 参数）
 python3 openspec/governance/check_project_reqs.py
 python3 openspec/governance/check_project_specs.py
+python3 openspec/governance/check_project_architecture.py
 ```
 
-两者退出码 `0` = PASS，`1` = 有违规（stderr 列出）。`config.yaml` 的 `rules.tasks`
-已把"归档前两脚本必须 PASS"固化为每个 change 的硬性收尾 task。
+三者退出码 `0` = PASS，`1` = 有违规（stderr 列出）。`config.yaml` 的 `rules.tasks`
+把归档前门禁固化为每个 change 的硬性收尾 task。
 
 ## ID / spec 约定速查
 
@@ -40,6 +47,7 @@ python3 openspec/governance/check_project_specs.py
 |------|------|
 | 缩写 | 首词前 2 字母 + 次词首字母（`custom-tool`→`CUT`）；单词型取前 3（`skills`→`SKI`） |
 | 声明归属 | main spec 首个 `##` 之前一行 `> req: XXX-001, XXX-002` |
+| 结构引用 | owning spec 首个 `##` 之前一行 `> structure: openspec/governance/project-structure.toml` |
 | 引用 | tasks `@impl XXX-001`、代码注释 `# @impl XXX-001`、模块 docstring |
 | 需求标题 | 稳定语义锚点，**不得**写进 ID（`### Requirement: Foo` ✅ / `... (CUT-001)` ❌） |
 | delta 头 | `## ADDED/MODIFIED/REMOVED/RENAMED Requirements` 只在 `openspec/changes/` 合法 |

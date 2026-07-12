@@ -1,0 +1,8 @@
+{
+  "skills": {
+    "deep-research-controller": {
+      "enabled": true,
+      "x-deerflow-deep-research-owner": "v1"
+    }
+  }
+}

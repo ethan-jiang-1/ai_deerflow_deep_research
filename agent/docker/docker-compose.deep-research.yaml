@@ -1,0 +1,33 @@
+# Deep Research downstream Compose override for the Gateway service.
+#
+# @impl DEC-001
+#
+# Apply AFTER the upstream base file (base first, override second):
+#
+#   docker compose \
+#     -f docker/docker-compose.yaml \
+#     -f agent/docker/docker-compose.deep-research.yaml \
+#     up -d
+#
+# It does NOT modify the upstream compose files or backend/Dockerfile. It only:
+#   1. read-only mounts <repo>/agent/src at /app/agent/src so the downstream
+#      package is importable without baking it into the image or editing source;
+#   2. replaces ONLY the Gateway command, keeping the upstream uvicorn tokens but
+#      prefixing PYTHONPATH=/app/agent/src:. and exporting the container-effective
+#      canonical startup fingerprint as DEER_FLOW_DEEP_RESEARCH_STARTUP_FINGERPRINT.
+#
+# The `../agent/src` source is resolved relative to the base compose directory
+# (docker/), so base-first ordering resolves it to <repo>/agent/src. Reversing the
+# file order is unsupported and renders a mismatched source origin.
+#
+# The research sandbox is untouched: host source is never mounted into it; it keeps
+# only DeerFlow's existing /mnt/user-data and /mnt/skills mounts.
+#
+# Group 13 finalizes this prelude by adding the in-container prelaunch doctor gate
+# before uvicorn; group 6 establishes only the source mount and fingerprint export.
+
+services:
+  gateway:
+    volumes:
+      - ../agent/src:/app/agent/src:ro
+    command: 'sh -c "cd backend && export PYTHONPATH=/app/agent/src:. && export DEER_FLOW_DEEP_RESEARCH_STARTUP_FINGERPRINT=$$(uv run python -m deerflow_deep_research.runtime.startup_snapshot) && uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers ${GATEWAY_WORKERS:-1}"'

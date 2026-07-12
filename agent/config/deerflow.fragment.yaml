@@ -1,0 +1,9 @@
+tool_groups:
+  - name: deep-research-control
+    x-deerflow-deep-research-owner: v1
+
+tools:
+  - name: deep_research
+    group: deep-research-control
+    use: deerflow_deep_research.tool:deep_research_tool
+    x-deerflow-deep-research-owner: v1

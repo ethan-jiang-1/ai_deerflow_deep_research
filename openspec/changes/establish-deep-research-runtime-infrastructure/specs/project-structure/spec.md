@@ -1,4 +1,5 @@
 > req: PRS-001, PRS-002, PRS-003, PRS-004
+> structure: openspec/governance/project-structure.toml
 
 ## ADDED Requirements
 

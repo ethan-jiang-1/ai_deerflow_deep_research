@@ -1,23 +1,31 @@
 # Plan: Deep Research 05 - Bootstrap Node
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-bootstrap-node`
 > 依赖: 02 State Contracts、03 Gate Kernel
-> 替换范围: fake bootstrap node
+> 替换范围: fake bootstrap node（`agent/src/deerflow_deep_research/graph/nodes/bootstrap/fake.py`）
+
+## 地基已具备（来自 00 + 01）
+
+以下已由 01 的 fake bootstrap node 实现，**本 plan 只做升级，不重做**：
+
+- **identity 派生**: user/thread → domain-separated opaque `research_id`，模型不能覆盖——已实现。
+- **original question 绑定**: 从 runtime 最新真实 `HumanMessage` 读取原文和 stable message id——已实现。
+- **start 幂等与冲突检测**: 同消息重试恢复同一 lifecycle，同 thread 已有 active run 拒绝新 start——已实现。
+- **generation 0 初始化**: 01 fake bootstrap 已写入初始 control state。
+- **directory/bundle 创建**: 01 fake bootstrap 已创建最小 bundle 目录。
+- **HumanMessage 文本为唯一权威**: 不接受 tool payload 中伪造的 question。
 
 ## 目标
 
-确定性建立一次 research run 的身份、目录、原始请求和初始控制状态，对应 DPT instantiation + setup，但不让 Agent 手工创建控制文件。
+将 fake bootstrap 升级为 real bootstrap：原子目录创建、schema/version marker、real gate。**不再重新设计 identity 派生或 start 语义。**
 
-## Scope
+## Scope（缩减后）
 
-- 从 outer runtime 派生 user/thread/research id，拒绝模型提供越权 identity。
-- 保存 original question 的原文和 hash，建立 generation 0。
-- 原子创建最小 bundle 目录与 schema/version marker。
-- 初始化 phase、repair budgets、空 work/quality/delivery state。
-- 检测同 thread 已有 active/completed research，定义 start 幂等和冲突行为。
-- bootstrap gate 验证目录、state、checkpoint/bundle binding。
+- **原子创建**最小 bundle 目录与 schema/version marker（01 fake 是非原子的简单 mkdir）。
+- **bootstrap gate** 验证目录、state、checkpoint/bundle binding——替换 fake 的 fixture pass。
 - 失败只做确定性清理/重试，不调用研究 LLM。
+- 检测同 thread 已有 active/completed research 的 edge cases（partial directory recovery）。
 
 ## 验收
 

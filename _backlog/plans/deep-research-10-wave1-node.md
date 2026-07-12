@@ -1,9 +1,14 @@
 # Plan: Deep Research 10 - Wave1 Node
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-wave1-node`
 > 依赖: 08 Wave0 Node、09 Evidence Critic Nodes
-> 替换范围: fake Wave1 plan/worker/critic/gate/repair subgraph
+> 替换范围: fake Wave1 plan/worker/critic/gate/repair subgraph（`agent/src/deerflow_deep_research/graph/nodes/wave1/fake.py`）
+
+## 地基已具备（来自 01）
+
+- **subgraph 结构**: 01 已定义 Wave1 plan → workers → submit → gate → repair（`wave1/subgraph.py`），与 Wave0 共用 `Send` 并行机制。
+- **worker → submit → critic pipeline**: 01 的 Wave1 fake subgraph 已走通 fan-out → fan-in → submit → gate 全路径。
 
 ## 目标
 

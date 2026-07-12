@@ -3,12 +3,12 @@
 > 类型: 设计 / 延期兼容性工作
 > 状态: Backlog；暂不实施
 > 建议 OpenSpec change: `support-deep-research-hitl-in-terminal-workbench`
-> 依赖: `build-deep-research-fake-graph-skeleton`（Change 01）
+> 依赖: `build-deep-research-fake-graph-skeleton`（Change 01，**已归档**）
 > 与 Change 02 的关系: 不依赖、不阻塞；可按产品演示优先级单独排期
 
 ## 背景
 
-Change 01 已经提供可运行的 `implementation_mode=full_fake` Deep Research lifecycle：
+Change 01 **已归档**，提供可运行的 `implementation_mode=full_fake` Deep Research lifecycle：
 
 - `start | resume | status | cancel`；
 - 两次真实 LangGraph interrupt；
@@ -195,7 +195,7 @@ TUI user request
 
 ### 为什么不继续塞进 Change 01
 
-- Change 01 已经 60/60 APPLY READY。
+- Change 01 **已归档**。
 - Change 01 明确禁止修改 `backend/` / `frontend/`。
 - 正式实现跨越 embedded client、stream serialization、TUI state、Textual UI 和 agent integration，属于独立兼容边界。
 - 单独 change 能清楚验证普通 TUI 行为没有回归，也不会让 graph skeleton 的验收范围失焦。
@@ -206,4 +206,4 @@ TUI user request
 
 ### 排期建议
 
-该 change 技术上只依赖 Change 01，不依赖 Change 02。若近期需要产品演示，可在归档 Change 01 后优先实施；若当前优先冻结 ResearchState，则继续 Change 02，把本计划保持在 backlog，之后独立 propose/apply。
+该 change 技术上只依赖已归档的 Change 01，不依赖 Change 02。若近期需要产品演示，可独立排期；若当前优先冻结 ResearchState（Change 02），则保持在 backlog。

@@ -1,9 +1,15 @@
 # Plan: Deep Research 16 - Final Delivery Node
 
-> 类型: 设计 | 更新: 2026-07-11
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-final-delivery-node`
 > 依赖: 15 Readiness Node
-> 替换范围: fake final writer、integrity gate、artifact publish
+> 替换范围: fake final writer、integrity gate、artifact publish（`agent/src/deerflow_deep_research/graph/nodes/final_delivery/fake.py`）
+
+## 地基已具备（来自 01）
+
+- **node 位置**: 01 的 final delivery node 已是 graph 的 terminal sink，readiness → final → END 路径通。
+- **terminal marker**: 01 的 fake final 返回 `implementation_mode=full_fake` terminal fixture，已走通 completed 后的幂等行为。
+- **lifecycle 合同**: 01 的 control-result envelope 已标准化 action 返回格式。
 
 ## 目标
 

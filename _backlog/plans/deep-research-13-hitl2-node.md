@@ -1,23 +1,32 @@
 # Plan: Deep Research 13 - HITL2 Node
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-hitl2-node`
 > 依赖: 03 Gate Kernel、12 Targeted Evidence Loop
-> 替换范围: fake HITL2 decision node
+> 替换范围: fake HITL2 decision node（`agent/src/deerflow_deep_research/graph/nodes/hitl2/fake.py`）
+
+## 地基已具备（来自 01）
+
+以下已由 01 的 fake HITL2 node 实现，**本 plan 只做升级，不重做**：
+
+- **真实 LangGraph interrupt**: HITL2 的 `interrupt()`、checkpoint、graph 暂停——已实现。
+- **resume + decision 路由**: proceed/repair/rerun/stop edges 已通——`routing.py` 已验证。
+- **control tool 映射**: interrupt → `ToolMessage.artifact.human_input` → outer `END`——与 HITL1 共用同一机制。
+- **research id/generation 绑定**: resume 已校验，拒绝过期 generation。
+- **非交互占位**: 缺 policy 则 blocked——已定义。
 
 ## 目标
 
-把通过 Wave2 gate 的 findings、限制和补证方向形成 decision brief，并以 typed interrupt 记录用户的 proceed/revise/repair/rerun/stop 决策。
+把 fake HITL2 的 fixture decision 替换为从 accepted findings 生成的 decision brief 和真实用户决策解析。
 
-## Scope
+## Scope（缩减后）
 
-- deterministic brief builder 从 accepted finding/quality state 生成展示数据。
+- **deterministic brief builder** 从 accepted finding/quality state 生成展示数据。
 - decision brief 明确：已确认结论、关键不确定性、未解决 gaps、成本/补证选项。
 - interrupt 前先 checkpoint `pending_user` 和 brief hash，保证断线可恢复。
-- closed decisions：proceed、revise_view、repair、rerun、stop_blocked。
+- **closed decisions 解析**：proceed、revise_view、repair、rerun、stop_blocked。
 - resume 绑定 research id/generation/brief hash/request id，拒绝旧 generation 回答。
-- revise_view 只回 synthesis projection；repair 回 targeted loop；rerun 交给 14；proceed 到 readiness。
-- 用户 proceed 不能绕过后续 hard gate。
+- state 先记录 pending 再展示 interrupt（fault-injection test 保留）。
 
 ## 验收
 

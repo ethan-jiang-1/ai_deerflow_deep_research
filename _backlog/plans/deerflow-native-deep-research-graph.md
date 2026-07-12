@@ -934,3 +934,63 @@ change 00 已定死 local editable/Docker source override 和 runtime bridge 直
 nodes，也不把延期的 deployment 工作塞入 01。
 
 当前稳定原则是：**graph 控制确定性流程与小型控制 state，agent loop 控制开放式研究判断，sandbox/ledger 控制大内容与证据权威。**
+
+---
+
+## 实现难度参考（00 和 01 归档后更新于 2026-07-12）
+
+以 00（Runtime Infrastructure）为基准——00 看似简单实则全是暗坑（identity 边界、provider lifecycle、per-action open/close、package mount 双模式、permission 模型）。01 站在 00 上搭完整拓扑 + 真实 interrupt，复杂度约 80% 的 00。
+
+### 难度分级
+
+```
+00 ██████████  (基准——基础设施暗坑)
+01 ████████    (完整拓扑 + interrupt，站在 00 上)
+```
+
+#### 🟢 低 —— 地基已铺好，主要是机械替换
+
+| Plan | 难度 | 说明 |
+|---|---|---|
+| 05 Bootstrap | 低 | 90% 逻辑在 01 fake 已实现。只剩原子 mkdir + real gate |
+| 16 Final Delivery | 低 | writer agent + integrity gate 是单向管道，hash 验证机械操作 |
+
+#### 🟡 中低 —— 有清晰模式，需要仔细的 schema 设计
+
+| Plan | 难度 | 说明 |
+|---|---|---|
+| 02 State Contracts | 中低 | Reducer + schema version 需细心，pattern 成熟，无新暗坑 |
+| 13 HITL2 | 中低 | interrupt 已通。核心是 brief builder + 5 种 decision 解析 |
+| 17 Runtime Ops | 中低 | 横切加固——cancel/checkpoint 已有，补 non-interactive、progress、diagnostics |
+
+#### 🟠 中 —— 核心新能力，非地基级别
+
+| Plan | 难度 | 说明 |
+|---|---|---|
+| 03 Gate Kernel | 中 | collect-all + inspect/advice + fatigue 通用框架。路由已有，需设计可复用 abstraction |
+| 06 HITL1 | 中 | LLM structured brief + 回答校验 + follow-up interrupt。机制已通，核心在 prompt/schema |
+| 09 Evidence Critics | 中 | 两个新 agent node。难度在 verdict schema 和 author/critic 隔离 |
+| 11 Wave2 Synthesis | 中 | synthesis agent 不许搜。finding index + cross-topic relations 的 structured output |
+| 14 Rerun | 中 | generation increment + invalidation。注意"旧决策不继承到新 generation" |
+| 15 Readiness | 中 | answerability assessment + citation closure。复用 03 gate，核心在评估逻辑 |
+
+#### 🔴 中高 —— 有实质性设计挑战
+
+| Plan | 难度 | 说明 |
+|---|---|---|
+| 04 Work Unit Kernel | 中高 | **事务心脏**。ledger + checkpoint + crash replay + per-research concurrency。fan-out 已通，但 crash-safe "最多一个 accepted winner" 是 00 级别的基础设施决策 |
+| 07 Topic Planning | 中高 | LLM structured output → deterministic materializer。第一个真正用 LLM 做决策的 node |
+| 12 Targeted Evidence | 中高 | gap → worker → critic → synthesis 收敛循环。round/attempt/token 三重 budget。`pure_synthesis_eligible` 必须代码导出 |
+| 18 Evaluation | 中高 | 5 类 eval corpus + adversarial sources + fault matrix。难度在覆盖面，非单点 |
+
+#### 🔴 高 —— 接近 00 的复杂度
+
+| Plan | 难度 | 说明 |
+|---|---|---|
+| 08 Wave0 | 高 | **第一个真实 evidence 节点**。web search/fetch 的 adversarial source、URL canonicalization、snippet-vs-cache、worker tool policy。每个 edge case 都可能是新 attack surface |
+| 10 Wave1 | 高 | 比 Wave0 更深：claim extraction、counterevidence、open question state machine。**质量保证的第一个真正关口** |
+| TUI Workbench | 高 | 跨 backend/frontend 边界。embedded client 消息合同、stream artifact 保留、TUI view-state、向后兼容。**组织复杂度**大于纯技术复杂度 |
+
+### 关键观察
+
+00 和 01 已经把"不知道怎么做"的地基问题解决了。剩下的 plan 没有一个需要重新经历 00 那种"从零摸索 provider lifecycle / identity 边界 / permission 模型"的痛苦。08 和 10 的"高"是**业务复杂度**（真实搜索、证据质量），不是基础设施暗坑。

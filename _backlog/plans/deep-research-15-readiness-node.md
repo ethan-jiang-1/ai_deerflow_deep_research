@@ -1,9 +1,14 @@
 # Plan: Deep Research 15 - Readiness Node
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-readiness-node`
 > 依赖: 09 Evidence Critics、13 HITL2 Node
-> 替换范围: fake readiness gate/repair router
+> 替换范围: fake readiness gate/repair router（`agent/src/deerflow_deep_research/graph/nodes/readiness/fake.py`）
+
+## 地基已具备（来自 01）
+
+- **node 和路由**: 01 的 readiness node 已在拓扑中，HITL2(proceed) → readiness → final delivery/pass/repair edges 已定义。
+- **gate kernel 复用**: 03 的 GateDefinition/GateResult 直接用于 readiness gate。
 
 ## 目标
 

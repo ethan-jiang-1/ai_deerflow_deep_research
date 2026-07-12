@@ -1,9 +1,14 @@
 # Plan: Deep Research 11 - Wave2 Synthesis Node
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-wave2-synthesis-node`
 > 依赖: 10 Wave1 Node
-> 替换范围: fake pure-synthesis node；targeted search 仍为 fake
+> 替换范围: fake pure-synthesis node（`agent/src/deerflow_deep_research/graph/nodes/wave2_synthesis/fake.py`）；targeted search 仍为 fake
+
+## 地基已具备（来自 01）
+
+- **node 位置**: 01 的 Wave2 synthesis node 已在拓扑中，Wave1 → synthesis → targeted evidence → HITL2 路径通。
+- **gate transition**: pass/repair edges 已定义。
 
 ## 目标
 

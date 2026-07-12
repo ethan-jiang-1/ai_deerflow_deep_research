@@ -1,9 +1,14 @@
 # Plan: Deep Research 12 - Targeted Evidence Loop
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-targeted-evidence-loop`
 > 依赖: 04 Work Unit Kernel、09 Evidence Critics、11 Wave2 Synthesis
-> 替换范围: fake gap planner、targeted workers、Wave2 convergence gate
+> 替换范围: fake gap planner、targeted workers、Wave2 convergence gate（`agent/src/deerflow_deep_research/graph/nodes/targeted_evidence/fake.py`）
+
+## 地基已具备（来自 01）
+
+- **循环边**: 01 已定义 synthesis → targeted evidence → back-to-synthesis 的收敛回边。
+- **fan-out 复用**: targeted workers 复用 04 的 `Send` 机制（01 已验证）。
 
 ## 目标
 

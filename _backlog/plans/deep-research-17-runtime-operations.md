@@ -1,23 +1,31 @@
 # Plan: Deep Research 17 - Runtime Operations
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `harden-deep-research-runtime-operations`
 > 依赖: 14 Rerun Node、16 Final Delivery Node
 > 替换范围: 横切运行时能力，不替换单一 phase node
 
+## 地基已具备（来自 00 + 01）
+
+以下已由 00 和 01 交付，**本 plan 不用重建**：
+
+- **cancel 传播**: 01 的 `runtime/control.py` 已实现 cancel action → lifecycle state transition → graph 清理；`status` 可返回当前 phase/waiting state。
+- **checkpoint recovery**: 01 已验证 memory 同进程恢复和 file-SQLite 跨进程恢复（subprocess restart）。
+- **provider lifecycle**: 00 已定义 `async_provider.make_checkpointer(app_config)` 和 per-action open/close；memory/sqlite/postgres 三 backend 可用。
+- **lifecycle tool**: 01 的 `start | resume | status | cancel` 已通过 reflected control tool 暴露；identity 由 RuntimeAdapter 提供。
+
 ## 目标
 
-补齐完整 graph 在真实 DeerFlow runtime 中的 cancellation、non-interactive、progress、recovery 和 operator diagnostics。
+补齐完整 graph 在真实 DeerFlow runtime 中的 non-interactive policy、progress visibility、recovery edge cases 和 operator diagnostics。
 
-## Scope
+## Scope（缩减后——cancel/checkpoint/lifecycle 已通）
 
-- outer run cancel 向 nested graph/worker 传播，禁止 cancel 后 submit ledger。
-- orphan attempt detection/cleanup，明确 crash 后 replay policy。
-- non-interactive policy：预置 profile/HITL2 policy 或 blocked；不伪造 human decision。
-- phase/batch/gate/usage coarse progress events 进入现有 stream/run events；网页噪声不进入 lead context。
-- status/cancel/operator inspect 输出稳定、脱敏、user/thread scoped。
-- memory/sqlite/postgres lifecycle、multi-worker ownership 和 connection cleanup。
-- support-bundle/diagnostics 包含 graph phase、checkpoint refs、gate codes，不包含网页正文/secret。
+- **crash 后 replay edge cases**: orphan attempt detection/cleanup，明确 crash 后 replay policy。
+- **non-interactive policy**: 预置 profile/HITL2 policy 或 blocked；不伪造 human decision——升级 01 的占位合同为完整实现。
+- **progress events**: phase/batch/gate/usage coarse progress events 进入现有 stream/run events；网页噪声不进入 lead context。
+- **status/cancel/operator inspect** 输出稳定、脱敏、user/thread scoped——在 01 已有基础上加固。
+- **multi-worker ownership**: memory/sqlite/postgres 的 connection cleanup 和 per-worker isolation contract。
+- **support-bundle/diagnostics** 包含 graph phase、checkpoint refs、gate codes，不包含网页正文/secret。
 - schema migration/unsupported-version runbook。
 
 ## 验收

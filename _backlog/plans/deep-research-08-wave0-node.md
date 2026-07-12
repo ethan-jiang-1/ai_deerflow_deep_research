@@ -1,9 +1,21 @@
 # Plan: Deep Research 08 - Wave0 Node
 
-> 类型: 设计 | 更新: 2026-07-11
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-wave0-node`
 > 依赖: 04 Work Unit Kernel、07 Topic Planning Node
-> 替换范围: fake Wave0 plan/worker/submit/gate/repair subgraph
+> 替换范围: fake Wave0 plan/worker/submit/gate/repair subgraph（`agent/src/deerflow_deep_research/graph/nodes/wave0/fake.py`）
+
+## 地基已具备（来自 01）
+
+- **subgraph 结构**: 01 已定义 Wave0 plan → fan-out workers → fan-in submit → gate → repair 的分层 subgraph（`wave0/subgraph.py`）。
+- **`Send` 并行**: 三路 fan-out/fan-in 已验证。
+- **node-agent policy 骨架**: 01 的 worker 已有 per-node tool policy 占位。
+
+## 目标
+
+实现每 topic 的基础来源摄入和共享参考层，对应 DPT Wave0 的广度优先证据建立。
+
+## Scope（原有——核心是真实 web search/fetch + source validation，地基没做）
 
 ## 目标
 

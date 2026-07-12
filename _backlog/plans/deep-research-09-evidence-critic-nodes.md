@@ -1,9 +1,15 @@
 # Plan: Deep Research 09 - Evidence Critic Nodes
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-evidence-critic-nodes`
 > 依赖: 03 Gate Kernel、04 Work Unit Kernel
 > 替换范围: 新增 source diagnostic 与 claim verifier agent nodes，先用 fixtures 验证
+
+## 地基已具备（来自 01）
+
+- **node 位置**: 01 的 `targeted_evidence` package 已为 critic 预留位置；Wave0/Wave1 submit 后可直接插入 critic nodes。
+- **tool policy 机制**: 01 的 per-node agent policy 可限制 critic 只读 assigned evidence。
+- **gate 消费 critic verdict**: 03 的 GateResult schema 将包含 critic verdict 字段。
 
 ## 目标
 

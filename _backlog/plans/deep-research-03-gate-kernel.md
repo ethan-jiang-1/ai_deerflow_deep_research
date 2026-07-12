@@ -1,15 +1,21 @@
 # Plan: Deep Research 03 - Gate Kernel
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `build-deep-research-gate-kernel`
 > 依赖: 02 State And Persistence Contracts
 > 替换范围: fake gate outcome router，业务 rule 仍使用 fixtures
+
+## 地基已具备（来自 01）
+
+- **gate 路由已通**: 01 的 `routing.py` 已实现 pass/repair/rerun/stop 全量 edge routing——fake gate 通过 fixture 控制 outcome，真实路由拓扑已验证。
+- **topology 闭集**: 所有 node 的 transition edge 在 `topology.py` 和 `topology_snapshot.py` 中已是 explicit closed set，CI 检查 unreachable node/edge。
+- **修复 loop 骨架**: fake repair node 已存在，回边路径可走通。
 
 ## 目标
 
 实现所有 phase 共用的 deterministic gate/repair 内核，保留 DPT collect-all、inspect/advice、attempt/fatigue 和不可假通过的合同。
 
-## Scope
+## Scope（原有，保持不变）
 
 - 定义 GateDefinition、GateRule、GateResult、stable failure code。
 - rule evaluation 收集所有失败，区分 hard、semantic、repairable、degradable。

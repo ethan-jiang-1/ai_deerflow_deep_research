@@ -1,9 +1,14 @@
 # Plan: Deep Research 14 - Rerun Node
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `implement-deep-research-rerun-node`
 > 依赖: 04 Work Unit Kernel、13 HITL2 Node
-> 替换范围: fake rerun planner、generation increment 和回边
+> 替换范围: fake rerun planner、generation increment 和回边（`agent/src/deerflow_deep_research/graph/nodes/rerun/fake.py`）
+
+## 地基已具备（来自 01）
+
+- **rerun node 位置**: 01 的 rerun node 已在拓扑中，HITL2 → rerun → topic planning/Wave0 回边已定义。
+- **generation 概念**: 01 的 state 已有 generation 字段占位。
 
 ## 目标
 

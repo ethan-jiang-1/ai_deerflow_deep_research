@@ -1,9 +1,16 @@
 # Plan: Deep Research 18 - Evaluation And Production Hardening
 
-> 类型: 设计 | 更新: 2026-07-10
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `evaluate-harden-deep-research-graph`
 > 依赖: 17 Runtime Operations
 > 替换范围: 全链路 release gate，不新增主要 workflow phase
+
+## 地基已具备（来自 00 + 01 + 所有前置 change）
+
+- **完整 graph 可评估**: 01 的 full-fake graph 已提供所有 node/edge，可直接用于故障注入和 recovery 测试。
+- **contract test 基础设施**: 00/01 的 contract 和 integration test 模式可直接复用到 eval corpus。
+- **checkpoint recovery 已验证**: memory + file-SQLite 跨进程恢复可用于 crash/recovery scenario。
+- **topology snapshot**: `topology_snapshot.py` CI 检查可保证 node/edge 闭集，防止意外变更。
 
 ## 目标
 

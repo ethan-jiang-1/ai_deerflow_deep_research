@@ -1,20 +1,26 @@
 # Plan: Deep Research 04 - Work Unit Kernel
 
-> 类型: 设计 | 更新: 2026-07-11
+> 类型: 设计 | 更新: 2026-07-12
 > 对应 OpenSpec change: `build-deep-research-work-unit-kernel`
 > 依赖: 02 State Contracts、03 Gate Kernel
 > 替换范围: fake fan-out/fan-in 和 fake submit，worker 内容仍为 fixture
+
+## 地基已具备（来自 01）
+
+- **`Send` fan-out/fan-in 已验证**: 01 的 Wave0/Wave1 fake subgraph 已实现三路 `Send` + fan-in，证明并行拓扑和 mixed-node contract 可行。
+- **topology 中 wave subgraph 结构已定义**: `wave0/subgraph.py` 和 `wave1/subgraph.py` 已有 plan/worker/submit/gate 的分层结构。
+- **fake worker 产出 fixture result/files**: 已能产出并 fan-in 到 submit node。
+- **submit node 骨架**: 01 已有 submit node，负责收拢 worker 结果——但用的是 fake 直接 pass。
 
 ## 目标
 
 把 DPT queue → work-unit → submit → ledger 的权威链映射为 LangGraph bounded `Send`、typed reducers 和 deterministic submit node。
 
-## Scope
+## Scope（缩减后——地基已覆盖 fan-out/fan-in 和 subgraph 结构）
 
 - 定义 immutable WorkSpec、Attempt、CandidateResult、SubmissionRecord schemas。
 - controller 分配 logical work id/attempt id；worker 不可自分配或改 spec。
 - pending/in-flight/terminal state、batch cursor 和并发上限。
-- `Send` fan-out/fan-in，使用 fake worker 产出 fixture result/files。
 - submit validator 检查 identity、spec hash、schema、path、file hash、source refs。
 - 只有 deterministic controller submit node 能 append evidence submission ledger 并更新 accepted refs；planner/worker/repair agent 只返回 candidate，不直接写 ledger。
 - 明确 ledger storage 选择与事务边界：append record、update accepted refs、checkpoint state 的 crash window 必须有 idempotent replay protocol。

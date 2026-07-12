@@ -32,8 +32,9 @@ filesystem behavior is introduced.
   identity enters graph state.
 - Add a minimal, versioned skeleton state containing only lifecycle status, stable
   start-message correlation/digest, phase/generation counters, validated deterministic
-  fixture controls, fan-out results, pending HITL correlation, consumed response ids,
-  and a bounded execution trace. Full `ResearchState`, evidence, work-unit,
+  fixture controls, fan-out results, consumed HITL response ids, and a bounded execution
+  trace. The pending request itself has one authority: the LangGraph checkpoint's
+  interrupt task, not a duplicated state field. Full `ResearchState`, evidence, work-unit,
   submission-ledger, and delivery schemas remain owned by changes 02 and later.
 - Add deterministic Wave0/Wave1 `Send` fan-out and reducer-based fan-in fixtures, plus
   repair and rerun loops with explicit bounded counters.
@@ -42,32 +43,65 @@ filesystem behavior is introduced.
   ends the current lead-agent turn. Resume accepts no answer in the tool arguments: it
   reads the latest actual `HumanMessage` from trusted runtime state, requires matching
   `human_input_response.source` and `request_id` metadata when present, binds it to the
-  one pending graph interrupt, and rejects stale, replayed, cross-thread, or mismatched
-  responses. The response value originates from that `HumanMessage`, never a model
-  supplied control-tool field.
+  one pending graph interrupt, and rejects stale, cross-thread, or mismatched
+  responses. A message already recorded as consumed is classified separately as a
+  result-delivery retry and may only reproject the current durable outcome; it never
+  advances the graph again. The response value originates from that `HumanMessage`,
+  never a model supplied control-tool field.
 - Extend the reflected tool and generic host registration with typed `start`, `resume`,
   `status`, and `cancel` handlers while preserving the independent `infra_probe`
-  topology and namespace. `start` accepts no caller-selected id or question: it binds
-  the latest eligible real `HumanMessage`, then derives a collision-resistant opaque
-  research id from trusted user/thread scope plus that stable message id. Retrying the
-  same start after a failure therefore reopens or reprojects the same lifecycle instead
-  of orphaning a randomly named checkpoint. Subsequent actions require the returned id
+  topology and namespace. `start` accepts no caller-selected id or question: after
+  ignoring hidden synthetic context, it binds the newest visible genuine
+  `HumanMessage` without falling back past an invalid candidate, then derives a collision-resistant opaque
+  research id from trusted user/thread scope. Its stable message id is stored as start
+  correlation, not as namespace authority. Retrying the same start after a failure
+  therefore reopens or reprojects the same lifecycle instead of orphaning a randomly
+  named checkpoint; a different start message in that thread conflicts with the one
+  existing lifecycle, so change 01 does not introduce multi-active research runs.
+  Subsequent actions require the returned id
   but still derive authority from trusted user/thread context. `cancel` is a durable
   terminal transition for a checkpointed research lifecycle; cancellation of an
   actively executing outer tool task continues to use DeerFlow/asyncio cancellation
   from change 00 rather than a second run-control system.
-- Define one bounded version-1 control-result envelope for suspended, running,
-  completed, stopped, cancelled, unavailable, and denied outcomes. A suspended
+- Treat internal `context.non_interactive` and the fail-closed
+  `context.disable_clarification` signal as an unavailable interaction capability. A
+  client that can supply the latter can only disable its own HITL path, never enable
+  autonomous execution. Until a later change provides an explicit
+  checkpointed auto-decision policy, `start` and `resume` fail before mutation in those
+  contexts; read-only `status` and durable `cancel` remain available.
+- Gate known IM-channel transports separately. The current checked-in channel response
+  extractor recognizes clarification only for `ask_clarification`, not a generic
+  `deep_research` human-input ToolMessage. Because this change does not modify
+  `backend/`, HITL-producing `start`/`resume` fail closed when reduced runtime context
+  identifies an IM path through `channel_user_id` and/or `channel_name`; status/cancel
+  remain available and a later explicit upstream compatibility change may enable
+  generic channel artifacts.
+- Require each research lifecycle action to be the sole tool call in the latest outer
+  AIMessage. DeerFlow may append built-in/MCP/ACP tools despite configured tool groups;
+  if a sibling call exists, the lifecycle returns `exclusive_control_call_required`
+  before nested checkpoint mutation. This does not claim to cancel or authorize the
+  sibling call itself.
+- Define one bounded version-1 research-lifecycle control-result envelope for suspended, completed,
+  stopped, cancelled, blocked, unavailable, and denied outcomes. A suspended
   `ToolMessage` carries the same envelope as text fallback plus the human-input
   artifact, so the lead agent can reliably retain the opaque research id and request
-  id without parsing UI prose.
+  id without parsing UI prose. Every research result is explicitly marked
+  `implementation_mode=full_fake`; `infra_probe` keeps its existing independent result
+  contract. Fake final delivery emits only a terminal fixture
+  marker and never research findings, evidence, citations, or a report.
+- Make resume result delivery at-least-once safe as well as start: when the latest
+  response message is already recorded as consumed, the handler reprojects the current
+  durable next interrupt or terminal result without invoking another node.
 - Add deterministic topology snapshots and zero-API E2E paths for happy completion,
   Wave0/Wave1 repair, targeted-evidence convergence, every HITL2 decision
   (`proceed | revise_view | repair | rerun | stop`), readiness/final repair,
-  cancellation, invalid/replayed resume, idempotent start-result reprojection, and
+  cancellation, stale-resume denial, consumed-response result reprojection,
+  idempotent start-result reprojection, and
   file-SQLite process-restart resume. Memory remains explicitly same-process only.
 - Update the committed public entry skill and dedicated Agent/SOUL guidance to describe
-  the newly available lifecycle actions without moving graph logic into prompts.
+  the lifecycle as a development skeleton, surface `implementation_mode=full_fake`,
+  and forbid presenting its terminal fixture as completed research. Graph logic remains
+  outside prompts.
 
 The new requirement IDs are `RUI-006` and `REG-001` through `REG-005`.
 
@@ -84,6 +118,10 @@ The new requirement IDs are `RUI-006` and `REG-001` through `REG-005`.
 - `runtime-integration`: The existing reflected control tool advances from an
   infrastructure-probe-only surface to action-specific research lifecycle dispatch
   while retaining the probe as an isolated diagnostic action.
+- `deployment-configuration`: The already committed/materialized public skill and
+  per-user Agent/SOUL may describe the new lifecycle, but must label it
+  `implementation_mode=full_fake`, keep entry/config paths unchanged, and forbid claims
+  of real research output.
 
 ## Impact
 

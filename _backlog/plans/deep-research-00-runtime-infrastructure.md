@@ -435,4 +435,4 @@ node-agent policy 通过独立 fake bridge/fake tool contracts 验证，不把 a
 
 ## 落地关联
 
-00 通过后，01 只能消费已冻结的 package、launcher、RuntimeAdapter、GraphHost 和 node-agent runtime，不再夹带基础设施选型。真实 business nodes 必须沿着 00 定义的目录、import、mount、path policy 和 prompt-loading 规则逐个替换。
+00 通过后，01 只能消费已冻结的 package/preparation/source-mount contract、RuntimeAdapter、GraphHost 和 node-agent runtime，不再夹带基础设施选型，也不得把延期的 launcher/live deployment 工作重新塞入 01。真实 business nodes 必须沿着 00 定义的目录、import、mount、path policy 和 prompt-loading 规则逐个替换。

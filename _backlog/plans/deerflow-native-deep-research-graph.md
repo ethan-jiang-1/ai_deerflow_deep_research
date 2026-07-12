@@ -263,17 +263,24 @@ flowchart TD
   D -- revise view --> SY
   D -- repair --> GP
   D -- rerun --> RR[rerun planner]
-  RR --> W0P
+  RR --> P
   D -- proceed --> RD{readiness gate}
-  D -- stop --> BL([BLOCKED / stopped])
+  D -- stop --> ST([STOPPED])
 
-  RD -- repair --> GP
+  RD -- repair targeted evidence --> GP
+  RD -- repair synthesis --> SY
+  RD -- repair HITL2 --> I2
   RD -- pass --> FW[final writer agent]
   FW --> FG{final integrity gate}
   FG -- repair --> FW
+  FG -- evidence blocked --> RD
   FG -- pass --> PUB[publish artifacts]
   PUB --> E([END])
 ```
+
+所有 bounded repair/rerun budget 耗尽统一进入独立 `BLOCKED` 终态；`STOPPED`
+仅表示 HITL2 的用户 stop 决策，两者不得合并。01 冻结以上顶层路由，后续 change
+只能替换 node 内实现或补充已规划的内部子图，不能静默改写这些逻辑 edge。
 
 ### 不机械保留 DPT 的 11 phase
 
@@ -498,7 +505,7 @@ Semantic critic 只产出 typed findings。是否达到阈值和如何路由仍�
 #### 3. Human gate
 
 - HITL1：研究边界、profile、必须回答的问题、时间/成本倾向。
-- HITL2：已确认结论、关键不确定性、补证优先级、proceed/repair/rerun/stop。
+- HITL2：已确认结论、关键不确定性、补证优先级、`proceed | revise_view | repair | rerun | stop`。
 
 人类决定不能伪装成证据。即使用户选择 proceed，hard provenance gate 仍不能绕过。
 
@@ -587,7 +594,7 @@ Custom tool 收到 suspension 后：
 
 - outer DeerFlow thread 与 research graph 共享用户/thread 归属，但使用独立 `checkpoint_ns` 或派生 research thread key。
 - key 至少包含 authenticated user、outer thread、research id；不能相信模型传入任意 thread id。
-- 同一 outer thread 第一版只允许一个 active research run；并行 run 需要显式 research id 和 UI 选择后再开放。
+- 同一 outer thread 第一版只允许一个 research lifecycle（包括终态）；新研究必须新建 outer thread。未来若要同 thread 多 lifecycle/并行 run，需要另行引入显式 lifecycle 选择与新的 namespace/index authority。
 - resume 前验证 checkpoint 所处 suspension 与当前 generation。
 
 ### Reentry
@@ -631,7 +638,7 @@ scheduled/non-interactive context 不能卡在 HITL：
 Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 ```text
-00 runtime infrastructure：local editable/Docker source-mounted package、launcher、public skill/per-user Agent、tool shell、RuntimeAdapter/bridge、GraphHost、node-agent policy
+00 runtime infrastructure：local editable preparation core、Docker source-mount override、public skill/per-user Agent、tool shell、RuntimeAdapter/bridge、GraphHost、node-agent policy；launcher/live smoke 已延期
 01 完整 fake graph：全 node、全 edge、HITL、rerun、fake final
 02 typed state/checkpoint：把 fake dict 换成正式控制合同
 03 gate kernel：把直接 fixture outcome 换成通用 fake rules + repair loop
@@ -692,7 +699,7 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 拆分遵循六条规则：
 
-1. **先搭 runtime infra。** 00 解决 source package、folder structure、launcher、tool/config、public skill/per-user Agent、RuntimeAdapter、GraphHost、node-agent policy，让“代码放哪、graph 怎么运行、权限怎么控”不再是 01 的隐含假设。
+1. **先搭 runtime infra。** 00 解决 source package、folder structure、preparation/source-mount contract、tool/config、public skill/per-user Agent、RuntimeAdapter、GraphHost、node-agent policy，让“代码放哪、graph 怎么运行、权限怎么控”不再是 01 的隐含假设；launcher/live deployment smoke 仍是独立 follow-up。
 2. **再搭完整 fake graph。** 01 交付全拓扑、全 edge、两个 HITL、rerun 回边和 fake final，所有节点先返回确定性 fixture。
 3. **逐节点替换，不最后集成。** 后续 change 每替换一个 fake node，全图端到端测试仍必须通过。
 4. **横切内核先于真实 node。** state、gate、work-unit 是所有 phase 的共同依赖，各自独立 change。
@@ -703,7 +710,7 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 | # | 子 plan / 对应 change | 替换或建立的边界 | 直接依赖 |
 |---:|---|---|---|
-| 00 | [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) | source package/folder structure/launcher/public skill/per-user Agent/tool shell/RuntimeAdapter/GraphHost/node-agent policy | 无 |
+| 00 | [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) | source package/folder structure/preparation + source-mount contract/public skill/per-user Agent/tool shell/RuntimeAdapter/GraphHost/node-agent policy；launcher/live smoke 延期 | 无 |
 | 01 | [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) | 可 checkpoint、可 HITL 的完整 fake graph | 00 |
 | 02 | [`deep-research-02-state-persistence-contracts.md`](deep-research-02-state-persistence-contracts.md) | typed state、reducers、bundle refs、checkpoint schema | 01 |
 | 03 | [`deep-research-03-gate-kernel.md`](deep-research-03-gate-kernel.md) | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
@@ -893,7 +900,7 @@ change 00 已定死 local editable/Docker source override 和 runtime bridge 直
 1. 是否出现可依赖的 public Gateway lifespan hook 来优化进程级 provider；00 合同保持 per-action official context。
 2. nested progress events 能否进入现有 RunJournal；不能时第一版 UI 显示到什么粒度。
 3. submission ledger 使用 JSONL + hash chain，还是独立 SQLite/Postgres 表；04 在多 worker 前必须定。
-4. HITL2 的 `repair` 与 `rerun` 精确语义，以及 generation 失效范围。
+4. 01 固定 HITL2 顶层路由：`revise_view -> wave2_synthesis`、`repair -> targeted_evidence`、`rerun -> rerun planner -> topic_planning`；14 仍需确定 rerun generation 的精确失效范围。
 5. semantic critic 的模型隔离和成本预算。
 
 ## 成功标准

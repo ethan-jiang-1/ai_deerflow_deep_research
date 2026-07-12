@@ -6,6 +6,10 @@
 > 依赖: `build-deep-research-fake-graph-skeleton`（Change 01，**已归档**）
 > 与 Change 02 的关系: 不依赖、不阻塞；可按产品演示优先级单独排期
 
+> 即时演示拆分: 小型 agent-owned Textual shell 已由
+> `add-deep-research-lifecycle-demo-tui` 单独处理；本计划继续只代表未来正式
+> DeerFlow Terminal Workbench/generic human-input 集成，不再承载“尽快可视化”的需求。
+
 ## 背景
 
 Change 01 **已归档**，提供可运行的 `implementation_mode=full_fake` Deep Research lifecycle：

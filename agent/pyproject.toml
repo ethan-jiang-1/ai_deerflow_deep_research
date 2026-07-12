@@ -15,6 +15,7 @@ operations = [
     "python-dotenv>=1.2,<2",
     "ruamel.yaml>=0.18,<0.19",
 ]
+demo-tui = ["textual>=0.80,<9"]
 postgres-test = ["deerflow-harness[postgres]>=2.1.0,<2.2"]
 
 [dependency-groups]

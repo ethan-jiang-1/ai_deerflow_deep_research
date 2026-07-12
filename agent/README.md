@@ -41,7 +41,14 @@ make test-durability
 make test-blocking-io
 make demo             # interactive zero-API lifecycle walkthrough
 make demo-scripted    # deterministic non-interactive walkthrough
+make demo-tui         # standalone Textual visualization of the same lifecycle
 ```
+
+`make demo-tui` is an agent-owned visual demo, not the production DeerFlow
+Terminal Workbench, Web UI, Gateway, or generic human-input integration. It
+requires no root `config.yaml`, model credentials, network, or service process;
+it drives the same process-local full-fake lifecycle used by `make demo` and
+never produces research findings or a report.
 
 `make test-viability` is a hard prerequisite for structure/runtime work after
 change 00 group 2. It verifies reflected async `ToolRuntime` injection and

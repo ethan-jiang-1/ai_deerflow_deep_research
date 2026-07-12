@@ -32,6 +32,7 @@ prefixes:
   DEC: deployment-configuration
   NOA: node-agent-runtime
   PRS: project-structure
+  RED: research-demo-tui
   REG: research-graph-lifecycle
   RUI: runtime-integration
 
@@ -64,6 +65,10 @@ PRS-001: project-structure — Deep Research code and tests use one canonical do
 PRS-002: project-structure — Import directions and shared-code ownership boundaries are enforced mechanically
 PRS-003: project-structure — Top-level workflow nodes expose one stable NodeSpec surface with colocated deterministic fakes
 PRS-004: project-structure — Canonical structural authority remains discoverable and mechanically synchronized after change archival
+
+# research-demo-tui
+RED-001: research-demo-tui — A standalone Textual demo drives the real full-fake lifecycle through both HITL requests without Gateway, model, or network dependencies
+RED-002: research-demo-tui — The demo remains an explicitly non-product visualization with deterministic tests and no claim of formal DeerFlow TUI or Web UI integration
 
 # runtime-integration
 RUI-001: runtime-integration — DeerFlow exposes one stable Deep Research control tool with an infrastructure probe action

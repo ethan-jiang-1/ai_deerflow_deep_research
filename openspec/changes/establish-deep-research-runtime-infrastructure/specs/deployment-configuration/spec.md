@@ -3,35 +3,25 @@
 ## ADDED Requirements
 
 ### Requirement: Gateway loads one downstream package in every supported environment
-The project SHALL provide documented local-development, local-production, and Docker assembly that resolves `deerflow_deep_research` from the checked-out or mounted `agent/src` source while leaving upstream source unchanged. Each start SHALL inject a secret-free, canonical, strictly parsed `v1:<64 lowercase hex>` fingerprint of the effective startup-only provider/sandbox/normalized-worker inputs for runtime drift detection; missing, malformed, or unknown-version fingerprints SHALL fail closed and launch code SHALL NOT evaluate fingerprint command output as shell source. Host package source SHALL NOT be mounted into the research sandbox.
+The project SHALL provide local-development, local-production, and Docker assembly that resolves `deerflow_deep_research` from the checked-out or mounted `agent/src` source while leaving upstream source unchanged. Each start SHALL inject a secret-free, canonical, strictly parsed `v1:<64 lowercase hex>` fingerprint of the effective startup-only provider/sandbox/normalized-worker inputs for runtime drift detection; missing, malformed, or unknown-version fingerprints SHALL fail closed and launch code SHALL NOT evaluate fingerprint command output as shell source. Host package source SHALL NOT be mounted into the research sandbox.
 
-#### Scenario: Local editable source is resolved
-- **WHEN** the project launcher prepares the existing backend environment and starts either local mode
-- **THEN** it loads the same root environment, runtime-path defaults, and Gateway backend working directory, proves the AppConfig and upstream config-upgrade targets are the same canonical file, passes read-only/exact-current-version preflight, delegates upstream stop before changing the backend environment, runs upstream-equivalent dependency sync before the editable install, validates a freshly computed prelaunch fingerprint candidate, delegates upstream startup with `UV_NO_SYNC=1` and `--skip-install`, and Python resolves `deerflow_deep_research` from the current `agent/src` tree with compatible DeerFlow 2.1 APIs
+Change 00 delivers the loadable-source mechanism and proves it with contract tests: the `prepare.py` preparation core (upstream-equivalent sync plus `--no-deps` editable install into the backend environment, root/backend/explicit config-target agreement and exact config-version preflight, harness/module-origin verification, and secret-free startup-candidate computation) and the committed Docker Compose override that read-only mounts `agent/src` and exports the container-effective candidate. The project-owned live launch WRAPPER that automates the stop → prepare → prelaunch-doctor → start lifecycle, the in-container prelaunch doctor GATE before uvicorn, and live dev/production/Docker launch verification are DEFERRED to a follow-up deployment change (`_backlog/todos/deferred_deep-research-00-launcher-and-docker.md`); they require a provisioned deployment environment and are not part of change 00.
+
+#### Scenario: Editable source is resolved by the preparation core
+- **WHEN** the preparation core runs against a caller-quiesced backend environment
+- **THEN** it proves the AppConfig and upstream config-upgrade targets are the same canonical file, passes exact-current-version preflight, runs upstream-equivalent dependency sync before the `--no-deps` editable install, verifies compatible DeerFlow 2.1 harness and module origin, computes a secret-free startup candidate, and Python resolves `deerflow_deep_research` from the current `agent/src` tree
 
 #### Scenario: Mismatched upstream config is refused before fingerprinting
 - **WHEN** the effective config version is missing, invalid, older, or newer than `config.example.yaml.config_version`
-- **THEN** project launch performs no shared backend-environment mutation, fingerprint, stop, or start and directs the operator to upgrade an older config or reconcile the config/checkout pair for any other mismatch
+- **THEN** preparation performs no shared backend-environment mutation or fingerprint and directs the operator to upgrade an older config or reconcile the config/checkout pair for any other mismatch
 
 #### Scenario: Ambiguous config targets are refused
 - **WHEN** AppConfig resolution and the current upstream config-upgrade search order select different canonical files, including an unqualified root/backend shadow pair
-- **THEN** project launch performs no stop, shared backend-environment mutation, fingerprint, or start and reports the conflicting paths without exposing their contents
+- **THEN** preparation performs no shared backend-environment mutation or fingerprint and reports the conflicting paths without exposing their contents
 
-#### Scenario: A running Gateway is quiesced before environment mutation
-- **WHEN** start or restart preparation would run exact sync or replace the editable installation
-- **THEN** the wrapper has already delegated a successful upstream stop and never mutates the shared backend environment beneath a live project Gateway
-
-#### Scenario: Post-stop preparation failure stays stopped
-- **WHEN** sync, editable installation, candidate generation, or prelaunch doctor fails after the wrapper has stopped the stack
-- **THEN** no start is delegated, no rollback of the reconciled environment is claimed, and the failure identifies the stage to rerun through locked preparation
-
-#### Scenario: Missing or wrong source fails before startup
-- **WHEN** the editable install, Docker source mount, or resolved module origin is absent or points outside the project source
-- **THEN** doctor exits nonzero with a source-loading diagnostic and does not report the environment ready
-
-#### Scenario: Docker gates the container-effective candidate
-- **WHEN** the base-first Docker override starts Gateway
-- **THEN** its command computes and exports the candidate inside the container, runs prelaunch doctor with the mounted source/effective config before the unchanged uvicorn tokens, stops on runtime-not-ready, and permits entry warnings
+#### Scenario: Docker exports the container-effective candidate
+- **WHEN** the base-first Docker override renders the Gateway command
+- **THEN** it read-only mounts `agent/src`, sets the Gateway-only `PYTHONPATH`, and computes and exports the candidate inside the container from the mounted source and effective config before the unchanged uvicorn tokens, without mounting host source into the research sandbox
 
 #### Scenario: Startup-only drift requires restart
 - **WHEN** live config reload changes effective database/checkpointer or sandbox values after the launcher captured the process-start fingerprint

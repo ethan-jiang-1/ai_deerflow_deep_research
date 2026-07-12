@@ -157,6 +157,16 @@ Alternative considered: keep the complete structure tree in `openspec/config.yam
 
 ### 3. Package independently and use environment-specific loading
 
+> Scope note (change 00): change 00 delivers the *source-loading mechanism* — the
+> `prepare.py` preparation core (sync + `--no-deps` editable install + config/version
+> preflight + origin verification + startup candidate) and the committed Docker
+> override that mounts `agent/src` and exports the container-effective candidate,
+> both proven with contract tests. The *live launch wrapper* (`serve.sh` stop/start
+> orchestration, `agent/Makefile` dev/prod/daemon targets), the in-container prelaunch
+> doctor GATE before uvicorn, and live launch smoke are DEFERRED to a follow-up
+> deployment change (production is not provisioned yet). The wrapper design below is
+> retained as the target for that follow-up change, not as change-00 scope.
+
 `agent/pyproject.toml` is an independent, locked uv project. For repository development it declares an editable uv source for `deerflow-harness` at `../backend/packages/harness`; build metadata remains valid outside the monorepo by declaring the compatible harness version normally. Package version is single-sourced from `deerflow_deep_research/__about__.py`, so source-mounted Docker can report the same version without installed distribution metadata. Only directly imported runtime packages and test tools are declared. Comment-preserving configuration support is isolated in an operations extra so the Gateway runtime does not acquire an unused YAML dependency. Agent-owned tests and operations scripts run in the agent project environment; local Gateway loading installs the package editable into the already-synchronized backend environment with `--no-deps`.
 
 Local dev/prod loading uses a project-owned wrapper:

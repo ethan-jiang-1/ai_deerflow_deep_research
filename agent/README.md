@@ -54,6 +54,16 @@ root with:
 python3 openspec/governance/check_project_architecture.py
 ```
 
-Local Gateway loading, Docker assembly, configuration materialization, and the
-`infra_probe` command are added by later tasks in change 00. Until those tasks
-are complete, use this project only for its package and governance test surface.
+The runtime substrate is complete and verified with zero-API tests: the trusted
+`RuntimeAdapter`, `GraphHost` with isolated checkpoint namespaces, the node-agent
+bridge with budgets/policy, the reflected `infra_probe` tool, configuration
+materialization (`configure.py`), the source-loading preparation core
+(`prepare.py`) and Docker override, readiness diagnostics (`doctor.py`), and
+file-backed SQLite durability (incl. real subprocess-restart recovery via
+`make test-durability`).
+
+The project-owned live launch wrapper (`serve.sh`, `make dev/prod` targets), the
+in-container prelaunch doctor gate, and the Postgres durability profile are
+**deferred to a follow-up deployment change** — production is not provisioned
+yet. See `../_backlog/todos/deferred_deep-research-00-launcher-and-docker.md` and
+`../_backlog/todos/deferred_deep-research-00-postgres-profile.md`.

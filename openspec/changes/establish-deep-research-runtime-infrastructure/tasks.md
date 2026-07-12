@@ -102,7 +102,8 @@ Execution order is a hard dependency chain: groups `1 -> 2 -> ... -> 15`, and ta
 > intentionally deferred to deployment-environment setup — production is not
 > provisioned yet, so building a launcher for it would overload change 00. The
 > runtime substrate (13.1–13.3 diagnostics) is complete. Tracking:
-> `_backlog/todos/deferred_deep-research-00-realstack-verification.md`.
+> `_backlog/todos/deferred_deep-research-00-launcher-and-docker.md` and
+> `_backlog/todos/deferred_deep-research-00-postgres-profile.md`.
 
 - [x] 13.1 Add red doctor fixtures for explicit prelaunch-candidate versus in-process fingerprint modes, missing/mismatched fingerprint and missing-mode refusal, missing/invalid/older/newer config version, valid/missing/wrong module origin, incompatible harness, reflection/name drift, rendered Compose reversed-order/source-origin mismatch, root/backend/explicit config or extensions target conflicts, noncanonical effective skills root, config ownership conflict, missing skill/Agent, authenticated Agent unknown offline, disabled `agents_api`, legacy paths, runtime/entry tri-state classification, effective provider precedence, memory/file-SQLite/in-memory-SQLite/Postgres durability, missing Postgres URL, every worker value not normalizing to integer one, and host-source sandbox leakage (`DEC-005`).
 - [x] 13.2 Add red credential fixtures for database URLs, environment references, API tokens, user ids, host paths, startup fingerprints/inputs, and checkpoint digests (`DEC-005`).
@@ -114,9 +115,9 @@ Execution order is a hard dependency chain: groups `1 -> 2 -> ... -> 15`, and ta
 
 - [x] 14.1 Run the complete agent-owned unit/contract/graph suite with zero LLM API calls and pass uv lock check, ruff format/lint, plus agent-scoped blocking-IO runtime checks (`PRS-001`..`PRS-004`, `DEC-001`..`DEC-005`, `RUI-001`..`RUI-005`, `NOA-001`..`NOA-006`).
 - [x] 14.2 From clean isolated config/DEER_FLOW_HOME fixtures, run configure dry-run/apply/check twice, exact-hash rollback, semantic rollback with unrelated edits, conflicting rollback, and doctor, verifying YAML/JSON preservation, public skill/no-auth Agent placement, no legacy writes, redaction, and exact reflection resolution (`DEC-002`..`DEC-005`).
-- [x] 14.3 Run local dev and local production smoke paths against isolated runtime config, invoke reflected `infra_probe`, restart Gateway on SQLite, and verify same-id reinvocation recovers the previous checkpoint marker without calling it resume (`DEC-001`, `RUI-001`, `RUI-005`).
-- [x] 14.4 Run the base-first Docker override smoke path and required Postgres persistence profile against isolated runtime data, then verify package origin, one-worker readiness, source/sandbox mount separation, per-action provider closure, and subprocess restart recovery (`DEC-001`, `DEC-005`, `RUI-004`, `RUI-005`).
-- [x] 14.5 Synchronize `agent/README.md`, the generated and human-authored portions of `agent/AGENTS.md`, root `README.md`, root `AGENTS.md` module map, `openspec/governance/architecture-policy.md`, `project-structure.toml`, the governance README, the short OpenSpec bootstrap pointer/archive command, and the 00/master plans with only verified final commands and contracts; do not copy the exact structure enumeration into policy or OpenSpec config (`PRS-001`, `PRS-004`, `DEC-001`, `DEC-005`).
+- [ ] 14.3 Run local dev and local production smoke paths against isolated runtime config, invoke reflected `infra_probe`, restart Gateway on SQLite, and verify same-id reinvocation recovers the previous checkpoint marker without calling it resume (`DEC-001`, `RUI-001`, `RUI-005`).
+- [ ] 14.4 Run the base-first Docker override smoke path and required Postgres persistence profile against isolated runtime data, then verify package origin, one-worker readiness, source/sandbox mount separation, per-action provider closure, and subprocess restart recovery (`DEC-001`, `DEC-005`, `RUI-004`, `RUI-005`).
+- [ ] 14.5 Synchronize `agent/README.md`, the generated and human-authored portions of `agent/AGENTS.md`, root `README.md`, root `AGENTS.md` module map, `openspec/governance/architecture-policy.md`, `project-structure.toml`, the governance README, the short OpenSpec bootstrap pointer/archive command, and the 00/master plans with only verified final commands and contracts; do not copy the exact structure enumeration into policy or OpenSpec config (`PRS-001`, `PRS-004`, `DEC-001`, `DEC-005`).
 
 ## 15. Final Traceability And Archive Gates
 

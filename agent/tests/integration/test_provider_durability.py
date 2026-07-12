@@ -18,8 +18,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from deerflow_deep_research.domain.lifecycle import LifecycleAction
 from deerflow_deep_research.runtime.checkpoint import resolve_effective_provider
+from deerflow_deep_research.runtime.control import build_control_graph_host
+from deerflow_deep_research.runtime.human_input import SelectedStartMessage
 from deerflow_deep_research.runtime.probe import build_probe_graph_host
+from deerflow_deep_research.runtime.research import ResearchActionInput, derive_research_id
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
@@ -91,12 +95,56 @@ async def test_file_sqlite_recovers_across_provider_contexts(tmp_path: Path) -> 
     assert second["current_visit"] == 2
 
 
+async def test_file_sqlite_probe_visits_are_isolated_from_research_lifecycle(tmp_path: Path) -> None:
+    db = str(tmp_path / "isolated.db")
+    config = _sqlite_config(db)
+    envelope = _envelope(config)
+    host = build_control_graph_host(fingerprint_verifier=lambda _app_config: None)
+
+    before = await host.run_action(action="infra_probe", envelope=envelope, action_input="p1")
+    research_id = derive_research_id(
+        effective_user_id=envelope.effective_user_id,
+        outer_thread_id=envelope.outer_thread_id,
+    )
+    started = await host.run_action(
+        action="start",
+        envelope=envelope,
+        action_input=ResearchActionInput(
+            action=LifecycleAction.START,
+            research_id=research_id,
+            tool_call_id="call-start",
+            messages=(),
+            start_message=SelectedStartMessage(message_id="human-start", text="research question"),
+        ),
+    )
+    after = await host.run_action(action="infra_probe", envelope=envelope, action_input="p1")
+
+    assert started.update["messages"][0].artifact["human_input"]["source"] == "deep_research"
+    assert before["previous_visit"] is None and before["current_visit"] == 1
+    assert after["previous_visit"] == 1 and after["current_visit"] == 2
+    assert before["durability"] == after["durability"] == "restart_durable"
+
+
 # ── real subprocess restart (RUI-005) ───────────────────────────────────────
 
 
 def _run_probe_subprocess(db: str, probe_id: str) -> dict:
     completed = subprocess.run(
         [sys.executable, str(FIXTURES / "sqlite_probe_subprocess.py"), db, probe_id],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    )
+    return json.loads(completed.stdout.strip())
+
+
+def _run_research_subprocess(db: str, mode: str, request_id: str | None = None) -> dict:
+    args = [sys.executable, str(FIXTURES / "sqlite_research_subprocess.py"), db, mode]
+    if request_id is not None:
+        args.append(request_id)
+    completed = subprocess.run(
+        args,
         capture_output=True,
         text=True,
         timeout=60,
@@ -123,6 +171,24 @@ def test_subprocess_cross_scope_isolation(tmp_path: Path) -> None:
     other = _run_probe_subprocess(db, "p2")
     assert other["previous_visit"] is None  # a different probe id is isolated
     assert other["current_visit"] == 1
+
+
+def test_file_sqlite_research_resumes_after_real_subprocess_restart(tmp_path: Path) -> None:
+    db = str(tmp_path / "research.db")
+    first = _run_research_subprocess(db, "start")
+    second = _run_research_subprocess(db, "resume", first["request_id"])
+
+    assert first["code"] == second["code"] == "suspended"
+    assert first["research_id"] == second["research_id"]
+    assert first["request_id"] != second["request_id"]
+    assert first["durability"] == second["durability"] == "restart_durable"
+    assert first["implementation_mode"] == second["implementation_mode"] == "full_fake"
+
+    # Research checkpoints use a separate digest domain; opening the probe
+    # namespace afterwards still observes a brand-new probe lifecycle.
+    probe = _run_probe_subprocess(db, "p1")
+    assert probe["previous_visit"] is None
+    assert probe["current_visit"] == 1
 
 
 @pytest.mark.postgres

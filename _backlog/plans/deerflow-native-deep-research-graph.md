@@ -639,7 +639,7 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 ```text
 00 runtime infrastructure：local editable preparation core、Docker source-mount override、public skill/per-user Agent、tool shell、RuntimeAdapter/bridge、GraphHost、node-agent policy；launcher/live smoke 已延期
-01 完整 fake graph：全 node、全 edge、HITL、rerun、fake final
+01 完整 fake graph（已实现）：全 node、全 edge、HITL、rerun、fake final；全部 lifecycle 显式 `implementation_mode=full_fake`，Web UI/兼容 generic client 可交互，known IM/non-interactive 的 start/resume fail closed
 02 typed state/checkpoint：把 fake dict 换成正式控制合同
 03 gate kernel：把直接 fixture outcome 换成通用 fake rules + repair loop
 04 work-unit kernel：把 fake phase 内直返换成 bounded Send + fake worker + submit

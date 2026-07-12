@@ -62,18 +62,40 @@ The configurator SHALL resolve and mutate the same AppConfig and extensions-conf
 - **THEN** it performs no write and reports the offline operational precondition, while check and dry-run remain available
 
 ### Requirement: Public entry skill is committed and enabled
-The project SHALL keep the `deep-research-controller` skill source under `agent/config/public-skill/`, materialize it under `skills/public/`, and store its enabled state in `extensions_config.json`. The change 00 skill SHALL route to the control tool without claiming research lifecycle/HITL availability and SHALL NOT contain graph topology, phase prompts, or claims of security isolation.
+
+The project SHALL keep the `deep-research-controller` skill source under
+`agent/config/public-skill/`, materialize it under `skills/public/`, and store its
+enabled state in `extensions_config.json`. The change-01 skill MAY route research
+requests to the `start | resume | status | cancel` lifecycle, but SHALL explicitly
+surface `implementation_mode=full_fake`, SHALL state that terminal fixtures are not
+research findings or reports, and SHALL NOT claim real research completion. It SHALL
+NOT contain graph topology, phase prompts, fixture controls, answer payloads, exclusive
+tool claims, or security-isolation claims.
 
 #### Scenario: Public skill is available
 - **WHEN** configuration is materialized and enabled skills are loaded
 - **THEN** the public Deep Research entry skill is discoverable with content matching its committed source
+
+#### Scenario: Full-fake lifecycle is represented honestly
+- **WHEN** the entry skill handles a research request or lifecycle result in change 01
+- **THEN** it preserves the `full_fake` mode, routes only through the documented control actions, and does not present a terminal fixture as findings, citations, report content, or completed research
 
 #### Scenario: Legacy custom path is rejected
 - **WHEN** validation finds the project entry skill under `skills/custom/deep-research-controller/` instead of the public path
 - **THEN** the configuration check fails and identifies the legacy location
 
 ### Requirement: Dedicated Agent is provisioned in the effective user scope
-The project SHALL provision `deep-research` Agent files only at `{DEER_FLOW_HOME}/users/{effective_user}/agents/deep-research/`, reference the public skill and control tool group, and use the dedicated Agent only as a recommended UX route. Offline filesystem configuration SHALL provision only explicit no-auth user `default`; authenticated provisioning SHALL use current-user `POST /api/agents` only when the operator has independently enabled `agents_api.enabled`. Change 00 SHALL NOT enable that security-sensitive API automatically. The global control tool SHALL remain usable when the Agent is absent.
+
+The project SHALL provision `deep-research` Agent files only at
+`{DEER_FLOW_HOME}/users/{effective_user}/agents/deep-research/`, reference the public
+skill and control tool group, and use the dedicated Agent only as a recommended UX
+route. Its change-01 SOUL/config guidance SHALL preserve and surface
+`implementation_mode=full_fake` and SHALL forbid presenting fake terminal state as
+research output. Offline filesystem configuration SHALL provision only explicit no-auth
+user `default`; authenticated provisioning SHALL use current-user `POST /api/agents`
+only when the operator has independently enabled `agents_api.enabled`. Change 01 SHALL
+NOT enable that security-sensitive API automatically. The global control tool SHALL
+remain usable when the Agent is absent.
 
 #### Scenario: No-auth user is isolated
 - **WHEN** configure provisions an explicit non-production `DEER_FLOW_AUTH_DISABLED=1` installation
@@ -90,6 +112,10 @@ The project SHALL provision `deep-research` Agent files only at `{DEER_FLOW_HOME
 #### Scenario: Offline rollback does not own authenticated Agent state
 - **WHEN** an authenticated user created the Agent through `POST /api/agents` and an operator rolls back the offline configuration manifest
 - **THEN** rollback leaves that user's Agent untouched and directs user-owned deletion through the authenticated Agent API
+
+#### Scenario: Dedicated Agent preserves skeleton honesty
+- **WHEN** the dedicated Agent invokes or explains a change-01 lifecycle action
+- **THEN** it surfaces the `full_fake` mode, does not claim exclusive tool isolation, and does not describe the terminal fixture as a real research answer or report
 
 ### Requirement: Diagnostics expose readiness without secrets
 Doctor SHALL separately report its fingerprint inspection mode, boolean `runtime_ready`, `entry_ready.status = ready | not_ready | unknown`, and `durability = same_process | restart_durable | unavailable` with effective provider kind. Prelaunch-candidate mode SHALL validate the launcher's freshly computed candidate against the effective launch config without claiming to inspect a running process. In-process mode SHALL compare live AppConfig with the fingerprint inherited by that process; missing mode or expected fingerprint SHALL NOT be replaced by silent recomputation. Runtime readiness SHALL cover package origin/version, reflection resolution, config ownership, source/mount paths, sandbox separation, the applicable fingerprint match, supported worker count, and provider compatibility. Entry readiness SHALL cover the public skill and dedicated Agent without disabling the global tool: a known defect SHALL produce `not_ready`; `unknown` SHALL apply only when no known defect exists and the authenticated Agent cannot be inspected offline; `ready` SHALL require all entry checks to pass. Durability SHALL follow legacy `checkpointer`-over-`database` precedence. Doctor's blocking exit status SHALL depend only on runtime readiness. Doctor SHALL report next-build/restart requirements and redact credentials, connection secrets, host user identifiers, full startup inputs/fingerprints, and full internal checkpoint keys.

@@ -1,12 +1,14 @@
 ---
 name: deep-research-controller
-description: Route multi-source deep research requests through the DeerFlow Deep Research control tool.
+description: Route multi-source research requests through DeerFlow's development full-fake lifecycle skeleton.
 ---
 
 # Deep Research Controller
 
-For a user request that requires multi-source deep research, call `deep_research` and treat its structured result as the authority for what is currently available.
+This is a development control-flow skeleton, not a research engine. Every lifecycle result must visibly retain `implementation_mode=full_fake`. Never present its terminal fixture marker as findings, evidence, a report, or completed research.
 
-When the tool returns `action_unavailable`, report that the requested capability is unavailable in the current runtime. Do not emulate a parallel research workflow in the lead or dedicated Agent.
+For a qualifying new request, call `deep_research` with `action="start"` as the sole tool call in that assistant turn. Do not copy the user's question or choose an id in tool arguments. Preserve the returned opaque `research_id` and, when suspended, let the Web UI or a compatible generic client collect the requested human response.
 
-Never invent workflow progress, user-review decisions, or tool-access guarantees. This skill and its recommended Agent are routing surfaces, not authorization boundaries.
+After the matching user response arrives, call `deep_research` with `action="resume"` and the preserved `research_id` as the sole tool call in that turn. The response belongs in the latest user message, never in tool arguments. Use `status` for an accurate read and `cancel` for a durable stop, each with that id.
+
+Known IM transports and non-interactive contexts refuse start/resume; report that limitation directly. Status and cancel remain available. Report any denial or unavailable code exactly, and never invent progress, output, access, or authorization guarantees.

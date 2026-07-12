@@ -16,10 +16,12 @@ from langchain_core.tools import tool
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILL_PATH = REPO_ROOT / "agent/config/public-skill/deep-research-controller/SKILL.md"
 SOUL_PATH = REPO_ROOT / "agent/config/agent-template/SOUL.md"
+RESEARCH_ID = "r_" + "A" * 43
+REQUEST_ID = "drh_fixture_request"
 
 
 class ReplayToolCallingModel(FakeMessagesListChatModel):
-    """Replay two committed assistant turns while accepting bound tools."""
+    """Replay committed assistant turns while accepting bound tools."""
 
     def bind_tools(  # type: ignore[override]
         self,
@@ -32,65 +34,112 @@ class ReplayToolCallingModel(FakeMessagesListChatModel):
 
 
 @pytest.mark.parametrize("surface_path", [SKILL_PATH, SOUL_PATH], ids=["public-skill", "agent-soul"])
-def test_entry_surface_routes_to_control_tool_and_surfaces_typed_unavailability(surface_path: Path) -> None:
-    calls: list[str] = []
+def test_entry_surface_replays_start_resume_and_fake_terminal_disclaimer(surface_path: Path) -> None:
+    calls: list[dict[str, str]] = []
 
     @tool
-    def deep_research(request: str) -> str:
-        """Fake global Deep Research control tool."""
-        calls.append(request)
+    def deep_research(action: str, research_id: str | None = None) -> str:
+        """Fake global Deep Research lifecycle control tool."""
+        call = {"action": action}
+        if research_id is not None:
+            call["research_id"] = research_id
+        calls.append(call)
+        if action == "start":
+            return json.dumps(
+                {
+                    "action": "start",
+                    "code": "suspended",
+                    "implementation_mode": "full_fake",
+                    "research_id": RESEARCH_ID,
+                    "request_id": REQUEST_ID,
+                },
+                sort_keys=True,
+            )
         return json.dumps(
             {
-                "ok": False,
-                "code": "action_unavailable",
-                "available_actions": ["infra_probe"],
+                "action": "resume",
+                "code": "completed",
+                "implementation_mode": "full_fake",
+                "research_id": RESEARCH_ID,
+                "terminal_fixture_marker": "full_fake_terminal_fixture",
             },
             sort_keys=True,
         )
 
-    final_text = "The requested Deep Research capability is unavailable in the current runtime."
-    model = ReplayToolCallingModel(
+    surface = surface_path.read_text(encoding="utf-8")
+    start_text = f"Development lifecycle suspended. Keep {RESEARCH_ID} for the matching reply. full_fake."
+    start_model = ReplayToolCallingModel(
         responses=[
             AIMessage(
                 content="",
                 tool_calls=[
                     {
                         "name": "deep_research",
-                        "args": {"request": "Research the evidence for the user's question."},
-                        "id": "deep-research-entry-call",
+                        "args": {"action": "start"},
+                        "id": "start-call",
                         "type": "tool_call",
                     }
                 ],
             ),
-            AIMessage(content=final_text),
+            AIMessage(content=start_text),
         ]
     )
-    surface = surface_path.read_text(encoding="utf-8")
-    graph = create_agent(model=model, tools=[deep_research], system_prompt=surface)
-
-    result = graph.invoke(
-        {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Please conduct multi-source research and give me a supported answer.",
-                }
-            ]
-        }
+    started = create_agent(model=start_model, tools=[deep_research], system_prompt=surface).invoke(
+        {"messages": [{"role": "user", "content": "Research the question using multiple sources."}]}
     )
 
-    tool_messages = [message for message in result["messages"] if isinstance(message, ToolMessage)]
-    assert calls == ["Research the evidence for the user's question."]
-    assert len(tool_messages) == 1
-    assert json.loads(tool_messages[0].content)["code"] == "action_unavailable"
-    assert result["messages"][-1].content == final_text
-    assert "deep_research" in surface
-    forbidden_claims = (
-        "research started",
-        "resume is available",
-        "human review is available",
-        "only tool",
+    terminal_text = "The full_fake lifecycle fixture reached a terminal state; no research output was produced."
+    resume_model = ReplayToolCallingModel(
+        responses=[
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "deep_research",
+                        "args": {"action": "resume", "research_id": RESEARCH_ID},
+                        "id": "resume-call",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            AIMessage(content=terminal_text),
+        ]
+    )
+    resumed = create_agent(model=resume_model, tools=[deep_research], system_prompt=surface).invoke(
+        {"messages": [{"role": "user", "content": "proceed"}]}
+    )
+
+    assert calls == [{"action": "start"}, {"action": "resume", "research_id": RESEARCH_ID}]
+    start_tool = next(message for message in started["messages"] if isinstance(message, ToolMessage))
+    resume_tool = next(message for message in resumed["messages"] if isinstance(message, ToolMessage))
+    assert json.loads(start_tool.content)["implementation_mode"] == "full_fake"
+    assert json.loads(resume_tool.content)["implementation_mode"] == "full_fake"
+    assert RESEARCH_ID in started["messages"][-1].content
+    assert resumed["messages"][-1].content == terminal_text
+    assert all(term not in terminal_text.casefold() for term in ("findings", "report", "completed research"))
+
+
+@pytest.mark.parametrize("surface_path", [SKILL_PATH, SOUL_PATH], ids=["public-skill", "agent-soul"])
+def test_entry_surface_keeps_control_guidance_bounded(surface_path: Path) -> None:
+    surface = surface_path.read_text(encoding="utf-8").casefold()
+    for required in (
+        "implementation_mode=full_fake",
+        'action="start"',
+        'action="resume"',
+        "research_id",
+        "sole tool call",
+        "status",
+        "cancel",
+        "non-interactive",
+        "known im",
+    ):
+        assert required in surface
+    for forbidden in (
+        "stategraph",
+        "fixture controls",
         "phase prompt",
-    )
-    combined = f"{surface}\n{final_text}".casefold()
-    assert all(claim not in combined for claim in forbidden_claims)
+        "security isolation",
+        "authorization boundary",
+        "answer=",
+    ):
+        assert forbidden not in surface

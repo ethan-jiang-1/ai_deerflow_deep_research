@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from deerflow_deep_research.runtime.control import reset_default_graph_host
 from deerflow_deep_research.runtime.probe import build_probe_graph_host
 from deerflow_deep_research.runtime.runtime_adapter import RuntimeAdapterError, TrustedRuntimeEnvelope
 from deerflow_deep_research.tool import (
@@ -125,6 +126,43 @@ async def test_same_probe_id_revisits_prior_marker() -> None:
     )
     assert second["previous_visit"] == 1
     assert second["current_visit"] == 2  # revisit, not "resume"
+
+
+async def test_default_dispatch_reuses_process_local_host_but_injected_hosts_are_independent() -> None:
+    reset_default_graph_host(_host())
+    try:
+        first = await run_deep_research(
+            action="infra_probe",
+            probe_id="default-p1",
+            runtime=None,
+            adapter=FakeAdapter(),
+        )
+        second = await run_deep_research(
+            action="infra_probe",
+            probe_id="default-p1",
+            runtime=None,
+            adapter=FakeAdapter(),
+        )
+        assert first["previous_visit"] is None
+        assert second["previous_visit"] == 1
+        assert second["current_visit"] == 2
+
+        left = _host()
+        right = _host()
+        left_result = await run_deep_research(
+            action="infra_probe", probe_id="injected-p1", runtime=None, adapter=FakeAdapter(), host_factory=lambda: left
+        )
+        right_result = await run_deep_research(
+            action="infra_probe",
+            probe_id="injected-p1",
+            runtime=None,
+            adapter=FakeAdapter(),
+            host_factory=lambda: right,
+        )
+        assert left_result["previous_visit"] is None
+        assert right_result["previous_visit"] is None
+    finally:
+        reset_default_graph_host()
 
 
 async def test_cross_scope_probe_is_isolated() -> None:

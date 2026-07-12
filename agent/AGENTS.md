@@ -37,18 +37,42 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/runtime/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/runtime/checkpoint.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/runtime/startup_snapshot.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/runtime/control.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/runtime/human_input.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/runtime/research.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/context.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/enums.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/node_spec.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/domain/invocation.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/domain/lifecycle.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/engine/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/__init__.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/engine/fake_control.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/agents/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/agents/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/graph/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/graph/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/graph/registry.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/builder.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/implementation_map.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/routing.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/skeleton_state.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/topology.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/topology_snapshot.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/bootstrap/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/hitl1/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/topic_planning/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/wave0/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/wave1/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/wave2_synthesis/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/targeted_evidence/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/hitl2/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/rerun/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/readiness/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/final_delivery/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/resources/` (directory; `PRS-001`)
   - `agent/config/` (directory; `PRS-001`)
   - `agent/config/deerflow.fragment.yaml` (file; `PRS-001`)
@@ -62,6 +86,8 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/scripts/` (directory; `PRS-001`)
   - `agent/scripts/configure.py` (file; `PRS-001`)
   - `agent/scripts/prepare.py` (file; `PRS-001`)
+  - `agent/scripts/render_topology.py` (file; `PRS-001`)
+  - `agent/docs/deep-research-topology.md` (file; `PRS-001`)
   - `agent/docker/` (directory; `PRS-001`)
   - `agent/tests/unit/` (directory; `PRS-001`)
   - `agent/tests/contract/` (directory; `PRS-001`)
@@ -79,11 +105,14 @@ Registry: `openspec/governance/project-structure.toml`
 
 ## Current Status
 
-The current checkout contains the completed, archived change 00 runtime
-substrate: the independent package, ownership roots, runtime integration,
-infrastructure probe, and bounded node-agent base. Empty business topology is
-intentionally absent until change 01. Treat any tree below labelled "later" as
-a placement rule, not as implemented behavior.
+The current checkout contains the completed change 00 runtime substrate and the
+change 01 full-fake graph skeleton. Eleven logical node packages, the normalized
+topology, implementation map, real checkpoint interrupts, lifecycle handlers,
+topology snapshot, and zero-API restart recovery are present. Every lifecycle
+result is `implementation_mode=full_fake`; no terminal fixture is research
+output. The Web UI and compatible generic clients support start/resume, while
+known IM and non-interactive contexts refuse those actions and retain
+status/cancel.
 
 ## Ownership
 
@@ -95,8 +124,9 @@ a placement rule, not as implemented behavior.
 - `agents/`: bounded embedded-agent construction, middleware, policies, prompts,
   and structured results. It may depend on `domain/` and public DeerFlow,
   LangChain, and LangGraph APIs, never `runtime/` or graph nodes.
-- `graph/`: nested graph recipes, explicit registry, infrastructure probe, and
-  later topology. It depends on pure contracts and explicitly listed nodes.
+- `graph/`: nested graph recipes, explicit registry, infrastructure probe,
+  normalized research topology, and explicitly listed fake node packages. It
+  depends on pure contracts and explicitly listed nodes.
 - `runtime/`: the only layer that binds raw DeerFlow context, parent sandbox,
   checkpointer providers, and embedded-agent execution to pure contracts.
 - `resources/`: package-owned prompt and policy files. External source content
@@ -137,31 +167,33 @@ registry, graph implementation modules, sibling nodes, `agents/`, or `runtime/`.
 The registry loads explicitly listed package roots and never discovers topology
 from the filesystem.
 
-## Planned Placement
+## Current And Deferred Placement
 
-Change 00 may add the following infrastructure files as their tasks turn green:
+Changes 00 and 01 own the current runtime, graph, and contract files:
 
 ```text
-runtime/{graph_host,runtime_adapter,projection,identity,checkpoint}.py
+runtime/{graph_host,runtime_adapter,projection,identity,checkpoint,control,human_input,research}.py
 runtime/{events,cancellation,node_agent_bridge,diagnostics,startup_snapshot}.py
-domain/{context,enums,node_spec}.py
+domain/{context,enums,node_spec,invocation,lifecycle}.py
 agents/{factory,middleware,policies,prompts,structured_output}.py
-graph/{builder,registry,infra_probe}.py
+graph/{builder,registry,infra_probe,topology,implementation_map,routing,skeleton_state,topology_snapshot}.py
+graph/nodes/<eleven-logical-phases>/
 resources/node_agent/runtime_policy.md
 ```
 
-Change 01 and later may add `graph/topology.py`, `implementation_map.py`,
-`routing.py`, `graph/components/`, and `graph/nodes/`. Change 03 and later may
+Change 02 must replace the temporary graph-owned skeleton state with its one
+canonical domain state authority. Later changes may add `graph/components/`.
+Change 03 and later may
 add `engine/gates/`, `work_units/`, `evidence/`, and `artifacts/`. Do not create
 these packages early merely to match a plan diagram.
 
 ## Development Order
 
 Execute the numbered Deep Research changes strictly in order `00 -> 01 -> ... ->
-18`. Within change 00, follow `tasks.md` group and task order. Group 2 is a hard
-viability gate: do not continue to group 3 unless reflected async `ToolRuntime`
-injection and ordinary asyncio cancellation propagation pass on the pinned
-stack. Run `make test-viability`; it executes
+18`. Within an active change, follow `tasks.md` group and task order. The
+reflected async `ToolRuntime`/Command viability and ordinary asyncio
+cancellation gates remain mandatory on the pinned stack. Run
+`make test-viability`; it executes
 `test_reflected_runtime_viability.py` and `test_cancellation_viability.py`.
 
 Use red-before-green deterministic tests. Model-facing tests use
@@ -181,6 +213,8 @@ make test          # complete agent-owned test suite
 make test-unit     # unit tests only
 make test-contract # contract tests only
 make test-viability # hard reflected-runtime and nested-cancellation gate
+make test-durability # file-SQLite provider and lifecycle restart recovery
+make test-blocking-io # deterministic async blocking guard
 ```
 
 Run permanent governance from the repository root:

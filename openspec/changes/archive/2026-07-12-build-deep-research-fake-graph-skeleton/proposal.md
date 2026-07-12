@@ -122,6 +122,11 @@ The new requirement IDs are `RUI-006` and `REG-001` through `REG-005`.
   per-user Agent/SOUL may describe the new lifecycle, but must label it
   `implementation_mode=full_fake`, keep entry/config paths unchanged, and forbid claims
   of real research output.
+- `project-structure`: Preserve the node-package grammar while allowing a
+  package-owned optional `subgraph.py` to import public LangGraph `Send`/graph APIs and
+  a HITL fake to import exactly public `interrupt`; all other node modules remain
+  limited to domain/engine and graph implementation, runtime, agents, and sibling-node
+  imports remain forbidden.
 
 ## Impact
 

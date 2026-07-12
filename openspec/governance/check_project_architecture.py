@@ -32,7 +32,7 @@ REQUIRED_IMPORT_POLICY = {
     "engine": {"domain"},
     "agents": {"domain", "deerflow", "langchain"},
     "graph": {"domain", "nodes", "langgraph"},
-    "nodes": {"domain", "engine"},
+    "nodes": {"domain", "engine", "langgraph"},
     "runtime": {"domain", "graph", "agents", "deerflow", "langchain", "langgraph"},
 }
 
@@ -456,6 +456,13 @@ def _validate_module_imports(
 
         target_layer, target_node = _target_owner(imported)
         if target_layer is None:
+            if layer == "nodes" and module_root == "langgraph":
+                hitl_interrupt = path.name == "fake.py" and imported == "langgraph.types.interrupt"
+                if path.name != "subgraph.py" and not hitl_interrupt:
+                    raise ContractViolation(
+                        "import.boundary",
+                        f"node LangGraph import is outside subgraph/HITL-interrupt exceptions: {path.relative_to(root)}",
+                    )
             if not _external_allowed(layer, module_root, manifest):
                 raise ContractViolation(
                     "import.external",

@@ -1,7 +1,7 @@
 # Plan: Deep Research 01 - Fake Graph Skeleton
 
 > 类型: 设计 | 更新: 2026-07-12
-> 状态: OpenSpec proposal ready；等待 apply
+> 状态: 已归档（`2026-07-12-build-deep-research-fake-graph-skeleton`）
 > 对应 OpenSpec change: `build-deep-research-fake-graph-skeleton`
 > 依赖: 已归档的 00 Runtime Infrastructure runtime substrate
 > 在主图中的作用: 先建立完整拓扑，所有业务 node 使用 deterministic fake
@@ -9,6 +9,8 @@
 ## 目标
 
 在实现任何真实 research node 前，跑通一张可以 start、interrupt、resume、rerun、finish 的完整 Deep Research StateGraph。它是后续所有 change 的集成底座和 topology contract。
+
+当前实现已落地于 `agent/`：11 个 logical node package、统一 topology/implementation map、两次真实 interrupt、全路由 deterministic fixture、memory 同进程恢复与 file-SQLite 跨进程恢复均已覆盖。公开边界是 Web UI/兼容 generic client；known IM 与 non-interactive 的 start/resume fail closed，status/cancel 保留。对应 requirement 为 `RUI-006`、`REG-001`..`REG-005`。
 
 ## Scope
 

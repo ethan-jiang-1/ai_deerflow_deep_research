@@ -25,6 +25,9 @@ INFRA_PROBE_CHECKPOINT_NS = f"{INFRA_PROBE_GRAPH}/{INFRA_PROBE_GRAPH_VERSION}"
 _INFRA_PROBE_DIGEST_DOMAIN = "deep-research/infra-probe"
 _INFRA_PROBE_KEY_SCHEMA = 1
 SUPPORTED_PROBE_KEY_SCHEMAS = frozenset({_INFRA_PROBE_KEY_SCHEMA})
+RESEARCH_CHECKPOINT_NS = "deep-research/research/v1"
+_RESEARCH_DIGEST_DOMAIN = "deep-research/research"
+_RESEARCH_KEY_SCHEMA = 1
 
 
 class CheckpointNamespaceError(ValueError):
@@ -147,6 +150,31 @@ def derive_probe_thread_key(
     return f"{_INFRA_PROBE_DIGEST_DOMAIN}:{digest}"
 
 
+def derive_research_thread_key(
+    *,
+    effective_user_id: str,
+    outer_thread_id: str,
+    research_id: str,
+) -> str:
+    for label, value in (
+        ("effective_user_id", effective_user_id),
+        ("outer_thread_id", outer_thread_id),
+        ("research_id", research_id),
+    ):
+        if not isinstance(value, str) or not value:
+            raise CheckpointNamespaceError("scope_invalid", f"{label} must be a non-empty string")
+    payload = b"".join(
+        (
+            _RESEARCH_KEY_SCHEMA.to_bytes(2, "big"),
+            _length_prefixed(_RESEARCH_DIGEST_DOMAIN),
+            _length_prefixed(effective_user_id),
+            _length_prefixed(outer_thread_id),
+            _length_prefixed(research_id),
+        )
+    )
+    return f"{_RESEARCH_DIGEST_DOMAIN}:{hashlib.sha256(payload).hexdigest()}"
+
+
 __all__ = [
     "INFRA_PROBE_CHECKPOINT_NS",
     "INFRA_PROBE_GRAPH",
@@ -158,6 +186,7 @@ __all__ = [
     "ProviderSelection",
     "ProviderSource",
     "derive_probe_thread_key",
+    "derive_research_thread_key",
     "resolve_effective_provider",
     "validate_probe_key_schema",
 ]

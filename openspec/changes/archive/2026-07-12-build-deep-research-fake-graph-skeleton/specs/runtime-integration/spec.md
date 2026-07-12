@@ -30,11 +30,11 @@ authority field SHALL remain forbidden.
 - **WHEN** the tool receives an action-valid `start`, `resume`, `status`, or `cancel` request
 - **THEN** it adapts trusted runtime and dispatches only to that registered lifecycle handler without accepting caller identity, path, checkpoint, or answer authority
 
-#### Scenario: Unsupported control action is refused early
+#### Scenario: Unsupported control action is refused
 - **WHEN** the tool receives an unknown bounded action in an otherwise valid request
 - **THEN** it returns typed `action_unavailable` without echoing the rejected value and without adapting runtime or touching sandbox/checkpoint state
 
-#### Scenario: Action-field mismatch is schema-rejected
+#### Scenario: Extra authority field is schema-rejected
 - **WHEN** `infra_probe` receives a research id, start receives caller-supplied probe/research ids or question text, resume/status/cancel omit their research id or include a probe/answer/authority field, or any action receives an unknown extra field
 - **THEN** strict validation emits only normalized field/code diagnostics and dispatch does not occur
 

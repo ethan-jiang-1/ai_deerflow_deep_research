@@ -39,7 +39,7 @@ domain = ["stdlib", "pydantic"]
 engine = ["domain"]
 agents = ["domain", "deerflow", "langchain"]
 graph = ["domain", "nodes", "langgraph"]
-nodes = ["domain", "engine"]
+nodes = ["domain", "engine", "langgraph"]
 runtime = ["domain", "graph", "agents", "deerflow", "langchain", "langgraph"]
 
 [node_packages]
@@ -77,6 +77,7 @@ VALID_MODULES = {
     "graph/nodes/alpha/contracts.py": "from deerflow_deep_research.domain import models\n",
     "graph/nodes/alpha/fake.py": "from deerflow_deep_research.engine import runner\n",
     "graph/nodes/alpha/node.py": ("from . import contracts\nfrom deerflow_deep_research.engine import runner\n"),
+    "graph/nodes/alpha/subgraph.py": "from langgraph.types import Send\n",
     "tool.py": "from deerflow_deep_research import runtime\n",
 }
 
@@ -143,6 +144,25 @@ def test_sibling_node_import_fails(project_root: Path) -> None:
         "from deerflow_deep_research.graph.nodes.alpha import node\n",
     )
     _assert_error(project_root, "import.sibling")
+
+
+def test_ordinary_node_module_cannot_import_langgraph(project_root: Path) -> None:
+    _write(
+        project_root,
+        "agent/src/deerflow_deep_research/graph/nodes/alpha/fake.py",
+        "from langgraph.types import Send\n",
+    )
+    _assert_error(project_root, "import.boundary")
+
+
+def test_hitl_fake_may_import_only_public_interrupt(project_root: Path) -> None:
+    _write(
+        project_root,
+        "agent/src/deerflow_deep_research/graph/nodes/alpha/fake.py",
+        "from langgraph.types import interrupt\n",
+    )
+    result = _run_checker(project_root)
+    assert result.returncode == 0, result.stderr
 
 
 def test_production_app_import_fails(project_root: Path) -> None:

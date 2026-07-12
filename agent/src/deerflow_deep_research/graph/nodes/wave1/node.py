@@ -1,0 +1,3 @@
+from deerflow_deep_research.domain.node_spec import UNAVAILABLE_REAL_FACTORY
+
+build_real = UNAVAILABLE_REAL_FACTORY

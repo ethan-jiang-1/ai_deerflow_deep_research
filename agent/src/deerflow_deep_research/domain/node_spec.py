@@ -50,6 +50,14 @@ class NodeBuildDependencies:
 NodeFactory = Callable[[NodeBuildDependencies], NodeCallable]
 
 
+def _unavailable_real_factory(_dependencies: NodeBuildDependencies) -> NodeCallable:
+    """Canonical sentinel; implementation maps reject it before invocation."""
+    raise RuntimeError("implementation_unavailable")
+
+
+UNAVAILABLE_REAL_FACTORY: NodeFactory = _unavailable_real_factory
+
+
 @dataclass(frozen=True)
 class PolicyRef:
     name: str

@@ -239,6 +239,12 @@ three `Send` branches, a reducer-backed result collection, and one join. The top
 logical topology still sees only `wave0` and `wave1`; dispatch/join workers are internal
 components and never become top-level phases.
 
+The optional package-local `subgraph.py` may import public LangGraph APIs, and a HITL
+`fake.py` may import exactly public `langgraph.types.interrupt`. Other `node.py`,
+`fake.py`, `contracts.py`, and package roots retain the domain/engine-only boundary;
+neither exception can import runtime, agents, graph implementation modules, or sibling nodes. The project-structure delta,
+registry, checker, and generated guide block are updated together for this narrow rule.
+
 The fake branch result contains only a stable branch id and fixture verdict. The
 validated fixture plan is a closed deterministic data contract selected by a
 test/handler factory (the production default is the happy profile), never a public tool

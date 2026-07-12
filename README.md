@@ -46,6 +46,7 @@ DeerFlow has newly integrated the intelligent search and crawling toolset indepe
   - [InfoQuest](#infoquest)
   - [Table of Contents](#table-of-contents)
   - [One-Line Agent Setup](#one-line-agent-setup)
+  - [Deep Research Development Skeleton](#deep-research-development-skeleton)
   - [Quick Start](#quick-start)
     - [Configuration](#configuration)
     - [Running the Application](#running-the-application)
@@ -91,6 +92,12 @@ Help me clone DeerFlow if needed, then bootstrap it for local development by fol
 ```
 
 That prompt is intended for coding agents. It tells the agent to clone the repo if needed, choose Docker when available, and stop with the exact next command plus any missing config the user still needs to provide.
+
+## Deep Research Development Skeleton
+
+The downstream project under `agent/` provides a checkpointed, zero-API Deep Research control-flow skeleton. Its `deep_research` tool supports `start`, `resume`, `status`, and `cancel` in addition to the isolated `infra_probe`; all lifecycle results are explicitly marked `implementation_mode=full_fake`. The Web UI and compatible generic clients can traverse its two human-input suspensions. Known IM transports and non-interactive runs fail closed for `start`/`resume`, while `status` and `cancel` remain available.
+
+This is development infrastructure, not a research implementation. Its terminal fixture contains no findings, evidence, citations, or report and must not be presented as completed research. File-backed SQLite supports restart recovery; memory and in-memory SQLite are same-process only. Postgres, live Docker launch verification, and multi-worker coordination remain deferred.
 
 ## Quick Start
 

@@ -1,7 +1,18 @@
-.PHONY: install lock-check format lint test test-unit test-contract test-viability test-durability test-postgres
+.PHONY: install lock-check format lint test test-unit test-contract test-viability test-durability test-blocking-io test-postgres demo demo-scripted
+
+DEMO_ARGS ?=
 
 install:
 	uv sync --extra operations
+
+# Standalone Change 01 lifecycle demo. It needs no Gateway, config.yaml,
+# model credentials, network access, or TUI installation.
+demo:
+	uv run --extra operations python scripts/demo.py $(DEMO_ARGS)
+
+# Non-interactive equivalent used by CI and quick smoke checks.
+demo-scripted:
+	uv run --extra operations python scripts/demo.py --scripted $(DEMO_ARGS)
 
 lock-check:
 	uv lock --check
@@ -33,9 +44,13 @@ test-viability:
 test-durability:
 	uv run --extra operations pytest tests/integration/test_provider_durability.py
 
+# Deterministic event-loop guard for lifecycle dispatch, nested graph Send
+# fan-in, provider cleanup, and outer Command projection.
+test-blocking-io:
+	uv run --extra operations pytest tests/blocking_io
+
 # Postgres durability profile is deferred (see openspec/config.yaml tech-stack
 # decisions). This target runs the postgres-marked tests, which skip until a
 # later change adds the isolated Postgres test service and Compose profile.
 test-postgres:
 	uv run --extra operations pytest -m postgres
-

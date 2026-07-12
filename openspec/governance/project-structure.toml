@@ -75,6 +75,21 @@ kind = "file"
 owner = "PRS-001"
 
 [[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime/control.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime/human_input.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime/research.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
 path = "agent/src/deerflow_deep_research/domain"
 kind = "directory"
 owner = "PRS-001"
@@ -100,12 +115,27 @@ kind = "file"
 owner = "PRS-003"
 
 [[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/invocation.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/lifecycle.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
 path = "agent/src/deerflow_deep_research/engine"
 kind = "directory"
 owner = "PRS-001"
 
 [[required_paths]]
 path = "agent/src/deerflow_deep_research/engine/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/engine/fake_control.py"
 kind = "file"
 owner = "PRS-001"
 
@@ -132,6 +162,96 @@ owner = "PRS-001"
 [[required_paths]]
 path = "agent/src/deerflow_deep_research/graph/registry.py"
 kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/builder.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/implementation_map.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/routing.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/skeleton_state.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/topology.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/topology_snapshot.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/bootstrap"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/hitl1"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/topic_planning"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/wave0"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/wave1"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/wave2_synthesis"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/targeted_evidence"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/hitl2"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/rerun"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/readiness"
+kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/final_delivery"
+kind = "directory"
 owner = "PRS-003"
 
 [[required_paths]]
@@ -200,6 +320,16 @@ kind = "file"
 owner = "PRS-001"
 
 [[required_paths]]
+path = "agent/scripts/render_topology.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/docs/deep-research-topology.md"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
 path = "agent/docker"
 kind = "directory"
 owner = "PRS-001"
@@ -254,7 +384,7 @@ domain = ["stdlib", "pydantic"]
 engine = ["domain"]
 agents = ["domain", "deerflow", "langchain"]
 graph = ["domain", "nodes", "langgraph"]
-nodes = ["domain", "engine"]
+nodes = ["domain", "engine", "langgraph"]
 runtime = ["domain", "graph", "agents", "deerflow", "langchain", "langgraph"]
 
 [node_packages]

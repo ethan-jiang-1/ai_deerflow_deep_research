@@ -56,7 +56,7 @@ domain = ["stdlib", "pydantic"]
 engine = ["domain"]
 agents = ["domain", "deerflow", "langchain"]
 graph = ["domain", "nodes", "langgraph"]
-nodes = ["domain", "engine"]
+nodes = ["domain", "engine", "langgraph"]
 runtime = ["domain", "graph", "agents", "deerflow", "langchain", "langgraph"]
 
 [node_packages]

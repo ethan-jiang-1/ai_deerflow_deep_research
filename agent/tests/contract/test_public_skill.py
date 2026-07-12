@@ -55,7 +55,11 @@ def test_committed_skill_is_thin_control_tool_entry() -> None:
     assert len(content.encode("utf-8")) <= 1400
     assert "name: deep-research-controller" in content
     assert "deep_research" in content
-    assert "action_unavailable" in content
+    assert "implementation_mode=full_fake" in content
+    assert 'action="start"' in content
+    assert 'action="resume"' in content
+    assert "research_id" in content
+    assert "terminal fixture" in content
     for forbidden in (
         "StateGraph",
         "ResearchState",
@@ -63,11 +67,9 @@ def test_committed_skill_is_thin_control_tool_entry() -> None:
         "HITL",
         "phase",
         "gate",
-        "start",
-        "resume",
-        "cancel",
-        "exclusive",
         "security isolation",
+        "fixture controls",
+        "answer=",
     ):
         assert forbidden.casefold() not in content.casefold()
 

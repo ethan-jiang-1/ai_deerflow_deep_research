@@ -15,6 +15,23 @@ from deerflow_deep_research.domain.node_spec import NodeBuildDependencies, NodeS
 _DOTTED_NAME_RE = re.compile(r"^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$")
 _REQUIRED_FILES = frozenset({"__init__.py", "node.py", "fake.py", "contracts.py"})
 _REGISTRY_MODULE = "deerflow_deep_research.graph.registry"
+RESEARCH_NODE_PACKAGE_PREFIX = "deerflow_deep_research.graph.nodes"
+RESEARCH_NODE_PACKAGES = tuple(
+    f"{RESEARCH_NODE_PACKAGE_PREFIX}.{name}"
+    for name in (
+        "bootstrap",
+        "hitl1",
+        "topic_planning",
+        "wave0",
+        "wave1",
+        "wave2_synthesis",
+        "targeted_evidence",
+        "hitl2",
+        "rerun",
+        "readiness",
+        "final_delivery",
+    )
+)
 
 
 class NodeRegistryError(ValueError):
@@ -105,4 +122,18 @@ class NodeRegistry:
             raise NodeRegistryError("node.import", f"cannot load {package_name}: {exc}") from exc
 
 
-__all__ = ["NodeBuildDependencies", "NodeRegistry", "NodeRegistryError"]
+def load_research_node_specs() -> Mapping[str, NodeSpec]:
+    return NodeRegistry(
+        package_prefix=RESEARCH_NODE_PACKAGE_PREFIX,
+        package_names=RESEARCH_NODE_PACKAGES,
+    ).load()
+
+
+__all__ = [
+    "NodeBuildDependencies",
+    "NodeRegistry",
+    "NodeRegistryError",
+    "RESEARCH_NODE_PACKAGES",
+    "RESEARCH_NODE_PACKAGE_PREFIX",
+    "load_research_node_specs",
+]

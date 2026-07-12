@@ -48,6 +48,7 @@ deer-flow/
 │   ├── packages/harness/           # deerflow-harness package (import: deerflow.*) — agent framework
 │   └── app/                        # FastAPI Gateway + IM channels (import: app.*)
 ├── frontend/                       # Next.js frontend (pnpm) — see frontend/AGENTS.md
+├── agent/                          # Downstream Deep Research project — see agent/AGENTS.md
 ├── docker/                         # docker-compose files, nginx config, provisioner
 ├── skills/                         # Agent skills: public/ (committed), custom/ (gitignored)
 ├── contracts/                      # Cross-component JSON contracts (e.g. subagent status)
@@ -65,6 +66,9 @@ Gateway API. Config schema and resolution order are documented in
 Scheduled-task note:
 - The scheduled-task MVP adds a workspace page at `/workspace/scheduled-tasks` plus a background scheduler service gated by `config.yaml -> scheduler.enabled`.
 - Scheduled background runs are intentionally non-interactive: they execute through the normal run lifecycle, but the lead-agent toolset excludes `ask_clarification` when `context.non_interactive=true`. The key is honored only for internally-authenticated callers (the scheduler launch path); client-supplied `context.non_interactive` is dropped.
+
+Deep Research development note:
+- `agent/` owns a zero-API `implementation_mode=full_fake` lifecycle skeleton with real checkpoint/HITL control flow but no findings or report generation. Web UI and compatible generic clients may use `start`/`resume`; known IM and non-interactive contexts refuse those actions while retaining `status`/`cancel`. Do not modify `backend/` or `frontend/` to widen that boundary in this change.
 
 ## Commands: Root vs. Module
 
@@ -108,6 +112,7 @@ Rule of thumb: **root `make` = the full application**; **`backend/Makefile` and 
 
 - Backend work → **[backend/AGENTS.md](backend/AGENTS.md)**
 - Frontend work → **[frontend/AGENTS.md](frontend/AGENTS.md)**
+- Deep Research work → **[agent/AGENTS.md](agent/AGENTS.md)**
 - Setup & install → **[Install.md](Install.md)**, **[CONTRIBUTING.md](CONTRIBUTING.md)**
 - Project overview & usage → **[README.md](README.md)** (translations: `README_zh.md`,
   `README_ja.md`, `README_fr.md`, `README_ru.md`)

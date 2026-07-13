@@ -36,6 +36,7 @@ prefixes:
   RED: research-demo-tui
   REG: research-graph-lifecycle
   RUI: runtime-integration
+  WOU: work-unit-kernel
 
 # ──────────────────────────────────────────────
 # Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
@@ -99,3 +100,13 @@ GAK-003: gate-kernel — Gate is the sole writer of phase transition routing and
 GAK-004: gate-kernel — Bounded repair loop with per-phase budget, lazy initialization, fingerprint-based fatigue detection, and cross-phase fatigue isolation
 GAK-005: gate-kernel — Fixture rules preserve all fake graph paths by wrapping the existing fixture_plan in typed GateDefinitions with phase-specific route resolution
 GAK-006: gate-kernel — Rule evaluation is stable-ordered and deterministic with pure rules that perform no I/O, model calls, or state mutation
+
+# work-unit-kernel
+WOU-001: work-unit-kernel — Immutable work, attempt, candidate, and submission contracts preserve controller-assigned identity and spec integrity
+WOU-002: work-unit-kernel — Typed pending and in-flight state drives bounded Send batches with deterministic fan-in and terminal monotonic reducers
+WOU-003: work-unit-kernel — Deterministic submit validation fails closed on identity, schema, containment, content hash, and source-reference defects
+WOU-004: work-unit-kernel — Only the controller submit path may atomically append hash-chained accepted records and publish accepted submission references
+WOU-005: work-unit-kernel — Submission replay reconciles ledger and checkpoint crash windows idempotently while divergent records fail closed
+WOU-006: work-unit-kernel — Per-research cross-process serialization guarantees at most one accepted winner without partial ledger publication
+WOU-007: work-unit-kernel — Retry, expiry, cancellation, failure, and crash recovery preserve one-way attempt lifecycle semantics
+WOU-008: work-unit-kernel — A generic drain check permits phase gating only when pending and in-flight work are empty

@@ -1,5 +1,7 @@
 # gate-kernel Specification
 
+> req: GAK-001, GAK-002, GAK-003, GAK-004, GAK-005, GAK-006
+
 ## Purpose
 TBD - created by archiving change build-deep-research-gate-kernel. Update Purpose after archive.
 ## Requirements
@@ -263,4 +265,3 @@ registration order, used for fatigue detection.
 #### Scenario: Rule evaluation has no side effects
 - **WHEN** `evaluate_gate` runs under spies for filesystem, network, model, and subprocess access
 - **THEN** every spy remains unused
-

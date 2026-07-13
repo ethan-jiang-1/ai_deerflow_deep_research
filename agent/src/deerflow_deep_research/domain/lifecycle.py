@@ -56,8 +56,9 @@ class TerminalReason(StrEnum):
     COMPLETED = "completed"
     USER_STOPPED = "user_stopped"
     USER_CANCELLED = "user_cancelled"
-    REPAIR_EXHAUSTED = "repair_exhausted"
+    REPAIR_EXHAUSTED = "repair_exhausted"  # retained for compat, no longer produced by gate
     RERUN_EXHAUSTED = "rerun_exhausted"
+    GATE_BLOCKED = "gate_blocked"  # @impl REG-004 — gate fatigue/budget exhaustion
 
 
 class ResultCode(StrEnum):

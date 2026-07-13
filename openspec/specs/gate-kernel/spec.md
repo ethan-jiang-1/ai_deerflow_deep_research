@@ -1,15 +1,8 @@
 # gate-kernel Specification
 
-> req: GAK-001, GAK-002, GAK-003, GAK-004, GAK-005, GAK-006
-
 ## Purpose
-The shared deterministic gate evaluation engine, closed failure-code registry,
-sole-writer phase-transition authority, bounded repair loop with fatigue
-escalation, and fixture-rule adapter that every Deep Research phase consumes
-without owning its own transition authority.
-
+TBD - created by archiving change build-deep-research-gate-kernel. Update Purpose after archive.
 ## Requirements
-
 ### Requirement: Gate definitions collect all rules and produce deterministic verdicts
 
 The system SHALL define `GateDefinition` as a named collection of `GateRule`
@@ -270,3 +263,4 @@ registration order, used for fatigue detection.
 #### Scenario: Rule evaluation has no side effects
 - **WHEN** `evaluate_gate` runs under spies for filesystem, network, model, and subprocess access
 - **THEN** every spy remains unused
+

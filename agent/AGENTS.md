@@ -124,8 +124,11 @@ non-interactive contexts refuse those actions and retain status/cancel.
 - `domain/`: frozen pure contracts. It may use only the standard library and
   Pydantic and must not import outer layers.
 - `engine/`: deterministic business/control primitives that depend only on
-  `domain/`. Change 03 and later add gates, work units, evidence, and artifact
-  policy when those contracts become real.
+  `domain/`. Includes `gate_kernel.py` (``evaluate_gate`` + state update
+  conversion), `gate_fixtures.py` (``FixtureSequenceRule`` + per-phase
+  ``GateDefinition`` registry), and `fake_control.py` (fixture mechanics).
+  Change 04 and later add work units, evidence, and artifact policy when those
+  contracts become real.
 - `agents/`: bounded embedded-agent construction, middleware, policies, prompts,
   and structured results. It may depend on `domain/` and public DeerFlow,
   LangChain, and LangGraph APIs, never `runtime/` or graph nodes.

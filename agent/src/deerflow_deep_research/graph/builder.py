@@ -3,6 +3,8 @@
 @impl REG-001
 @impl REG-002
 @impl REG-006
+@impl GAK-003
+@impl GAK-005
 """
 
 from __future__ import annotations
@@ -14,16 +16,26 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 
+from deerflow_deep_research.domain.gate import GateDefinition
 from deerflow_deep_research.domain.invocation import GraphInvocationContext
 from deerflow_deep_research.domain.lifecycle import make_attempt_id
 from deerflow_deep_research.domain.node_spec import NodeSpec
 from deerflow_deep_research.domain.state import ResearchState
 from deerflow_deep_research.graph.implementation_map import resolve_implementations
+from deerflow_deep_research.graph.nodes.gate_adapter import (
+    default_gate_defs,
+    evaluate_gate_for_node,
+)
 from deerflow_deep_research.graph.registry import load_research_node_specs
 from deerflow_deep_research.graph.topology import LOGICAL_NODES
 
 
-def _node_wrapper(logical_name: str, spec: NodeSpec, factory):
+def _node_wrapper(
+    logical_name: str,
+    spec: NodeSpec,
+    factory,
+    gate_defs: Mapping[str, GateDefinition],
+):
     async def run(state: ResearchState, runtime: Runtime[GraphInvocationContext]) -> dict[str, Any]:
         context = runtime.context
         current_attempt = make_attempt_id(state, logical_name)
@@ -40,7 +52,15 @@ def _node_wrapper(logical_name: str, spec: NodeSpec, factory):
             raise ValueError("dependency_attempt_mismatch")
         node = factory(dependencies)
         result = node(state)
-        return await result if inspect.isawaitable(result) else result
+        result = await result if inspect.isawaitable(result) else result
+
+        # Gate evaluation — delegated to nodes layer (architecture: graph → nodes → engine)
+        gate_def = gate_defs.get(logical_name)
+        if gate_def is not None:
+            gate_update = evaluate_gate_for_node(state, logical_name, gate_def)
+            result = {**result, **gate_update}
+
+        return result
 
     run.__name__ = f"run_{logical_name}"
     return run
@@ -57,6 +77,7 @@ def build_research_graph(
     *,
     implementation_modes: Mapping[str, str] | None = None,
     spec_overrides: Mapping[str, NodeSpec] | None = None,
+    gate_defs: Mapping[str, GateDefinition] | None = None,
 ) -> StateGraph:
     loaded = dict(load_research_node_specs())
     if spec_overrides:
@@ -69,9 +90,14 @@ def build_research_graph(
     modes = dict(implementation_modes or {name: "fake" for name in LOGICAL_NODES})
     factories = resolve_implementations(loaded, modes)
 
+    _gate_defs: Mapping[str, GateDefinition] = gate_defs if gate_defs is not None else default_gate_defs()
+
     builder = StateGraph(ResearchState, context_schema=GraphInvocationContext)
     for logical_name in LOGICAL_NODES:
-        builder.add_node(logical_name, _node_wrapper(logical_name, loaded[logical_name], factories[logical_name]))
+        builder.add_node(
+            logical_name,
+            _node_wrapper(logical_name, loaded[logical_name], factories[logical_name], _gate_defs),
+        )
 
     builder.add_edge(START, "bootstrap")
     builder.add_conditional_edges(

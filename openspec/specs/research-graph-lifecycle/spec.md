@@ -40,11 +40,29 @@ LangGraph `Send` fan-out and reducer-based fan-in, normalize branch ordering, an
 return one typed phase result. Typed routers SHALL support pass, bounded repair,
 targeted-evidence convergence, all five HITL2 decisions
 (`proceed | revise_view | repair | rerun | stop`), typed readiness repair targets,
-bounded final-delivery self-repair/evidence-blocked return, and completion without reading free-form model text.
-The validated fixture plan SHALL come from handler/test construction rather than public
-tool arguments and SHALL be persisted as closed data needed for deterministic resume.
-Bootstrap SHALL expose both `needs_input -> hitl1` and
-`profile_complete -> topic_planning`; the default fake path SHALL still exercise HITL1.
+bounded final-delivery self-repair/evidence-blocked return, and completion without
+reading free-form model text. The validated fixture plan SHALL come from handler/test
+construction rather than public tool arguments and SHALL be persisted as closed data
+needed for deterministic resume. Bootstrap SHALL expose both `needs_input -> hitl1`
+and `profile_complete -> topic_planning`; the default fake path SHALL still exercise
+HITL1.
+
+Gate evaluation SHALL replace the change-01 direct fixture-outcome switch. Every gated
+phase node SHALL have a registered `GateDefinition` containing a
+`FixtureSequenceRule` (fake graph) or real rules (later changes). After the phase node
+returns its work result, the node wrapper SHALL invoke `evaluate_gate()` which runs
+all rules, collects failures, and produces a typed `PhaseVerdict`. The gate's
+`route_map` SHALL translate the verdict to the route string written to
+`state["route"]`. The existing `_route()` function SHALL read `state["route"]`
+unchanged. The graph's conditional edges SHALL continue to match on the same route
+labels as change 01.
+
+The `choose_fixture()` and `bounded_repair_update()` helpers in
+`engine/fake_control.py` SHALL be removed; fixture sequence indexing moves into
+`FixtureSequenceRule`, and attempt/budget tracking moves into the gate kernel. The
+`repair_counts` state field SHALL be frozen (no longer written, superseded by
+`gate_attempts_by_phase`). The topology snapshot SHALL be regenerated and SHALL remain
+identical in node/edge structure; every route label SHALL match change 01 exactly.
 
 #### Scenario: Three branches join deterministically
 - **WHEN** a Wave fake runs with three branch fixtures completing in any scheduler order
@@ -55,20 +73,28 @@ Bootstrap SHALL expose both `needs_input -> hitl1` and
 - **THEN** the graph routes directly to topic planning without creating HITL1, while the default fixture still routes through HITL1 and the topology snapshot remains unchanged
 
 #### Scenario: Wave0 repair is bounded
-- **WHEN** the first Wave0 fixture verdict is repair and the next verdict is pass
-- **THEN** the topology executes Wave0 twice, increments the bounded repair counter, records both logical visits, and advances to Wave1 only after pass
+- **WHEN** the Wave0 fixture gate definition sequences `repair` then `pass`
+- **THEN** gate evaluation returns `REPAIR` on the first attempt (route `"repair"`), the repair agent runs, gate evaluation returns `PASS` on the second attempt (route `"pass"`), `gate_attempts_by_phase["wave0"]` is 2, and the topology advances to Wave1 only after pass
 
 #### Scenario: Targeted evidence always returns through synthesis
 - **WHEN** Wave2, HITL2 repair, or readiness routes to targeted evidence
 - **THEN** the targeted phase returns to Wave2 synthesis before HITL2 or readiness can be reached again, and a fixture cannot bypass synthesis by routing directly to HITL2
 
 #### Scenario: Every later repair edge remains explicit
-- **WHEN** fixtures select Wave1 repair, HITL2 revise-view/repair, any readiness repair target, final-delivery self-repair, or final evidence-blocked return to readiness
+- **WHEN** fixture gate definitions produce Wave1 repair, HITL2 revise-view/repair, any readiness repair target, final-delivery self-repair, or final evidence-blocked return to readiness
 - **THEN** the normalized topology follows the declared bounded edge and eventually reaches the expected next gate or typed terminal without changing node implementations
 
 #### Scenario: Fake execution has no external side effect
 - **WHEN** the complete graph runs under spies for model, web, subagent, and sandbox research tools
 - **THEN** every spy remains unused and no evidence, cache, ledger, report, or research output file is created
+
+#### Scenario: Gate verdict drives routing through unchanged _route function
+- **WHEN** a gated phase node completes
+- **THEN** the gate writes `route` via `route_map` (e.g. `PhaseVerdict.PASS → "pass"`), `_route()` reads `state["route"]` exactly as in change 01, and the conditional edge matches the identical route label
+
+#### Scenario: Fixture gate rules produce identical outcomes to old fixture plan
+- **WHEN** the fake graph runs with fixture gate definitions encoding the same sequences as the change-01 `fixture_plan`
+- **THEN** every phase transition follows the same path as the change-01 fake graph, and every E2E test (happy completion, repair, rerun, stop, cancel, stale-response denial) passes identically
 
 ### Requirement: Graph-owned HITL bridges and resumes from one matching HumanMessage
 
@@ -170,7 +196,9 @@ request id, and a terminal result MAY add its terminal reason. Every result SHAL
 raw identity, internal namespace, host paths, fixtures, and checkpoint values. Exact
 start text SHALL be limited to 16,384 characters and serialized control results to
 4,096 characters; semantic content SHALL fail validation rather than be silently
-truncated. Fake repair exhaustion SHALL produce typed `blocked`.
+truncated. Gate fatigue escalation or budget exhaustion SHALL produce typed `blocked`
+with `terminal_reason=GATE_BLOCKED`; the change-01 `REPAIR_EXHAUSTED` reason SHALL be
+retained in the enum but no longer produced (gate-produced `GATE_BLOCKED` replaces it).
 
 After strict schema and registered-action validation, version-1 lifecycle-owned result
 codes SHALL be closed to normal `suspended | completed | stopped | cancelled | blocked`,
@@ -233,6 +261,10 @@ candidate without substituting an older response.
 #### Scenario: Cross-scope and invalid transitions fail closed
 - **WHEN** another outer thread reuses the research id, a fresh response resumes with no pending interrupt or targets a terminal lifecycle, or start targets an existing namespace
 - **THEN** wrong scope returns `research_not_found`, fresh no-pending or terminal resume returns `invalid_transition`, same-message start reprojects, different-message start returns `thread_research_exists`, and no path mutates or discloses another scope's lifecycle
+
+#### Scenario: Gate-blocked terminal reason replaces fixture exhaustion
+- **WHEN** gate fatigue escalation or budget exhaustion produces a `BLOCKED` verdict
+- **THEN** `terminal_reason` is `GATE_BLOCKED`, not the change-01 `REPAIR_EXHAUSTED`, and the lifecycle transitions to typed terminal `blocked`
 
 ### Requirement: Checkpoints and topology contracts remain durable and deterministic
 

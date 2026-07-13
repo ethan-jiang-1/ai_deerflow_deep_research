@@ -119,6 +119,7 @@ GATED_FIELDS = frozenset(
         "schema_version",
         "research_id",
         "outer_thread_id",
+        "route",  # @impl GAK-003 — gate writes route for gated phases
     }
 )
 
@@ -580,9 +581,11 @@ OWNERSHIP_TABLE: tuple[FieldOwnership, ...] = (
     FieldOwnership("report_refs", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "merge_content_refs"),
     FieldOwnership("content_refs", WriterRole.WORKER, (WriterRole.CONTROLLER, WriterRole.GATE), "merge_content_refs"),
     FieldOwnership("fixture_plan", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "controller_init"),
-    FieldOwnership("route", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
+    # @impl GAK-003 — gate writes route for gated phases
+    FieldOwnership("route", WriterRole.GATE, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
     FieldOwnership("terminal_fixture_marker", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
-    FieldOwnership("repair_counts", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
+    # frozen — superseded by gate_attempts_by_phase + repair_budget_by_phase (change 03)  @impl GAK-003
+    FieldOwnership("repair_counts", WriterRole.GATE, (WriterRole.CONTROLLER,), "last_write_wins"),
     FieldOwnership("consumed_request_ids", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
     FieldOwnership("consumed_message_ids", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
     FieldOwnership("execution_trace", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "merge_trace"),

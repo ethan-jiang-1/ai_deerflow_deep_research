@@ -2,6 +2,7 @@
 
 @impl REG-001
 @impl REG-002
+@impl REG-006
 """
 
 from __future__ import annotations
@@ -16,14 +17,14 @@ from langgraph.runtime import Runtime
 from deerflow_deep_research.domain.invocation import GraphInvocationContext
 from deerflow_deep_research.domain.lifecycle import make_attempt_id
 from deerflow_deep_research.domain.node_spec import NodeSpec
+from deerflow_deep_research.domain.state import ResearchState
 from deerflow_deep_research.graph.implementation_map import resolve_implementations
 from deerflow_deep_research.graph.registry import load_research_node_specs
-from deerflow_deep_research.graph.skeleton_state import SkeletonState
 from deerflow_deep_research.graph.topology import LOGICAL_NODES
 
 
 def _node_wrapper(logical_name: str, spec: NodeSpec, factory):
-    async def run(state: SkeletonState, runtime: Runtime[GraphInvocationContext]) -> dict[str, Any]:
+    async def run(state: ResearchState, runtime: Runtime[GraphInvocationContext]) -> dict[str, Any]:
         context = runtime.context
         current_attempt = make_attempt_id(state, logical_name)
         dependencies = context.dependency_resolver.resolve(
@@ -45,7 +46,7 @@ def _node_wrapper(logical_name: str, spec: NodeSpec, factory):
     return run
 
 
-def _route(state: SkeletonState) -> str:
+def _route(state: ResearchState) -> str:
     route = state.get("route")
     if not isinstance(route, str):
         raise ValueError("typed_route_missing")
@@ -68,7 +69,7 @@ def build_research_graph(
     modes = dict(implementation_modes or {name: "fake" for name in LOGICAL_NODES})
     factories = resolve_implementations(loaded, modes)
 
-    builder = StateGraph(SkeletonState, context_schema=GraphInvocationContext)
+    builder = StateGraph(ResearchState, context_schema=GraphInvocationContext)
     for logical_name in LOGICAL_NODES:
         builder.add_node(logical_name, _node_wrapper(logical_name, loaded[logical_name], factories[logical_name]))
 

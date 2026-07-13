@@ -15,9 +15,9 @@ from deerflow_deep_research.domain.lifecycle import (
     ResponseKind,
 )
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
+from deerflow_deep_research.domain.state import FakeFixturePlan, ResearchState, fixture_plan_to_checkpoint
 from deerflow_deep_research.graph.nodes.hitl1 import NODE_SPEC as HITL1_SPEC
 from deerflow_deep_research.graph.nodes.hitl2 import NODE_SPEC as HITL2_SPEC
-from deerflow_deep_research.graph.skeleton_state import FakeFixturePlan, SkeletonState, fixture_plan_to_checkpoint
 from deerflow_deep_research.runtime.human_input import HumanInputError, project_suspension
 
 
@@ -49,13 +49,12 @@ def _dependencies(name: str) -> NodeBuildDependencies:
 
 def _initial() -> dict:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "research_id": "r_" + "A" * 43,
         "start_message_id": "human-start",
         "request_digest": "d_" + "B" * 43,
         "request_text": "question",
         "fixture_plan": fixture_plan_to_checkpoint(FakeFixturePlan()),
-        "status": "suspended",
         "phase": "bootstrap",
         "generation": 0,
         "repair_counts": {},
@@ -68,7 +67,7 @@ def _initial() -> dict:
 
 
 def _graph(spec):
-    builder = StateGraph(SkeletonState)
+    builder = StateGraph(ResearchState)
     builder.add_node(spec.logical_name, spec.fake_factory(_dependencies(spec.logical_name)))
     builder.add_edge(START, spec.logical_name)
     builder.add_edge(spec.logical_name, END)

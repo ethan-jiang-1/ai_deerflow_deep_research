@@ -18,15 +18,20 @@ gate) unchanged.
   checkpointed control authority, with `identity`, `request`, `control`, `planning`,
   `work`, `quality`, and `delivery` blocks, and a `schema_version` field governed by a
   fail-closed migration policy.
-- Define phase / terminal / waiting / work status enums and the `phase_status`,
-  `waiting_for`, `terminal_status` control model, reconciling the change-01 single
-  `LifecycleStatus` with the three-field control truth.
+- Define phase / terminal / waiting / work status enums (including the closed
+  `WorkStatus` set `pending | running | submitted | failed | timed_out | cancelled`) and
+  the `phase_status`, `waiting_for`, `terminal_status` control model carrying
+  `gate_attempts_by_phase` and `repair_budget_by_phase`, reconciling the change-01 single
+  `LifecycleStatus` with the three-field control truth while leaving the wire status
+  projection unchanged.
 - Implement state reducers that enforce: work terminal monotonicity (a terminal status
-  cannot be downgraded by a late `running` or stale value); exactly one terminal winner
-  per work/attempt; same work/attempt plus same content hash = idempotent replay,
-  different hash = conflict (not last-write-wins); `accepted_submission_refs`
-  dedupe-append; `latest_gate_feedback` sole-writer (gate node only); workers cannot
-  write gate feedback, phase, or accepted submissions.
+  cannot be downgraded by a late `running` or stale value); `generation` monotonic
+  non-decreasing; exactly one terminal winner per work/attempt; same work/attempt plus
+  same content hash = idempotent replay, different hash = conflict (not last-write-wins);
+  `accepted_submission_refs` dedupe-append; `latest_gate_feedback`,
+  `gate_attempts_by_phase`, and `repair_budget_by_phase` sole-writer (gate node only);
+  workers cannot write gate feedback, gate attempts or repair budgets, phase, or accepted
+  submissions.
 - Codify the content-ref rule: web page bodies, PDFs, full evidence summaries, full
   reports, screenshots, and large tool output never enter the checkpoint — only sandbox
   path, content hash, schema version, and a short summary ref; a hard checkpoint-size
@@ -64,8 +69,9 @@ capability, which already owns checkpointed control state via REG-005.
 - `research-graph-lifecycle`: adds the typed `ResearchState` authority, reducer
   invariants, content-ref rule, three-authority boundary, minimal bundle and
   path-containment contract, and versioned fail-closed schema policy
-  (REG-006 through REG-011); updates REG-003 and REG-005 to replace stale
-  `skeleton state` references with the typed `ResearchState`.
+  (REG-006 through REG-011); updates REG-003 and REG-005 to replace stale `skeleton state`
+  references with the typed `ResearchState`. REG-005's schema-fail-closed scenario is retained
+  (ResearchState wording); REG-011 adds the comprehensive versioned-schema policy.
 
 ## Impact
 
@@ -76,8 +82,11 @@ capability, which already owns checkpointed control state via REG-005.
 - **Typed state/checkpoint data affected:** the checkpointed payload changes from the
   change-01 `SkeletonState` / `SkeletonCheckpoint` to `ResearchState`. Existing control
   fields (`research_id`, `start_message_id`, `request_digest`, `phase`, `generation`,
-  `status`, `execution_trace`, consumed ids, `terminal_reason`, branch summaries) are
-  preserved in typed form so fake-graph paths are unchanged. New slots
+  `execution_trace`, consumed ids, `terminal_reason`, branch summaries, and the fake-specific
+  `fixture_plan`, `route`, `terminal_fixture_marker`, `repair_counts`) are preserved in typed
+  form so fake-graph paths are unchanged; the skeleton's single `status` field is
+  reconciled into the three-field control model (`phase_status` / `waiting_for` /
+  `terminal_status`) with the wire status projection unchanged. New slots
   (`work_specs_by_id`, `work_status_by_id`, `accepted_submission_refs`,
   `latest_gate_feedback`, `gate_attempts_by_phase`, `repair_budget_by_phase`, delivery
   refs) are defined with ownership but left unpopulated by the fake graph.

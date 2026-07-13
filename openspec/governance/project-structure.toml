@@ -125,6 +125,16 @@ kind = "file"
 owner = "PRS-003"
 
 [[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/state.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/bundle.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
 path = "agent/src/deerflow_deep_research/engine"
 kind = "directory"
 owner = "PRS-001"
@@ -176,11 +186,6 @@ owner = "PRS-003"
 
 [[required_paths]]
 path = "agent/src/deerflow_deep_research/graph/routing.py"
-kind = "file"
-owner = "PRS-003"
-
-[[required_paths]]
-path = "agent/src/deerflow_deep_research/graph/skeleton_state.py"
 kind = "file"
 owner = "PRS-003"
 

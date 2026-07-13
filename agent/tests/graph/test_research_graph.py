@@ -10,8 +10,8 @@ from deerflow_deep_research.domain.context import GraphContextView, NodeAgentCon
 from deerflow_deep_research.domain.invocation import GraphInvocationContext
 from deerflow_deep_research.domain.lifecycle import AcceptedHumanResponse, ResponseKind
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
+from deerflow_deep_research.domain.state import FakeFixturePlan, fixture_plan_to_checkpoint
 from deerflow_deep_research.graph.builder import build_research_graph
-from deerflow_deep_research.graph.skeleton_state import FakeFixturePlan, fixture_plan_to_checkpoint
 
 
 class ForbiddenCapabilities:
@@ -53,13 +53,12 @@ def _context() -> tuple[GraphInvocationContext, Resolver]:
 
 def _initial(plan: FakeFixturePlan | None = None) -> dict:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "research_id": "r_" + "A" * 43,
         "start_message_id": "human-start",
         "request_digest": "d_" + "B" * 43,
         "request_text": "question",
         "fixture_plan": fixture_plan_to_checkpoint(plan or FakeFixturePlan()),
-        "status": "suspended",
         "phase": "bootstrap",
         "generation": 0,
         "repair_counts": {},
@@ -106,7 +105,7 @@ async def test_happy_path_suspends_twice_and_completes_with_fresh_attempt_depend
         config=config,
         context=context,
     )
-    assert result["status"] == "completed"
+    assert result["terminal_status"] == "completed"
     assert result["terminal_fixture_marker"] == "full_fake_terminal_fixture"
     assert result["execution_trace"] == (
         "bootstrap",
@@ -168,7 +167,7 @@ async def test_every_hitl2_decision_uses_declared_route(decision: str, expected_
         context=context,
     )
     if decision == "stop":
-        assert result["status"] == "stopped"
+        assert result["terminal_status"] == "stopped"
         return
     next_snapshot = await graph.aget_state(config)
     assert _pending(next_snapshot)["phase"] == expected_phase
@@ -195,7 +194,7 @@ async def test_readiness_and_final_repairs_converge_before_completion() -> None:
             context=context,
         )
     result = (await graph.aget_state(config)).values
-    assert result["status"] == "completed"
+    assert result["terminal_status"] == "completed"
     assert result["execution_trace"].count("readiness") >= 3
     assert result["execution_trace"].count("final_delivery") == 3
 
@@ -227,4 +226,4 @@ async def test_readiness_targeted_repair_returns_through_synthesis_and_hitl2() -
         config=config,
         context=context,
     )
-    assert result["status"] == "completed"
+    assert result["terminal_status"] == "completed"

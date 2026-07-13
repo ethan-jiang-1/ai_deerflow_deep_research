@@ -1,9 +1,10 @@
 # Plan: Deep Research 02 - State And Persistence Contracts
 
-> 类型: 设计 | 更新: 2026-07-12
+> 类型: 设计 | 更新: 2026-07-13
 > 对应 OpenSpec change: `define-deep-research-state-persistence-contracts`
 > 依赖: 01 Fake Graph Skeleton（已归档）
 > 替换范围: fake state/checkpoint payload，不替换业务 node
+> 状态: 已实现 — typed `ResearchState` (`domain/state.py`)、reducers、三种权威边界、`domain/bundle.py` 路径围栏、versioned fail-closed schema 已落地；fake graph 路径与行为不变。
 
 ## 地基已具备（来自 00 + 01）
 

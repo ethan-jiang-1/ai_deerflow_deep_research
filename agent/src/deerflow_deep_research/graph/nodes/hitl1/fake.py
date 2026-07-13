@@ -11,6 +11,7 @@ from deerflow_deep_research.domain.lifecycle import (
     make_hitl_request_id,
 )
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
+from deerflow_deep_research.domain.state import PhaseStatus
 from deerflow_deep_research.engine.fake_control import completed_visits, node_update
 
 
@@ -40,7 +41,8 @@ def build_fake(_dependencies: NodeBuildDependencies):
             return node_update(
                 "hitl1",
                 route="cancel",
-                status=LifecycleStatus.CANCELLED.value,
+                terminal_status=LifecycleStatus.CANCELLED.value,
+                phase_status=PhaseStatus.TERMINAL.value,
                 terminal_reason=TerminalReason.USER_CANCELLED.value,
             )
         response = AcceptedHumanResponse.model_validate(raw)

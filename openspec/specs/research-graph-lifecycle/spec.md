@@ -1,6 +1,6 @@
 # research-graph-lifecycle Specification
 
-> req: REG-001, REG-002, REG-003, REG-004, REG-005
+> req: REG-001, REG-002, REG-003, REG-004, REG-005, REG-006, REG-007, REG-008, REG-009, REG-010, REG-011
 
 ## Purpose
 The stable Deep Research graph topology, deterministic implementation selection,
@@ -94,7 +94,7 @@ correlation and MAY only reproject the current durable pending or terminal resul
 without requiring the old interrupt to remain pending or invoking another node.
 
 The LangGraph checkpoint interrupt task SHALL be the only pending-request authority;
-skeleton state SHALL NOT duplicate a mutable pending descriptor. Request ids SHALL
+ResearchState SHALL NOT duplicate a mutable pending descriptor. Request ids SHALL
 include a deterministic HITL ordinal derived from prior checkpointed logical HITL
 visits, so retrying the same interrupt is stable and a later HITL2 in the same
 generation cannot collide. A suspended lifecycle and every fresh resume SHALL require
@@ -237,15 +237,15 @@ candidate without substituting an older response.
 ### Requirement: Checkpoints and topology contracts remain durable and deterministic
 
 The fake graph SHALL use a versioned research checkpoint namespace isolated from the
-outer lead-agent and infra-probe namespaces. Skeleton state SHALL contain only bounded
-control fields, branch summaries, HITL correlation, consumed-response ids, and a
-bounded logical trace; it SHALL NOT contain raw runtime authority or large research
-content. File-backed SQLite SHALL recover a suspended HITL across provider close and a
-fresh process. Memory and SQLite memory mode SHALL be labelled same-process only. A
-committed normalized topology snapshot SHALL reject unexpected node/edge or reachability
-changes. Zero-API E2E coverage SHALL include happy completion, repair, rerun, stop,
-cancel, stale-response denial, consumed-response delivery reprojection, and restart
-resume.
+outer lead-agent and infra-probe namespaces. ResearchState SHALL contain only bounded
+control fields, artifact refs, branch summaries, HITL correlation, consumed-response ids,
+and a bounded logical trace, per REG-006 through REG-008; it SHALL NOT contain raw
+runtime authority or large research content. File-backed SQLite SHALL recover a
+suspended HITL across provider close and a fresh process. Memory and SQLite memory mode
+SHALL be labelled same-process only. A committed normalized topology snapshot SHALL
+reject unexpected node/edge or reachability changes. Zero-API E2E coverage SHALL include
+happy completion, repair, rerun, stop, cancel, stale-response denial, consumed-response
+delivery reprojection, and restart resume.
 
 #### Scenario: SQLite restart resumes the same interrupt
 - **WHEN** one process starts a lifecycle to HITL, closes the provider, and a fresh process resumes the same trusted user/thread/research id with a matching HumanMessage
@@ -256,7 +256,7 @@ resume.
 - **THEN** retrying start from the same trusted scope and start HumanMessage reopens the same namespace and reprojects the same pending request without rerunning completed nodes
 
 #### Scenario: Unknown skeleton schema fails closed
-- **WHEN** status, resume, or cancel reads a research checkpoint with an unsupported skeleton schema version
+- **WHEN** status, resume, or cancel reads a research checkpoint whose stored `ResearchState.schema_version` is unsupported
 - **THEN** it returns `schema_unsupported` before node execution or checkpoint mutation
 
 #### Scenario: Topology drift is detected
@@ -266,3 +266,159 @@ resume.
 #### Scenario: Memory does not claim restart durability
 - **WHEN** the same-process memory host revisits a lifecycle and a fresh-process capability is inspected
 - **THEN** same-process actions work on the retained host but status reports restart recovery unsupported and no restart E2E claim is made
+
+### Requirement: One typed ResearchState is the canonical checkpointed control authority
+
+The downstream package SHALL define one versioned typed `ResearchState` in
+`domain/state.py` as the sole checkpointed control authority for a research lifecycle,
+replacing the change-01 `SkeletonState` and `SkeletonCheckpoint` payload. `ResearchState`
+SHALL organize its fields into `identity`, `request`, `control`, `planning`, `work`,
+`quality`, and `delivery` blocks. The `identity` block SHALL carry `research_id`,
+`outer_thread_id`, `generation`, and `schema_version`, and identity and scope SHALL come
+only from the trusted `RuntimeAdapter` envelope and SHALL NOT be overridable by a node,
+worker, or model. The `control` block SHALL carry `phase`, `phase_status`, `waiting_for`,
+`terminal_status`, `gate_attempts_by_phase`, and `repair_budget_by_phase`; exactly one
+legal `phase` and at most one `waiting_for` condition SHALL hold at any time, and
+`phase_status`, `waiting_for`, and `terminal_status` SHALL be distinct control fields. The
+`work` block SHALL carry `work_specs_by_id`, `work_status_by_id`, and
+`accepted_submission_refs`, where `work_status_by_id` is closed to the `WorkStatus` enum
+`pending | running | submitted | failed | timed_out | cancelled`. The fake graph SHALL bind
+`StateGraph` to the typed
+`ResearchState`, the temporary `graph/skeleton_state.py` module SHALL be removed, and the
+two schemas SHALL never coexist as authorities. Any future addition to `ResearchState`
+SHALL explicitly declare its writer, reader, and reducer.
+
+#### Scenario: Typed state replaces the skeleton payload without changing fake paths
+- **WHEN** the fake graph runs start, resume, status, and cancel after the builder binds `ResearchState`
+- **THEN** every change-01 fake route, interrupt, terminal marker, and restart-resume path behaves identically, the checkpointed payload is `ResearchState`, and no `graph/skeleton_state.py` symbol is imported
+
+#### Scenario: Identity cannot be overridden by a node or worker
+- **WHEN** a node or worker attempts to write `research_id`, `outer_thread_id`, `generation`, or `schema_version`
+- **THEN** the reducer rejects the write and the trusted identity derived from `RuntimeAdapter` is preserved
+
+#### Scenario: Only one legal phase and waiting state hold at once
+- **WHEN** a reducer receives an update that would set a second active phase or a second `waiting_for` condition
+- **THEN** it rejects the update and the prior single legal control state is preserved
+
+#### Scenario: Every field declares its writer, reader, and reducer
+- **WHEN** the `ResearchState` field set is inspected
+- **THEN** each field has a declared writer, reader, and reducer in the ownership table, and a contract test fails if any field lacks one
+
+### Requirement: State reducers enforce terminal monotonicity, duplicate-hash idempotency, and sole-writer ownership
+
+`ResearchState` SHALL be updated only through declared reducers. A terminal
+`work_status` SHALL be monotonic: a later `running` or stale value SHALL NOT downgrade a
+terminal status, and at most one terminal winner SHALL hold per work/attempt. The
+`generation` field SHALL be monotonic non-decreasing and a reducer SHALL reject any update
+that would decrease it. Replaying the same work/attempt with the same content hash SHALL be
+idempotent and SHALL NOT append a duplicate or advance phase or generation; replaying the
+same work/attempt with a different content hash SHALL be flagged as a conflict and SHALL
+NOT be resolved last-write-wins. `accepted_submission_refs` SHALL be dedupe-append only.
+`latest_gate_feedback`, `gate_attempts_by_phase`, and `repair_budget_by_phase` SHALL be
+writable solely by the gate node; worker, planner, and repair agents SHALL NOT write gate
+feedback, gate attempts or repair budgets, `phase`, or `accepted_submission_refs`.
+
+#### Scenario: Terminal status cannot be downgraded
+- **WHEN** a reducer receives `running` for a work/attempt whose status is already `submitted`, `failed`, `timed_out`, or `cancelled`
+- **THEN** the terminal status is preserved and the late update is rejected
+
+#### Scenario: Same-hash replay is idempotent
+- **WHEN** the same work/attempt result with the same content hash is reduced twice
+- **THEN** the second reduction performs no append and does not advance phase or generation
+
+#### Scenario: Different-hash replay is a conflict
+- **WHEN** the same work/attempt is reduced again with a different content hash
+- **THEN** the reducer flags `conflict` rather than overwriting, and the original accepted result is preserved
+
+#### Scenario: Generation cannot decrease
+- **WHEN** a reducer receives an update that would lower `generation`
+- **THEN** it rejects the update and the current `generation` is preserved
+
+#### Scenario: Workers cannot write gated authority
+- **WHEN** a worker or repair agent update attempts to set `latest_gate_feedback`, `gate_attempts_by_phase`, `repair_budget_by_phase`, `phase`, or `accepted_submission_refs`
+- **THEN** the reducer rejects the write and only the gate node or controller authority is preserved
+
+### Requirement: Large research content stays out of the checkpoint as bounded content refs
+
+`ResearchState` SHALL NOT store web page bodies, PDFs, full evidence summaries, full
+reports, screenshots, or large tool output. Such content SHALL live only as sandbox
+artifact files, and `ResearchState` SHALL reference it by at most a sandbox path, a content
+hash, a schema version, and a short summary. A hard checkpoint-size bound SHALL reject any
+state update whose serialized form exceeds the bound; semantic content SHALL fail
+validation rather than be silently truncated. Raw runtime authority —
+`TrustedRuntimeEnvelope` fields, AppConfig, model and tool handles, sandbox handles, and
+credentials — SHALL NOT enter the checkpoint.
+
+#### Scenario: Oversized content is rejected
+- **WHEN** a node returns a state update whose serialized size exceeds the hard checkpoint-size bound
+- **THEN** the update is rejected with a typed failure and the checkpoint is not mutated
+
+#### Scenario: Content is referenced, not embedded
+- **WHEN** a state update carries large content
+- **THEN** the reducer stores only a `ContentRef` (sandbox path, content hash, schema version, short summary) and excludes the raw body from the checkpoint
+
+#### Scenario: Raw runtime authority is rejected
+- **WHEN** a state update includes a `TrustedRuntimeEnvelope`, AppConfig, model/tool handle, sandbox handle, or credential field
+- **THEN** the reducer rejects the unknown field and the checkpoint is not mutated
+
+### Requirement: Control, evidence, and content authorities remain distinct
+
+The system SHALL keep three authorities distinct: checkpointed `ResearchState` is the
+control truth for phase, interrupt, retry, work status, and legal transitions; the
+append-only validated submission ledger is the evidence truth for which work output, claim,
+or source has been formally accepted; and sandbox artifact files are the content truth for
+page cache, evidence, synthesis, and report. The graph checkpoint SHALL be the sole legal
+execution path and the system SHALL NOT maintain a second phase-cursor file.
+`accepted_submission_refs` in `ResearchState` SHALL hold references into the submission
+ledger, not a duplicate of ledger records; the ledger remains the sole evidence authority.
+File existence, worker final text, a tool event, or a `running` status SHALL NOT count as a
+validated submission. The fake graph SHALL define the `accepted_submission_refs` slot
+(referencing the submission ledger) and content-ref slots, with their ownership, but SHALL
+NOT implement ledger storage or write real artifacts.
+
+#### Scenario: No second phase cursor exists
+- **WHEN** a lifecycle advances phase, suspends, or terminates
+- **THEN** the checkpointed `ResearchState` is the only control authority and no companion status file is read or written as a phase cursor
+
+#### Scenario: Only ledger refs count as accepted submissions
+- **WHEN** the accepted-submission authority is inspected
+- **THEN** only `accepted_submission_refs` (references into the validated ledger) mark accepted submissions, and no field treats file existence, worker final text, a tool event, or a `running` status as accepted coverage
+
+### Requirement: A minimal research bundle layout and path-containment contract scope sandbox writes
+
+The system SHALL define a minimal research bundle rooted at
+`workspace/deep-research/<research_id>/` containing `request/`,
+`work/<work_id>/<attempt_id>/`, `evidence/`, `synthesis/`, `review/`, `final/`, and
+`diagnostics/` subtrees. A worker SHALL write only its own
+`<work_id>/<attempt_id>/` directory and controlled cache regions, and writes outside the
+assigned research and attempt root SHALL fail closed. Canonical source URLs SHALL be
+deduplicated. `diagnostics/gate-attempts.jsonl` SHALL be audit-only and SHALL NOT serve as
+a phase cursor. The fake graph SHALL define the layout and containment contract but SHALL
+NOT write real bundle artifacts.
+
+#### Scenario: Out-of-containment write is rejected
+- **WHEN** the path-containment contract resolves a write path outside the assigned `<work_id>/<attempt_id>/` directory or outside the research root
+- **THEN** it rejects the path and no artifact may land outside the contained root
+
+#### Scenario: Diagnostics are not a phase cursor
+- **WHEN** `diagnostics/gate-attempts.jsonl` is written
+- **THEN** it is used only for audit and the checkpointed `ResearchState` remains the sole phase authority
+
+### Requirement: A versioned ResearchState schema fails closed on incompatible versions
+
+`ResearchState` SHALL carry a `schema_version` field. On read, if the stored
+`schema_version` is unsupported or incompatible, the handler SHALL stop and return
+`schema_unsupported` before node execution or checkpoint mutation, and SHALL NOT silently
+reset, auto-migrate, or reinterpret an incompatible payload. This change SHALL establish
+only the version field and the fail-closed contract; business state migration across
+versions is explicitly out of scope. The change-01 skeleton schema-version gate SHALL be
+preserved in typed form under `ResearchState`.
+
+#### Scenario: Unsupported schema version fails closed
+- **WHEN** status, resume, or cancel reads a research checkpoint whose `ResearchState.schema_version` is unsupported
+- **THEN** it returns `schema_unsupported` before node execution or checkpoint mutation and does not reset or reinterpret the payload
+
+#### Scenario: No silent migration
+- **WHEN** a stored payload carries an incompatible `schema_version`
+- **THEN** the handler does not auto-migrate, reinterpret, or silently reset state, and requires an explicit migration path
+

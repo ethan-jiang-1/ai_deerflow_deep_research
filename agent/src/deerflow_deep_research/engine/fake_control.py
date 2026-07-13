@@ -12,6 +12,7 @@ from deerflow_deep_research.domain.lifecycle import (
     make_attempt_id,
     text_only_content,
 )
+from deerflow_deep_research.domain.state import PhaseStatus
 
 attempt_id = make_attempt_id
 
@@ -54,7 +55,8 @@ def bounded_repair_update(state: Mapping[str, Any], logical_name: str, route: st
                 logical_name,
                 route="exhausted",
                 repair_counts=counts,
-                status=LifecycleStatus.BLOCKED.value,
+                terminal_status=LifecycleStatus.BLOCKED.value,
+                phase_status=PhaseStatus.TERMINAL.value,
                 terminal_reason=TerminalReason.REPAIR_EXHAUSTED.value,
             )
         counts[logical_name] = prior + 1

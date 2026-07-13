@@ -2,6 +2,8 @@
 
 @impl REG-004
 @impl REG-005
+@impl REG-006
+@impl REG-011
 @impl RUI-006
 """
 
@@ -27,12 +29,13 @@ from deerflow_deep_research.domain.lifecycle import (
     ResultCode,
 )
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies, PolicyRef
-from deerflow_deep_research.graph.builder import build_research_graph
-from deerflow_deep_research.graph.skeleton_state import (
+from deerflow_deep_research.domain.state import (
     FakeFixturePlan,
-    SkeletonCheckpoint,
+    ResearchCheckpoint,
     fixture_plan_to_checkpoint,
+    project_lifecycle_status,
 )
+from deerflow_deep_research.graph.builder import build_research_graph
 from deerflow_deep_research.runtime.checkpoint import derive_research_thread_key, resolve_effective_provider
 from deerflow_deep_research.runtime.human_input import (
     ConsumedResponseRetry,
@@ -110,11 +113,11 @@ def _durability(envelope: TrustedRuntimeEnvelope) -> Durability:
     return Durability(resolve_effective_provider(envelope.app_config).durability)
 
 
-def _checkpoint(snapshot: Any) -> SkeletonCheckpoint:
+def _checkpoint(snapshot: Any) -> ResearchCheckpoint:
     if not snapshot or not snapshot.values:
         raise HumanInputError("research_not_found", "research checkpoint does not exist")
     try:
-        return SkeletonCheckpoint(**dict(snapshot.values))
+        return ResearchCheckpoint(**dict(snapshot.values))
     except (TypeError, ValueError) as exc:
         message = str(exc)
         code = (
@@ -134,7 +137,7 @@ def _result_from_snapshot(
 ) -> tuple[DeepResearchControlResult, Any]:
     checkpoint = _checkpoint(snapshot)
     pending = pending_from_snapshot(snapshot)
-    status = checkpoint.status
+    status = project_lifecycle_status(checkpoint)
     if status is LifecycleStatus.SUSPENDED and pending is None:
         raise HumanInputError("checkpoint_inconsistent", "suspended lifecycle has no pending interrupt")
     if status is not LifecycleStatus.SUSPENDED and pending is not None:
@@ -239,8 +242,9 @@ class StartResearchHandler(ResearchActionHandler):
                 return result.model_dump(mode="json", exclude_none=True)
             return _project_action_result(action_input=action_input, snapshot=snapshot, envelope=envelope)
 
-        initial = SkeletonCheckpoint(
+        initial = ResearchCheckpoint(
             research_id=action_input.research_id,
+            outer_thread_id=envelope.outer_thread_id,
             start_message_id=action_input.start_message.message_id,
             request_digest=request_digest,
             request_text=action_input.start_message.text,
@@ -248,8 +252,10 @@ class StartResearchHandler(ResearchActionHandler):
         )
         values = asdict(initial)
         values["fixture_plan"] = fixture_plan_to_checkpoint(initial.fixture_plan)
-        values["status"] = initial.status.value
         values["phase"] = initial.phase.value
+        values["phase_status"] = initial.phase_status.value
+        values["waiting_for"] = initial.waiting_for
+        values["terminal_status"] = initial.terminal_status.value if initial.terminal_status is not None else None
         values["terminal_reason"] = initial.terminal_reason.value if initial.terminal_reason is not None else None
         await graph.ainvoke(values, config=config, context=self._context(envelope, action_input.research_id))
         return _project_action_result(
@@ -339,7 +345,7 @@ class CancelResearchHandler(ResearchActionHandler):
         snapshot = await graph.aget_state(config)
         try:
             checkpoint = _checkpoint(snapshot)
-            if checkpoint.status in {
+            if project_lifecycle_status(checkpoint) in {
                 LifecycleStatus.COMPLETED,
                 LifecycleStatus.STOPPED,
                 LifecycleStatus.CANCELLED,

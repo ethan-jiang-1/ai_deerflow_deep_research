@@ -105,10 +105,18 @@ switching schemas would widen the diff and risk fake-path regression; reducers a
 `accepted_submission_refs`), `quality` (`latest_gate_feedback`, gaps, degraded decisions),
 and `delivery` refs. The single change-01 `LifecycleStatus` is reconciled into the
 three-field control truth (`phase_status`, `waiting_for`, `terminal_status`); `LogicalPhase`
-and `TerminalReason` are reused unchanged. A `WorkStatus` enum
+and `TerminalReason` are reused unchanged, and the wire control-result `status` projection
+(REG-004) is unchanged — the three-field split is internal to `ResearchState`. A `WorkStatus`
+enum
 (`pending | running | submitted | failed | timed_out | cancelled`) is defined with the work
 block so the terminal-monotonicity reducer has a typed target, even though the fake graph
-does not populate it.
+does not populate it. The change-01 fake-specific fields (`fixture_plan`, `route`,
+`terminal_fixture_marker`, `repair_counts`) are preserved in a typed `fake` control slot for
+deterministic fake-graph resume; they are explicitly not part of the real `ResearchState`
+contract and are removed when the fake graph is replaced by real nodes. Every `ResearchState`
+field is recorded in a module-level writer/reader/reducer ownership table in `domain/state.py`,
+and a contract test asserts the table covers every declared field so the declaration rule is
+mechanically enforced.
 
 **Rationale:** freezing the slot shape and the three-field control model now is exactly what
 03 (gate feedback, attempt/budget counters) and 04 (work status, accepted refs, batch
@@ -122,13 +130,15 @@ them.
 ### 3. Reducers enforce monotonicity, idempotency, conflict, dedupe, and sole-writer
 
 Pure reducers in `domain/state.py` enforce: terminal `work_status` monotonicity (reject
-`running`/stale on a terminal); exactly-one terminal winner per work/attempt; same
+`running`/stale on a terminal); exactly-one terminal winner per work/attempt; `generation`
+monotonic non-decreasing (reject any decrease when the controller advances it); same
 work/attempt + same content hash = idempotent (no append, no advance); same work/attempt +
 different hash = `conflict` (not last-write-wins); `accepted_submission_refs` dedupe-append;
-`latest_gate_feedback` / `phase` / `accepted_submission_refs` writable only by the gate node
-/ controller, rejected from worker/planner/repair updates. Identity fields
-(`research_id`, `outer_thread_id`, `generation`, `schema_version`) are reducer-rejected from
-any node/worker.
+`latest_gate_feedback` / `gate_attempts_by_phase` / `repair_budget_by_phase` / `phase` /
+`accepted_submission_refs` writable only by the gate node / controller, rejected from
+worker/planner/repair updates. Identity fields (`research_id`, `outer_thread_id`,
+`schema_version`) are reducer-rejected from any node/worker; `generation` is writable only
+by the controller and only monotonically.
 
 **Rationale:** these are the master-plan reducer invariants
 (`deerflow-native-deep-research-graph.md:354-361`) and the ownership rule 03/04 require. The
@@ -162,9 +172,9 @@ The design declares checkpointed `ResearchState` (control truth), the append-onl
 submission ledger (evidence truth), and sandbox artifact files (content truth) as distinct,
 per `deerflow-native-deep-research-graph.md:376-385`. The graph checkpoint is the sole legal
 execution path; no `rb_status.json` or equivalent second phase cursor exists.
-`accepted_submission_refs` is a dedupe-append slot in `ResearchState`; the ledger storage
-itself (JSONL + hash chain vs. SQLite/Postgres table) is NOT implemented and is deferred to
-04. File existence, worker text, tool events, and `running` status do not count as accepted
+`accepted_submission_refs` is a dedupe-append slot in `ResearchState` holding references
+into the ledger (not a duplicate of ledger records); the ledger storage itself (JSONL +
+hash chain vs. SQLite/Postgres table) is NOT implemented and is deferred to 04. File existence, worker text, tool events, and `running` status do not count as accepted
 submissions.
 
 **Rationale:** freezes the authority boundary and the gate's read surface without building
@@ -195,7 +205,9 @@ contract.
 ### 7. Versioned schema with fail-closed, no business migration
 
 `ResearchState.schema_version` is `RESEARCH_STATE_SCHEMA_VERSION = 2` (the skeleton was 1;
-the payload shape changes, so v1 checkpoints fail closed as `schema_unsupported`). The
+the payload shape changes, so v1 checkpoints fail closed as `schema_unsupported`). This is
+the checkpoint-state schema version, distinct from the wire control-result envelope
+`schema_version: Literal[1]` (`domain/lifecycle.py:261`), which is unchanged. The
 frozen validator's `__post_init__` preserves the change-01 fail-closed gate in typed form;
 `ResultCode.SCHEMA_UNSUPPORTED` (`domain/lifecycle.py:76`) and the
 `runtime/research.py:121-122` mapping are reused. On incompatible version the handler stops
@@ -212,15 +224,17 @@ payload, violating the fail-closed contract.
 ### 8. Test strategy reuses 00/01 fixtures; parametrized pytest, no hypothesis
 
 - Unit reducer tests: `agent/tests/unit/test_state_reducers.py` — terminal monotonicity,
-  same-hash idempotency, different-hash conflict, ref dedupe, sole-writer rejection,
-  identity-write rejection. Precedent: `test_skeleton_contracts.py:87-94` (branch reducer).
+  generation monotonicity, same-hash idempotency, different-hash conflict, ref dedupe,
+  sole-writer rejection (including gate attempt/budget fields), identity-write rejection.
+  Precedent: `test_skeleton_contracts.py:87-94` (branch reducer).
 - Checkpoint-size hard test: `agent/tests/unit/test_state_bounds.py` — oversized content
   rejected. Precedent: `merge_trace` `trace_too_large`.
 - Per-backend namespace/isolation: `agent/tests/integration/test_state_persistence.py`,
   extending the `test_provider_durability.py` pattern (memory same-process, file-SQLite
   restart-durable via `agent/tests/fixtures/sqlite_research_subprocess.py`, Postgres
-  deferred under `@pytest.mark.postgres`). Reuses `_sqlite_config` / `_memory_config` /
-  `_envelope` fixtures and `build_control_graph_host`.
+  multi-worker namespace/isolation under `@pytest.mark.postgres`, deferred when the Postgres
+  profile is absent — the same deferred pattern as change 00/01). Reuses `_sqlite_config` /
+  `_memory_config` / `_envelope` fixtures and `build_control_graph_host`.
 - Restart/resume/duplicate-update property tests: reducer logic in `tests/unit/`,
   cross-restart persistence in `tests/integration/` via `make test-durability`.
 
@@ -294,6 +308,10 @@ Rollback is reverting the change; no data migration is required.
 - **Submission ledger storage** (JSONL + hash chain vs. SQLite/Postgres table): explicitly
   deferred to change 04; this change defines only the `accepted_submission_refs` slot and
   its sole-writer rule.
-- **`WorkStatus` enum home** (`domain/state.py` vs. `domain/lifecycle.py`): proposed
-  `domain/state.py` since it ships with the work block; if 03/04 prefer enum cohesion in
-  `lifecycle.py`, that is a mechanical move with no spec impact.
+- **`WorkStatus` enum home** — decided: `domain/state.py`, colocated with the work block.
+  (If 03/04 later prefer enum cohesion in `domain/lifecycle.py`, that is a mechanical move
+  with no spec impact.)
+- **Evidence claim id uniqueness** (master plan line 360: claim id unique per run; same id
+  with inconsistent content fails closed): deferred to change 04, which owns the submission
+  ledger and evidence schema. Claim ids do not live in `ResearchState`, so the invariant is
+  not enforceable in this change and is intentionally absent from REG-007.

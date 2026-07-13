@@ -47,6 +47,8 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/domain/node_spec.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/invocation.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/lifecycle.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/domain/state.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/domain/bundle.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/engine/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/fake_control.py` (file; `PRS-001`)
@@ -58,7 +60,6 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/graph/builder.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/implementation_map.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/routing.py` (file; `PRS-003`)
-  - `agent/src/deerflow_deep_research/graph/skeleton_state.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/topology.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/topology_snapshot.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/` (directory; `PRS-003`)
@@ -105,14 +106,18 @@ Registry: `openspec/governance/project-structure.toml`
 
 ## Current Status
 
-The current checkout contains the completed change 00 runtime substrate and the
-change 01 full-fake graph skeleton. Eleven logical node packages, the normalized
-topology, implementation map, real checkpoint interrupts, lifecycle handlers,
-topology snapshot, and zero-API restart recovery are present. Every lifecycle
-result is `implementation_mode=full_fake`; no terminal fixture is research
-output. The Web UI and compatible generic clients support start/resume, while
-known IM and non-interactive contexts refuse those actions and retain
-status/cancel.
+The current checkout contains the completed change 00 runtime substrate, the
+change 01 full-fake graph skeleton, and the change 02 typed state contracts.
+Eleven logical node packages, the normalized topology, implementation map, real
+checkpoint interrupts, lifecycle handlers, topology snapshot, and zero-API
+restart recovery are present. The fake graph binds the versioned typed
+`ResearchState` from `domain/state.py` (the sole checkpointed control
+authority), with reducer invariants, the three-authority boundary, the
+content-ref and checkpoint-size bound, the `domain/bundle.py` path-containment
+contract, and the versioned fail-closed schema. Every lifecycle result is
+`implementation_mode=full_fake`; no terminal fixture is research output. The
+Web UI and compatible generic clients support start/resume, while known IM and
+non-interactive contexts refuse those actions and retain status/cancel.
 
 ## Ownership
 
@@ -174,15 +179,19 @@ Changes 00 and 01 own the current runtime, graph, and contract files:
 ```text
 runtime/{graph_host,runtime_adapter,projection,identity,checkpoint,control,human_input,research}.py
 runtime/{events,cancellation,node_agent_bridge,diagnostics,startup_snapshot}.py
-domain/{context,enums,node_spec,invocation,lifecycle}.py
+domain/{context,enums,node_spec,invocation,lifecycle,state,bundle}.py
 agents/{factory,middleware,policies,prompts,structured_output}.py
-graph/{builder,registry,infra_probe,topology,implementation_map,routing,skeleton_state,topology_snapshot}.py
+graph/{builder,registry,infra_probe,topology,implementation_map,routing,topology_snapshot}.py
 graph/nodes/<eleven-logical-phases>/
 resources/node_agent/runtime_policy.md
 ```
 
-Change 02 must replace the temporary graph-owned skeleton state with its one
-canonical domain state authority. Later changes may add `graph/components/`.
+Change 02 replaced the temporary graph-owned skeleton state with the canonical
+`domain/state.py` authority (`ResearchState`, reducers, three-authority
+boundary, content-ref and checkpoint-size bound, versioned fail-closed schema)
+and the `domain/bundle.py` path-containment contract; `graph/skeleton_state.py`
+is removed. Any future `ResearchState` field addition must declare its writer,
+reader, and reducer. Later changes may add `graph/components/`.
 Change 03 and later may
 add `engine/gates/`, `work_units/`, `evidence/`, and `artifacts/`. Do not create
 these packages early merely to match a plan diagram.

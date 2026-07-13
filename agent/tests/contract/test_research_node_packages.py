@@ -8,8 +8,8 @@ import pytest
 
 from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext
 from deerflow_deep_research.domain.node_spec import UNAVAILABLE_REAL_FACTORY, NodeBuildDependencies
+from deerflow_deep_research.domain.state import FakeFixturePlan
 from deerflow_deep_research.graph.registry import NodeRegistry
-from deerflow_deep_research.graph.skeleton_state import FakeFixturePlan
 from deerflow_deep_research.graph.topology import LOGICAL_NODES
 
 PACKAGE_PREFIX = "deerflow_deep_research.graph.nodes"

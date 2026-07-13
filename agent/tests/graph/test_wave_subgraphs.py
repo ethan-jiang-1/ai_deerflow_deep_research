@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from deerflow_deep_research.domain.state import BranchResult
 from deerflow_deep_research.graph.nodes.wave0.subgraph import build_wave0_subgraph, normalize_results
 from deerflow_deep_research.graph.nodes.wave1.subgraph import build_wave1_subgraph
-from deerflow_deep_research.graph.skeleton_state import BranchResult
 
 
 @pytest.mark.asyncio

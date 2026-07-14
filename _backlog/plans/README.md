@@ -1,6 +1,6 @@
 # Active Plans — 活跃 plan/分析文档列表
 
-> 最后更新: 2026-07-11 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
+> 最后更新: 2026-07-14 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
 >
 > **plan 没有编号，文件名即标识。完成后文件名不变，位置即状态。**
 
@@ -19,12 +19,9 @@
 
 | Plan | 简述 |
 |------|------|
-| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00-18 共 19 个 change 的严格串行路线图 |
-| [deep-research-00-runtime-infrastructure.md](deep-research-00-runtime-infrastructure.md) | Canonical folder structure、mount/config、source package、public skill/per-user Agent、RuntimeAdapter、GraphHost 与 node-agent policy |
-| [deep-research-01-fake-graph-skeleton.md](deep-research-01-fake-graph-skeleton.md) | 在 00 底座上交付完整可运行的 fake graph、HITL/resume 与 rerun |
-| [deep-research-02-state-persistence-contracts.md](deep-research-02-state-persistence-contracts.md) | typed ResearchState、reducers、checkpoint 与三种权威边界 |
-| [deep-research-03-gate-kernel.md](deep-research-03-gate-kernel.md) | 通用 gate、repair、retry、fatigue 内核 |
-| [deep-research-04-work-unit-kernel.md](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded Send、sole-writer submit ledger 与 fake worker |
+| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00–18 路线图（00–04 ✅ 已归档，05 起待做） |
+| [deep-research-spec-gates-and-coverage.md](deep-research-spec-gates-and-coverage.md) | 治理：spec 门禁与 requirement-test 覆盖目录（提案，未立 change） |
+| [deep-research-structured-output-linting.md](deep-research-structured-output-linting.md) | 治理：agent YAML/JSON 结构化输出 lint（提案，Phase 2 已随 04 解锁） |
 | [deep-research-05-bootstrap-node.md](deep-research-05-bootstrap-node.md) | 真实 bootstrap/instantiation/setup node |
 | [deep-research-06-hitl1-node.md](deep-research-06-hitl1-node.md) | 真实 HITL1 profile interrupt/resume node |
 | [deep-research-07-topic-planning-node.md](deep-research-07-topic-planning-node.md) | 真实 topic planning 与 seed materialization node |

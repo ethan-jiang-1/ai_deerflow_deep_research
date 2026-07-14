@@ -1,7 +1,7 @@
 # Plan: DeerFlow 原生 Deep Research Graph
 
 > 类型: 设计 / 架构映射 | 更新: 2026-07-13
-> 状态: 00 ✅ · 01 ✅ · 02 ⬜ ← 当前 · 03-18 ⬜
+> 状态: 00–04 ✅ 已归档 · 05 ⬜ ← 当前 · 06–18 ⬜
 > 参考: [`../_reference/dpt/`](../_reference/dpt/) 全部 9 份架构分析，以及 DPT 原始 workflow、gate、queue、work-unit、trace 实现
 
 ## 结论先行
@@ -642,7 +642,7 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 01 完整 fake graph（已实现）：全 node、全 edge、HITL、rerun、fake final；全部 lifecycle 显式 `implementation_mode=full_fake`，Web UI/兼容 generic client 可交互，known IM/non-interactive 的 start/resume fail closed
 02 typed state/checkpoint（已实现）：把 fake dict 换成正式控制合同
 03 gate kernel（已实现）：把直接 fixture outcome 换成通用 fake rules + repair loop
-04 work-unit kernel（apply-ready，待归档）：把 fake phase 内直返换成 bounded Send + controlled fixture worker + sole-writer submit ledger
+04 work-unit kernel（已实现）：把 fake phase 内直返换成 bounded Send + controlled fixture worker + sole-writer submit ledger
 ```
 
 完成后得到的是“控制面、状态面、门禁面、工作调度面都真实，研究内容仍是 fixture”的完整骨架。05 才开始替换第一个真实业务 node。
@@ -710,11 +710,11 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 
 | # | 状态 | 子 plan / 对应 change | 替换或建立的边界 | 直接依赖 |
 |---:|:---:|---|---|---|
-| 00 | ✅ | [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) | source package/folder structure/preparation + source-mount contract/public skill/per-user Agent/tool shell/RuntimeAdapter/GraphHost/node-agent policy；launcher/live smoke 延期 | 无 |
-| 01 | ✅ | [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) | 可 checkpoint、可 HITL 的完整 fake graph | 00 |
-| 02 | ✅ | [`deep-research-02-state-persistence-contracts.md`](deep-research-02-state-persistence-contracts.md) | typed state、reducers、bundle refs、checkpoint schema | 01 |
-| 03 | ✅ | [`deep-research-03-gate-kernel.md`](deep-research-03-gate-kernel.md) | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
-| 04 | ✅ | [`deep-research-04-work-unit-kernel.md`](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded `Send`、sole-writer JSONL ledger、controlled fixture worker；apply-ready，待 archive | 02, 03 |
+| 00 | ✅ | deep-research-00-runtime-infrastructure *(已归档)* | source package/folder structure/preparation + source-mount contract/public skill/per-user Agent/tool shell/RuntimeAdapter/GraphHost/node-agent policy；launcher/live smoke 延期 | 无 |
+| 01 | ✅ | deep-research-01-fake-graph-skeleton *(已归档)* | 可 checkpoint、可 HITL 的完整 fake graph | 00 |
+| 02 | ✅ | deep-research-02-state-persistence-contracts *(已归档)* | typed state、reducers、bundle refs、checkpoint schema | 01 |
+| 03 | ✅ | deep-research-03-gate-kernel *(已归档)* | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
+| 04 | ✅ | deep-research-04-work-unit-kernel *(已归档)* | WorkSpec、bounded `Send`、sole-writer JSONL ledger、controlled fixture worker | 02, 03 |
 | 05 | ⬜ | [`deep-research-05-bootstrap-node.md`](deep-research-05-bootstrap-node.md) | 替换 fake bootstrap | 02, 03 |
 | 06 | ⬜ | [`deep-research-06-hitl1-node.md`](deep-research-06-hitl1-node.md) | 替换 fake HITL1/profile interrupt | 05 |
 | 07 | ⬜ | [`deep-research-07-topic-planning-node.md`](deep-research-07-topic-planning-node.md) | 替换 fake topic planner/seed materialization | 03, 06 |
@@ -925,10 +925,10 @@ change 00 已定死 local editable/Docker source override 和 runtime bridge 直
 
 ## 落地关联
 
-00 runtime substrate 与 01 fake graph skeleton 已完成并归档；launcher、Docker live
-smoke 与 Postgres profile 已明确转入 deployment follow-up，不阻塞 graph 路线。
-下一步严格按 02→18 的依赖关系逐项推进，不提前合并真实 nodes，也不把延期的
-deployment 工作塞入未完成的 change。
+00–04（runtime substrate、fake graph skeleton、typed state、gate kernel、work-unit kernel）
+均已完成并归档；launcher、Docker live smoke 与 Postgres profile 已明确转入 deployment
+follow-up，不阻塞 graph 路线。下一步从 05 bootstrap node 起，严格按 05→18 的依赖关系
+逐项推进，不提前合并真实 nodes，也不把延期的 deployment 工作塞入未完成的 change。
 
 当前稳定原则是：**graph 控制确定性流程与小型控制 state，agent loop 控制开放式研究判断，sandbox/ledger 控制大内容与证据权威。**
 

@@ -1,28 +1,23 @@
-"""Minimal research bundle layout and path-containment contract.
+"""Canonical research-bundle paths and containment rules.
 
+@impl WOU-003
+@impl WOU-004
+@impl WOU-006
 @impl REG-009
 @impl REG-010
-
-The research bundle is rooted at ``workspace/deep-research/<research_id>/`` and scopes
-every sandbox write. A worker writes only its own
-``work/<work_id>/<attempt_id>/`` directory and controlled cache regions; writes outside
-the assigned research and attempt root fail closed. ``diagnostics/gate-attempts.jsonl``
-is audit-only and is never a phase cursor (the checkpointed ``ResearchState`` is the sole
-control authority).
-
-This module defines the contract only; the fake graph writes no artifacts. Real worker
-writes arrive with later changes and enforce containment through this contract.
 """
 
 from __future__ import annotations
 
-import posixpath
 import re
-from urllib.parse import urlsplit, urlunsplit
+from enum import StrEnum
 
-RESEARCH_ID_RE = re.compile(r"^r_[A-Za-z0-9_-]{43}$")
-WORK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
-ATTEMPT_ID_RE = re.compile(r"^g\d+-[a-z0-9_]+-a\d+$")
+from deerflow_deep_research.domain.work_units import (
+    ATTEMPT_ID_RE,
+    RESEARCH_ID_RE,
+    WORK_ID_RE,
+    canonicalize_source_url,
+)
 
 BUNDLE_ROOT = "workspace/deep-research"
 REQUEST_SUBTREE = "request"
@@ -44,50 +39,140 @@ BUNDLE_SUBTREES = (
 )
 
 DIAGNOSTICS_GATE_ATTEMPTS = "gate-attempts.jsonl"
-DIAGNOSTICS_AUDIT_ONLY = frozenset({DIAGNOSTICS_GATE_ATTEMPTS})
+EVIDENCE_LEDGER = "submissions.jsonl"
+EVIDENCE_LOCK = ".submissions.lock"
+
+_PROBE_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+_STAGING_RE = re.compile(r"^\.submissions\.[0-9a-f]{32}\.tmp$")
+_ALIAS_PROBE_RE = re.compile(r"^\.work-unit-probe-[0-9a-f]{32}$")
+_FS_PROBE_RE = re.compile(r"^\.work-unit-fsprobe-[0-9a-f]{32}\.(?:lock|src|dst)$")
+_DPT_CONTROL_NAMES = frozenset({"queue.json", "index.json", "status.json"})
+
+
+class BundlePathKind(StrEnum):
+    CONTENT = "content"
+    EVIDENCE = "evidence"
+    AUDIT = "audit"
+    UNKNOWN = "unknown"
+
+
+def _require_research_id(research_id: str) -> str:
+    if not isinstance(research_id, str) or not RESEARCH_ID_RE.fullmatch(research_id):
+        raise ValueError("research_id_invalid")
+    return research_id
+
+
+def _require_probe_token(token: str) -> str:
+    if not isinstance(token, str) or not _PROBE_TOKEN_RE.fullmatch(token):
+        raise ValueError("probe_token_invalid")
+    return token
+
+
+def _canonical_relative(path: str, *, label: str, max_length: int = 1024) -> str:
+    if not isinstance(path, str) or not path or len(path) > max_length or not path.isascii():
+        raise ValueError(f"{label}_invalid")
+    if path.startswith("/") or path.endswith("/") or "\\" in path or "\x00" in path:
+        raise ValueError(f"{label}_invalid")
+    if any(part in {"", ".", ".."} for part in path.split("/")):
+        raise ValueError(f"{label}_invalid")
+    return path
+
+
+def _require_work_attempt(work_id: str, attempt_id: str) -> tuple[str, str]:
+    if not isinstance(work_id, str) or not WORK_ID_RE.fullmatch(work_id):
+        raise ValueError("work_id_invalid")
+    match = ATTEMPT_ID_RE.fullmatch(attempt_id) if isinstance(attempt_id, str) else None
+    if match is None or match.group("work_id") != work_id:
+        raise ValueError("attempt_id_invalid")
+    return work_id, attempt_id
 
 
 def bundle_root(research_id: str) -> str:
-    if not RESEARCH_ID_RE.fullmatch(research_id):
-        raise ValueError("research_id_invalid")
-    return f"{BUNDLE_ROOT}/{research_id}"
+    return f"{BUNDLE_ROOT}/{_require_research_id(research_id)}"
 
 
 def attempt_dir(research_id: str, work_id: str, attempt_id: str) -> str:
-    """Return the canonical worker write root for one work/attempt."""
-    if not RESEARCH_ID_RE.fullmatch(research_id):
-        raise ValueError("research_id_invalid")
+    _require_work_attempt(work_id, attempt_id)
+    return f"{bundle_root(research_id)}/{WORK_SUBTREE}/{work_id}/{attempt_id}"
+
+
+def work_spec_path(research_id: str, work_id: str, attempt_id: str) -> str:
+    return f"{attempt_dir(research_id, work_id, attempt_id)}/work-spec.json"
+
+
+def first_work_spec_path(research_id: str, work_id: str) -> str:
     if not WORK_ID_RE.fullmatch(work_id):
         raise ValueError("work_id_invalid")
-    if not ATTEMPT_ID_RE.fullmatch(attempt_id):
-        raise ValueError("attempt_id_invalid")
-    return f"{BUNDLE_ROOT}/{research_id}/{WORK_SUBTREE}/{work_id}/{attempt_id}"
+    return work_spec_path(research_id, work_id, f"{work_id}_a00")
+
+
+def result_path(research_id: str, work_id: str, attempt_id: str) -> str:
+    return f"{attempt_dir(research_id, work_id, attempt_id)}/result.json"
+
+
+def output_path(research_id: str, work_id: str, attempt_id: str, relative_output: str) -> str:
+    relative = _canonical_relative(relative_output, label="output", max_length=256)
+    if relative == "outputs" or relative.startswith("outputs/"):
+        raise ValueError("output_must_be_relative_to_outputs")
+    return f"{attempt_dir(research_id, work_id, attempt_id)}/outputs/{relative}"
+
+
+def evidence_ledger_path(research_id: str) -> str:
+    return f"{bundle_root(research_id)}/{EVIDENCE_SUBTREE}/{EVIDENCE_LEDGER}"
+
+
+def evidence_lock_path(research_id: str) -> str:
+    return f"{bundle_root(research_id)}/{EVIDENCE_SUBTREE}/{EVIDENCE_LOCK}"
+
+
+def evidence_staging_path(research_id: str, token: str) -> str:
+    return f"{bundle_root(research_id)}/{EVIDENCE_SUBTREE}/.submissions.{_require_probe_token(token)}.tmp"
+
+
+def is_evidence_staging_name(name: str) -> bool:
+    return isinstance(name, str) and _STAGING_RE.fullmatch(name) is not None
 
 
 def diagnostics_path(research_id: str, name: str = DIAGNOSTICS_GATE_ATTEMPTS) -> str:
-    if name not in DIAGNOSTICS_AUDIT_ONLY:
+    if name != DIAGNOSTICS_GATE_ATTEMPTS:
         raise ValueError("diagnostic_unknown")
     return f"{bundle_root(research_id)}/{DIAGNOSTICS_SUBTREE}/{name}"
 
 
-def is_audit_only(path: str) -> bool:
-    """A diagnostics path is audit-only and is never a phase cursor."""
-    normalized = _normalize(path)
-    marker = f"/{DIAGNOSTICS_SUBTREE}/"
-    if marker not in normalized:
-        return False
-    tail = normalized.split(marker, 1)[1]
-    return any(tail.startswith(name) for name in DIAGNOSTICS_AUDIT_ONLY)
+def runtime_alias_probe_path(research_id: str, token: str) -> str:
+    return f"{bundle_root(research_id)}/{DIAGNOSTICS_SUBTREE}/.work-unit-probe-{_require_probe_token(token)}"
 
 
-def _normalize(path: str) -> str:
-    if not isinstance(path, str) or not path:
-        raise ValueError("path_invalid")
-    normalized = posixpath.normpath(path)
-    # Reject absolute paths and any residual parent traversal that would escape the root.
-    if posixpath.isabs(normalized) or normalized.startswith(".."):
-        raise ValueError("path_not_contained")
-    return normalized
+def runtime_fs_probe_paths(research_id: str, token: str) -> tuple[str, str, str]:
+    prefix = f"{bundle_root(research_id)}/{DIAGNOSTICS_SUBTREE}/.work-unit-fsprobe-{_require_probe_token(token)}"
+    return (f"{prefix}.lock", f"{prefix}.src", f"{prefix}.dst")
+
+
+def prelaunch_fs_probe_names(token: str) -> tuple[str, str, str]:
+    prefix = f".deep-research-work-unit-fsprobe-{_require_probe_token(token)}"
+    return (f"{prefix}.lock", f"{prefix}.src", f"{prefix}.dst")
+
+
+def _normalize_bundle_ref(path: str) -> str:
+    canonical = _canonical_relative(path, label="bundle_ref")
+    if not canonical.startswith(f"{BUNDLE_ROOT}/"):
+        raise ValueError("bundle_ref_invalid")
+    parts = canonical.split("/")
+    if len(parts) < 4 or not RESEARCH_ID_RE.fullmatch(parts[2]):
+        raise ValueError("bundle_ref_invalid")
+    return canonical
+
+
+def bundle_ref_to_virtual(path: str, *, virtual_user_data_root: str = "/mnt/user-data") -> str:
+    ref = _normalize_bundle_ref(path)
+    if virtual_user_data_root != "/mnt/user-data":
+        raise ValueError("virtual_root_invalid")
+    return f"{virtual_user_data_root}/{ref}"
+
+
+def relative_to_workspace_path(path: str) -> str:
+    ref = _normalize_bundle_ref(path)
+    return ref.removeprefix("workspace/")
 
 
 def resolve_contained_path(
@@ -97,40 +182,60 @@ def resolve_contained_path(
     work_id: str | None = None,
     attempt_id: str | None = None,
 ) -> str:
-    """Resolve a worker write path and fail closed if it escapes the assigned root.
-
-    With ``work_id`` and ``attempt_id`` the allowed root is the attempt directory; a
-    worker may write only there (plus controlled cache regions, represented by the
-    attempt root). Without them the allowed root is the research bundle root, used by
-    controller-level writes. Any path that resolves outside the root via ``..`` or an
-    absolute escape is rejected.
-    """
-    normalized = _normalize(write_path)
-    if work_id is not None and attempt_id is not None:
-        root = attempt_dir(research_id, work_id, attempt_id)
-    else:
-        root = bundle_root(research_id)
-    root_prefix = root.rstrip("/") + "/"
-    if normalized == root or normalized.startswith(root_prefix):
+    try:
+        normalized = _normalize_bundle_ref(write_path)
+    except ValueError as exc:
+        raise ValueError("path_not_contained") from exc
+    if (work_id is None) != (attempt_id is None):
+        raise ValueError("path_not_contained")
+    try:
+        root = (
+            attempt_dir(research_id, work_id, attempt_id)
+            if work_id is not None and attempt_id is not None
+            else bundle_root(research_id)
+        )
+    except ValueError as exc:
+        raise ValueError("path_not_contained") from exc
+    if normalized == root or normalized.startswith(f"{root}/"):
         return normalized
     raise ValueError("path_not_contained")
 
 
-def canonicalize_source_url(url: str) -> str:
-    """Canonicalize a source URL so duplicates collapse (REG-010).
+def classify_bundle_path(path: str) -> BundlePathKind:
+    try:
+        ref = _normalize_bundle_ref(path)
+    except ValueError:
+        return BundlePathKind.UNKNOWN
+    parts = ref.split("/")
+    tail = parts[3:]
+    if not tail:
+        return BundlePathKind.UNKNOWN
+    subtree = tail[0]
+    if subtree == DIAGNOSTICS_SUBTREE and len(tail) == 2:
+        name = tail[1]
+        if name == DIAGNOSTICS_GATE_ATTEMPTS or _ALIAS_PROBE_RE.fullmatch(name) or _FS_PROBE_RE.fullmatch(name):
+            return BundlePathKind.AUDIT
+    if subtree == EVIDENCE_SUBTREE and len(tail) == 2:
+        name = tail[1]
+        if name == EVIDENCE_LEDGER:
+            return BundlePathKind.EVIDENCE
+        if name == EVIDENCE_LOCK or _STAGING_RE.fullmatch(name):
+            return BundlePathKind.AUDIT
+    if subtree == WORK_SUBTREE and len(tail) >= 4:
+        work_id, attempt_id = tail[1], tail[2]
+        try:
+            _require_work_attempt(work_id, attempt_id)
+        except ValueError:
+            return BundlePathKind.UNKNOWN
+        artifact = "/".join(tail[3:])
+        if artifact in {"work-spec.json", "result.json"} or artifact.startswith("outputs/"):
+            if not any(name in _DPT_CONTROL_NAMES or name.endswith(".queue") for name in tail[3:]):
+                return BundlePathKind.CONTENT
+    return BundlePathKind.UNKNOWN
 
-    Strips the fragment, lower-cases the host, and drops trailing slashes from the path
-    so the same source is not recorded twice under trivially different URLs.
-    """
-    if not isinstance(url, str) or not url:
-        raise ValueError("source_url_invalid")
-    parts = urlsplit(url)
-    if not parts.scheme or not parts.netloc:
-        raise ValueError("source_url_invalid")
-    scheme = parts.scheme.lower()
-    netloc = parts.netloc.lower()
-    path = parts.path.rstrip("/") or "/"
-    return urlunsplit((scheme, netloc, path, parts.query, ""))
+
+def is_audit_only(path: str) -> bool:
+    return classify_bundle_path(path) is BundlePathKind.AUDIT
 
 
 def dedupe_source_urls(urls: list[str]) -> tuple[str, ...]:
@@ -149,9 +254,11 @@ __all__ = [
     "ATTEMPT_ID_RE",
     "BUNDLE_ROOT",
     "BUNDLE_SUBTREES",
-    "DIAGNOSTICS_AUDIT_ONLY",
+    "BundlePathKind",
     "DIAGNOSTICS_GATE_ATTEMPTS",
     "DIAGNOSTICS_SUBTREE",
+    "EVIDENCE_LEDGER",
+    "EVIDENCE_LOCK",
     "EVIDENCE_SUBTREE",
     "FINAL_SUBTREE",
     "RESEARCH_ID_RE",
@@ -161,10 +268,24 @@ __all__ = [
     "WORK_ID_RE",
     "WORK_SUBTREE",
     "attempt_dir",
+    "bundle_ref_to_virtual",
     "bundle_root",
     "canonicalize_source_url",
+    "classify_bundle_path",
     "dedupe_source_urls",
     "diagnostics_path",
+    "evidence_ledger_path",
+    "evidence_lock_path",
+    "evidence_staging_path",
+    "first_work_spec_path",
     "is_audit_only",
+    "is_evidence_staging_name",
+    "output_path",
+    "prelaunch_fs_probe_names",
+    "relative_to_workspace_path",
     "resolve_contained_path",
+    "result_path",
+    "runtime_alias_probe_path",
+    "runtime_fs_probe_paths",
+    "work_spec_path",
 ]

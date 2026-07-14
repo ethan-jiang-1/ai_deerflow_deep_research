@@ -11,8 +11,11 @@ profile); this suite requires no database server and no Docker.
 from __future__ import annotations
 
 import json
+import secrets
 import subprocess
 import sys
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -25,8 +28,28 @@ from deerflow_deep_research.runtime.human_input import SelectedStartMessage
 from deerflow_deep_research.runtime.probe import build_probe_graph_host
 from deerflow_deep_research.runtime.research import ResearchActionInput, derive_research_id
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
+from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def _verified_work_unit_store(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    async def create(_cls, _envelope, *, research_id, **_kwargs):
+        return WorkUnitStore(
+            workspace_host_path=workspace,
+            research_id=research_id,
+            clock=lambda: datetime(2026, 7, 14, tzinfo=UTC),
+            monotonic=time.monotonic,
+            lock_sleep=time.sleep,
+            token_factory=lambda: secrets.token_hex(16),
+            fault_hook=None,
+        )
+
+    monkeypatch.setattr(WorkUnitStore, "create", classmethod(create))
 
 
 def _sqlite_config(db_path: str) -> object:

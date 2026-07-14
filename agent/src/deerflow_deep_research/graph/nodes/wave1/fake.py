@@ -1,15 +1,26 @@
+from datetime import UTC, datetime
+
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
-from deerflow_deep_research.engine.fake_control import attempt_id, node_update
+from deerflow_deep_research.domain.work_units import WORK_UNIT_GATE_VIEW_KEY
+from deerflow_deep_research.engine.fake_control import node_update
 
-from .subgraph import build_wave1_subgraph
+from .subgraph import run_wave1_work_units
 
 
-def build_fake(_dependencies: NodeBuildDependencies):
-    subgraph = build_wave1_subgraph()
+def build_fake(dependencies: NodeBuildDependencies):
+    if dependencies.work_units is None:
+        raise ValueError("work_unit_capability_missing")
 
     async def run(state):
-        fan_in = await subgraph.ainvoke({"branch_prefix": attempt_id(state, "wave1"), "branch_results": ()})
-        results = tuple(item.model_dump(mode="json") for item in fan_in["normalized_results"])
-        return node_update("wave1", wave1_results=results)
+        result = await run_wave1_work_units(
+            state,
+            controller=dependencies.work_units,
+            clock=lambda: datetime(2026, 1, 2, tzinfo=UTC),
+        )
+        return {
+            **node_update("wave1"),
+            **result.parent_update,
+            WORK_UNIT_GATE_VIEW_KEY: result.gate_view,
+        }
 
     return run

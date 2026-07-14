@@ -30,8 +30,11 @@ import json
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any, TypedDict
+
+from pydantic import BaseModel
 
 from deerflow_deep_research.domain.lifecycle import (
     MAX_CONTROL_RESULT_CHARS,
@@ -50,6 +53,21 @@ from deerflow_deep_research.domain.lifecycle import (
     SynthesisVerdict,
     TerminalReason,
 )
+from deerflow_deep_research.domain.work_units import (
+    ATTEMPT_ID_RE,
+    MAX_PARENT_ACCEPTED_REFS,
+    MAX_PARENT_ATTEMPTS,
+    MAX_PARENT_FAILURES,
+    MAX_PARENT_WORKS,
+    WORK_ID_RE,
+    AttemptRef,
+    AttemptStatus,
+    TerminalFailureSummary,
+    WorkSpecRef,
+)
+from deerflow_deep_research.domain.work_units import (
+    CONTENT_HASH_RE as WORK_UNIT_HASH_RE,
+)
 
 RESEARCH_STATE_SCHEMA_VERSION = 2
 
@@ -58,6 +76,7 @@ RESEARCH_STATE_SCHEMA_VERSION = 2
 # under this bound; oversized updates indicate large content that must live as a sandbox
 # ContentRef rather than inside the checkpoint.
 MAX_CHECKPOINT_STATE_BYTES = 65_536
+MAX_WORK_UNIT_BLOCK_BYTES = 40_960
 
 RESEARCH_ID_RE = re.compile(r"^r_[A-Za-z0-9_-]{43}$")
 REQUEST_DIGEST_RE = re.compile(r"^d_[A-Za-z0-9_-]{43}$")
@@ -65,13 +84,7 @@ CONTENT_HASH_RE = re.compile(r"^h_[A-Za-z0-9_-]{43}$")
 SANDBOX_PATH_RE = re.compile(r"^workspace/deep-research/r_[A-Za-z0-9_-]{43}/.+$")
 
 
-class WorkStatus(StrEnum):
-    PENDING = "pending"
-    RUNNING = "running"
-    SUBMITTED = "submitted"
-    FAILED = "failed"
-    TIMED_OUT = "timed_out"
-    CANCELLED = "cancelled"
+WorkStatus = AttemptStatus
 
 
 TERMINAL_WORK_STATUSES = frozenset(
@@ -92,6 +105,7 @@ class PhaseStatus(StrEnum):
 
 class WriterRole(StrEnum):
     CONTROLLER = "controller"
+    SUBMIT = "submit"
     GATE = "gate"
     PLANNER = "planner"
     WORKER = "worker"
@@ -101,7 +115,7 @@ class WriterRole(StrEnum):
 # Writers permitted to mutate gated authority fields (phase, control status, gate
 # feedback, gate attempt/budget counters, accepted submission refs). Worker, planner, and
 # repair agents are refused at the reducer.
-AUTHORITY_WRITERS = frozenset({WriterRole.CONTROLLER, WriterRole.GATE})
+AUTHORITY_WRITERS = frozenset({WriterRole.CONTROLLER, WriterRole.SUBMIT, WriterRole.GATE})
 
 # Fields that only authority writers (controller / gate) may mutate. Any other writer
 # raising an update touching one of these is rejected by ``apply_research_update``.
@@ -115,6 +129,13 @@ GATED_FIELDS = frozenset(
         "gate_attempts_by_phase",
         "repair_budget_by_phase",
         "accepted_submission_refs",
+        "work_specs_by_id",
+        "attempts_by_id",
+        "work_status_by_id",
+        "active_attempt_by_work_id",
+        "terminal_failures_by_attempt_id",
+        "next_work_ordinal",
+        "next_attempt_ordinal_by_work_id",
         "generation",
         "schema_version",
         "research_id",
@@ -247,6 +268,8 @@ def merge_work_status(
     """
     merged: dict[str, WorkStatus] = {key: _coerce_work_status(value) for key, value in current.items()}
     for work_id, value in incoming.items():
+        if not ATTEMPT_ID_RE.fullmatch(work_id):
+            raise ValueError(f"work_status_key_invalid:{work_id}")
         candidate = _coerce_work_status(value)
         existing = merged.get(work_id)
         if existing in TERMINAL_WORK_STATUSES and candidate is not existing:
@@ -255,18 +278,136 @@ def merge_work_status(
     return merged
 
 
+def _plain_model(value: Any, model_type: type[BaseModel]) -> dict[str, Any]:
+    model = value if isinstance(value, model_type) else model_type.model_validate(value)
+    return model.model_dump(mode="json")
+
+
+def merge_work_spec_refs(current: Mapping[str, Any], incoming: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    merged = {key: _plain_model(value, WorkSpecRef) for key, value in current.items()}
+    for work_id, value in incoming.items():
+        if not WORK_ID_RE.fullmatch(work_id):
+            raise ValueError(f"work_spec_ref_key_invalid:{work_id}")
+        candidate = _plain_model(value, WorkSpecRef)
+        existing = merged.get(work_id)
+        if existing is not None and existing != candidate:
+            raise ValueError(f"work_spec_ref_conflict:{work_id}")
+        merged[work_id] = candidate
+    if len(merged) > MAX_PARENT_WORKS:
+        raise ValueError("work_spec_refs_too_many")
+    return merged
+
+
+def _datetime_from_json(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def merge_attempt_refs(current: Mapping[str, Any], incoming: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    merged = {key: _plain_model(value, AttemptRef) for key, value in current.items()}
+    for attempt_id, value in incoming.items():
+        if not ATTEMPT_ID_RE.fullmatch(attempt_id):
+            raise ValueError(f"attempt_ref_key_invalid:{attempt_id}")
+        candidate = _plain_model(value, AttemptRef)
+        existing = merged.get(attempt_id)
+        if existing is not None:
+            existing_terminal = existing["terminal_code"] is not None
+            if existing_terminal and candidate != existing:
+                raise ValueError(f"attempt_terminal_conflict:{attempt_id}")
+            if not existing_terminal:
+                immutable_changed = (
+                    candidate["created_at"] != existing["created_at"]
+                    or candidate["expires_at"] != existing["expires_at"]
+                )
+                if immutable_changed:
+                    raise ValueError(f"attempt_immutable_conflict:{attempt_id}")
+                prior_started = _datetime_from_json(existing["started_at"])
+                next_started = _datetime_from_json(candidate["started_at"])
+                if prior_started is not None and next_started != prior_started:
+                    raise ValueError(f"attempt_started_at_conflict:{attempt_id}")
+        merged[attempt_id] = candidate
+    if len(merged) > MAX_PARENT_ATTEMPTS:
+        raise ValueError("attempt_refs_too_many")
+    return merged
+
+
+def merge_active_attempts(_current: Mapping[str, str], incoming: Mapping[str, str]) -> dict[str, str]:
+    normalized: dict[str, str] = {}
+    for work_id, attempt_id in incoming.items():
+        if not WORK_ID_RE.fullmatch(work_id) or not ATTEMPT_ID_RE.fullmatch(attempt_id):
+            raise ValueError("active_attempt_id_invalid")
+        if not attempt_id.startswith(f"{work_id}_a"):
+            raise ValueError("active_attempt_identity_mismatch")
+        normalized[work_id] = attempt_id
+    if len(normalized) > MAX_PARENT_WORKS:
+        raise ValueError("active_attempts_too_many")
+    return normalized
+
+
+def merge_terminal_failures(_current: Mapping[str, Any], incoming: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    normalized: dict[str, dict[str, Any]] = {}
+    works: set[str] = set()
+    for attempt_id, value in incoming.items():
+        match = ATTEMPT_ID_RE.fullmatch(attempt_id)
+        if match is None:
+            raise ValueError("terminal_failure_key_invalid")
+        work_id = match.group("work_id")
+        if work_id in works:
+            raise ValueError("terminal_failure_duplicate_work")
+        works.add(work_id)
+        normalized[attempt_id] = _plain_model(value, TerminalFailureSummary)
+    if len(normalized) > MAX_PARENT_FAILURES:
+        raise ValueError("terminal_failures_too_many")
+    return normalized
+
+
 def merge_accepted_refs(current: Iterable[str], incoming: Iterable[str]) -> tuple[str, ...]:
     """Dedupe-append references into the validated submission ledger."""
     seen: list[str] = [ref for ref in current if isinstance(ref, str)]
     existing = set(seen)
     for ref in incoming:
-        if not isinstance(ref, str):
+        if not isinstance(ref, str) or not WORK_UNIT_HASH_RE.fullmatch(ref):
             raise ValueError("accepted_ref_invalid")
         if ref in existing:
             continue
         existing.add(ref)
         seen.append(ref)
+    if len(seen) > MAX_PARENT_ACCEPTED_REFS:
+        raise ValueError("accepted_refs_too_many")
     return tuple(seen)
+
+
+WORK_UNIT_GATE_PREVIEW_FIELDS = frozenset(
+    {
+        "work_specs_by_id",
+        "attempts_by_id",
+        "work_status_by_id",
+        "active_attempt_by_work_id",
+        "terminal_failures_by_attempt_id",
+        "accepted_submission_refs",
+    }
+)
+
+
+def preview_work_unit_update(current: Mapping[str, Any], incoming: Mapping[str, Any]) -> dict[str, Any]:
+    preview = dict(current)
+    unknown = set(incoming) - WORK_UNIT_GATE_PREVIEW_FIELDS
+    if unknown:
+        raise ValueError(f"work_unit_preview_field_forbidden:{','.join(sorted(unknown))}")
+    reducers = {
+        "work_specs_by_id": merge_work_spec_refs,
+        "attempts_by_id": merge_attempt_refs,
+        "work_status_by_id": merge_work_status,
+        "active_attempt_by_work_id": merge_active_attempts,
+        "terminal_failures_by_attempt_id": merge_terminal_failures,
+        "accepted_submission_refs": merge_accepted_refs,
+    }
+    for field_name, value in incoming.items():
+        preview[field_name] = reducers[field_name](
+            current.get(field_name, {} if field_name != "accepted_submission_refs" else ()), value
+        )
+    return preview
 
 
 def merge_content_refs(
@@ -339,10 +480,34 @@ def apply_research_update(
     (worker / planner / repair). Enforces ``generation`` monotonic non-decrease. Returns
     the validated partial update for the caller to merge.
     """
-    if writer not in AUTHORITY_WRITERS:
-        forbidden = sorted(name for name in incoming if name in GATED_FIELDS)
-        if forbidden:
-            raise ValueError(f"writer_not_authorized:{','.join(forbidden)}")
+    allowed_writers: dict[str, frozenset[WriterRole]] = {
+        "phase": frozenset({WriterRole.CONTROLLER, WriterRole.GATE}),
+        "phase_status": frozenset({WriterRole.CONTROLLER, WriterRole.GATE}),
+        "waiting_for": frozenset({WriterRole.CONTROLLER, WriterRole.GATE}),
+        "terminal_status": frozenset({WriterRole.CONTROLLER, WriterRole.GATE}),
+        "terminal_reason": frozenset({WriterRole.CONTROLLER, WriterRole.GATE}),
+        "latest_gate_feedback": frozenset({WriterRole.GATE}),
+        "gate_attempts_by_phase": frozenset({WriterRole.GATE}),
+        "repair_budget_by_phase": frozenset({WriterRole.GATE}),
+        "route": frozenset({WriterRole.GATE}),
+        "generation": frozenset({WriterRole.CONTROLLER, WriterRole.GATE}),
+        "schema_version": frozenset({WriterRole.CONTROLLER}),
+        "research_id": frozenset({WriterRole.CONTROLLER}),
+        "outer_thread_id": frozenset({WriterRole.CONTROLLER}),
+        "work_specs_by_id": frozenset({WriterRole.CONTROLLER}),
+        "pending_work_ids": frozenset({WriterRole.CONTROLLER}),
+        "batch_cursor": frozenset({WriterRole.CONTROLLER}),
+        "next_work_ordinal": frozenset({WriterRole.CONTROLLER}),
+        "next_attempt_ordinal_by_work_id": frozenset({WriterRole.CONTROLLER}),
+        "attempts_by_id": frozenset({WriterRole.CONTROLLER, WriterRole.SUBMIT}),
+        "work_status_by_id": frozenset({WriterRole.CONTROLLER, WriterRole.SUBMIT}),
+        "active_attempt_by_work_id": frozenset({WriterRole.CONTROLLER, WriterRole.SUBMIT}),
+        "terminal_failures_by_attempt_id": frozenset({WriterRole.SUBMIT}),
+        "accepted_submission_refs": frozenset({WriterRole.SUBMIT}),
+    }
+    forbidden = sorted(name for name in incoming if name in allowed_writers and writer not in allowed_writers[name])
+    if forbidden:
+        raise ValueError(f"writer_not_authorized:{','.join(forbidden)}")
     if "generation" in incoming:
         prior = current.get("generation")
         if prior is not None and int(incoming["generation"]) < int(prior):
@@ -381,9 +546,14 @@ class ResearchCheckpoint:
     active_wave: str | None = None
     pending_work_ids: tuple[str, ...] = ()
     batch_cursor: int = 0
+    next_work_ordinal: int = 0
+    next_attempt_ordinal_by_work_id: dict[str, int] = field(default_factory=dict)
     # work
     work_specs_by_id: dict[str, Any] = field(default_factory=dict)
+    attempts_by_id: dict[str, Any] = field(default_factory=dict)
     work_status_by_id: dict[str, WorkStatus] = field(default_factory=dict)
+    active_attempt_by_work_id: dict[str, str] = field(default_factory=dict)
+    terminal_failures_by_attempt_id: dict[str, Any] = field(default_factory=dict)
     accepted_submission_refs: tuple[str, ...] = ()
     wave0_results: tuple[dict[str, str], ...] = ()
     wave1_results: tuple[dict[str, str], ...] = ()
@@ -447,8 +617,55 @@ class ResearchCheckpoint:
         if self.terminal_reason is not None:
             object.__setattr__(self, "terminal_reason", TerminalReason(self.terminal_reason))
         # work status values must be valid WorkStatus
-        coerced_status = {work_id: _coerce_work_status(value) for work_id, value in self.work_status_by_id.items()}
+        object.__setattr__(self, "work_specs_by_id", merge_work_spec_refs({}, self.work_specs_by_id))
+        object.__setattr__(self, "pending_work_ids", tuple(self.pending_work_ids))
+        object.__setattr__(self, "attempts_by_id", merge_attempt_refs({}, self.attempts_by_id))
+        coerced_status = merge_work_status({}, self.work_status_by_id)
         object.__setattr__(self, "work_status_by_id", coerced_status)
+        object.__setattr__(
+            self,
+            "active_attempt_by_work_id",
+            merge_active_attempts({}, self.active_attempt_by_work_id),
+        )
+        object.__setattr__(
+            self,
+            "terminal_failures_by_attempt_id",
+            merge_terminal_failures({}, self.terminal_failures_by_attempt_id),
+        )
+        object.__setattr__(self, "accepted_submission_refs", merge_accepted_refs((), self.accepted_submission_refs))
+        self._validate_work_bounds()
+
+    def _validate_work_bounds(self) -> None:
+        if len(self.pending_work_ids) > MAX_PARENT_WORKS or len(set(self.pending_work_ids)) != len(
+            self.pending_work_ids
+        ):
+            raise ValueError("pending_work_ids_bound_invalid")
+        if tuple(sorted(self.pending_work_ids)) != self.pending_work_ids:
+            raise ValueError("pending_work_ids_not_canonical")
+        if any(not WORK_ID_RE.fullmatch(work_id) for work_id in self.pending_work_ids):
+            raise ValueError("pending_work_id_invalid")
+        if not 0 <= self.batch_cursor <= MAX_PARENT_WORKS:
+            raise ValueError("batch_cursor_invalid")
+        if not 0 <= self.next_work_ordinal <= 10_000:
+            raise ValueError("next_work_ordinal_invalid")
+        if len(self.next_attempt_ordinal_by_work_id) > MAX_PARENT_WORKS:
+            raise ValueError("next_attempt_ordinals_too_many")
+        for work_id, ordinal in self.next_attempt_ordinal_by_work_id.items():
+            if not WORK_ID_RE.fullmatch(work_id) or not isinstance(ordinal, int) or not 0 <= ordinal <= 100:
+                raise ValueError("next_attempt_ordinal_invalid")
+        if set(self.work_status_by_id) - set(self.attempts_by_id):
+            raise ValueError("work_status_attempt_missing")
+        for work_id, attempt_id in self.active_attempt_by_work_id.items():
+            status = self.work_status_by_id.get(attempt_id)
+            if status is None or status in TERMINAL_WORK_STATUSES:
+                raise ValueError("active_attempt_status_invalid")
+            if work_id not in self.work_specs_by_id:
+                raise ValueError("active_attempt_work_spec_missing")
+        for attempt_id in self.terminal_failures_by_attempt_id:
+            status = self.work_status_by_id.get(attempt_id)
+            if status not in {WorkStatus.FAILED, WorkStatus.TIMED_OUT, WorkStatus.CANCELLED}:
+                raise ValueError("terminal_failure_status_invalid")
+        serialize_work_unit_block(self.__dict__)
 
 
 class ResearchState(TypedDict, total=False):
@@ -476,9 +693,14 @@ class ResearchState(TypedDict, total=False):
     active_wave: str
     pending_work_ids: tuple[str, ...]
     batch_cursor: int
+    next_work_ordinal: int
+    next_attempt_ordinal_by_work_id: dict[str, int]
     # work
-    work_specs_by_id: dict[str, Any]
+    work_specs_by_id: Annotated[dict[str, Any], merge_work_spec_refs]
+    attempts_by_id: Annotated[dict[str, Any], merge_attempt_refs]
     work_status_by_id: Annotated[dict[str, WorkStatus], merge_work_status]
+    active_attempt_by_work_id: Annotated[dict[str, str], merge_active_attempts]
+    terminal_failures_by_attempt_id: Annotated[dict[str, Any], merge_terminal_failures]
     accepted_submission_refs: Annotated[tuple[str, ...], merge_accepted_refs]
     wave0_results: Annotated[tuple[dict[str, str], ...], merge_branch_results]
     wave1_results: Annotated[tuple[dict[str, str], ...], merge_branch_results]
@@ -545,21 +767,46 @@ OWNERSHIP_TABLE: tuple[FieldOwnership, ...] = (
         "active_wave", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.WORKER), "apply_research_update"
     ),
     FieldOwnership(
-        "pending_work_ids", WriterRole.PLANNER, (WriterRole.CONTROLLER, WriterRole.WORKER), "last_write_wins"
+        "pending_work_ids", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.WORKER), "last_write_wins"
     ),
     FieldOwnership(
         "batch_cursor", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.WORKER), "apply_research_update"
     ),
+    FieldOwnership("next_work_ordinal", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "apply_research_update"),
     FieldOwnership(
-        "work_specs_by_id", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.WORKER), "controller_assign"
+        "next_attempt_ordinal_by_work_id",
+        WriterRole.CONTROLLER,
+        (WriterRole.CONTROLLER,),
+        "apply_research_update",
     ),
     FieldOwnership(
-        "work_status_by_id", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "merge_work_status"
+        "work_specs_by_id", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.WORKER), "merge_work_spec_refs"
+    ),
+    FieldOwnership(
+        "attempts_by_id",
+        WriterRole.CONTROLLER,
+        (WriterRole.CONTROLLER, WriterRole.SUBMIT, WriterRole.GATE),
+        "merge_attempt_refs",
+    ),
+    FieldOwnership(
+        "work_status_by_id", WriterRole.SUBMIT, (WriterRole.CONTROLLER, WriterRole.GATE), "merge_work_status"
+    ),
+    FieldOwnership(
+        "active_attempt_by_work_id",
+        WriterRole.CONTROLLER,
+        (WriterRole.CONTROLLER, WriterRole.SUBMIT),
+        "merge_active_attempts",
+    ),
+    FieldOwnership(
+        "terminal_failures_by_attempt_id",
+        WriterRole.SUBMIT,
+        (WriterRole.CONTROLLER, WriterRole.GATE),
+        "merge_terminal_failures",
     ),
     FieldOwnership(
         "accepted_submission_refs",
-        WriterRole.CONTROLLER,
-        (WriterRole.CONTROLLER, WriterRole.GATE),
+        WriterRole.SUBMIT,
+        (WriterRole.CONTROLLER, WriterRole.SUBMIT, WriterRole.GATE),
         "merge_accepted_refs",
     ),
     FieldOwnership(
@@ -604,10 +851,41 @@ def research_state_fields() -> frozenset[str]:
 # Serialization and validation
 # ---------------------------------------------------------------------------
 
+WORK_UNIT_BLOCK_FIELDS = (
+    "pending_work_ids",
+    "batch_cursor",
+    "next_work_ordinal",
+    "next_attempt_ordinal_by_work_id",
+    "work_specs_by_id",
+    "attempts_by_id",
+    "work_status_by_id",
+    "active_attempt_by_work_id",
+    "terminal_failures_by_attempt_id",
+    "accepted_submission_refs",
+)
+
+
+def serialize_work_unit_block(values: Mapping[str, Any]) -> str:
+    tuple_fields = {"pending_work_ids", "accepted_submission_refs"}
+    integer_fields = {"batch_cursor", "next_work_ordinal"}
+
+    def default_value(field_name: str) -> Any:
+        if field_name in tuple_fields:
+            return ()
+        if field_name in integer_fields:
+            return 0
+        return {}
+
+    payload = {field_name: values.get(field_name, default_value(field_name)) for field_name in WORK_UNIT_BLOCK_FIELDS}
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=_json_default)
+    if len(encoded.encode("utf-8")) > MAX_WORK_UNIT_BLOCK_BYTES:
+        raise ValueError("work_unit_block_too_large")
+    return encoded
+
 
 def serialize_research_state(values: Mapping[str, Any]) -> str:
     payload = json.dumps(values, sort_keys=True, separators=(",", ":"), default=_json_default)
-    if len(payload) > MAX_CHECKPOINT_STATE_BYTES:
+    if len(payload.encode("utf-8")) > MAX_CHECKPOINT_STATE_BYTES:
         raise ValueError("state_too_large")
     return payload
 
@@ -615,6 +893,10 @@ def serialize_research_state(values: Mapping[str, Any]) -> str:
 def _json_default(value: Any) -> Any:
     if isinstance(value, StrEnum):
         return value.value
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    if isinstance(value, datetime):
+        return value.isoformat().replace("+00:00", "Z")
     if isinstance(value, ContentRef):
         return {
             "sandbox_path": value.sandbox_path,
@@ -642,6 +924,7 @@ __all__ = [
     "FieldOwnership",
     "GATED_FIELDS",
     "MAX_CHECKPOINT_STATE_BYTES",
+    "MAX_WORK_UNIT_BLOCK_BYTES",
     "MAX_CONTROL_RESULT_CHARS",
     "MAX_FAKE_REPAIR_ATTEMPTS",
     "MAX_FAKE_RERUN_GENERATIONS",
@@ -655,16 +938,23 @@ __all__ = [
     "TERMINAL_WORK_STATUSES",
     "WriterRole",
     "WorkStatus",
+    "WORK_UNIT_GATE_PREVIEW_FIELDS",
     "apply_research_update",
     "fixture_plan_to_checkpoint",
+    "merge_active_attempts",
     "merge_accepted_refs",
+    "merge_attempt_refs",
     "merge_branch_results",
     "merge_content_refs",
+    "merge_terminal_failures",
     "merge_trace",
     "merge_work_status",
+    "merge_work_spec_refs",
     "ownership_fields",
     "project_lifecycle_status",
+    "preview_work_unit_update",
     "research_state_fields",
     "serialize_research_state",
+    "serialize_work_unit_block",
     "validate_research_state",
 ]

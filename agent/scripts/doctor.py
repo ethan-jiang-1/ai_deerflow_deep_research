@@ -61,6 +61,7 @@ def main() -> int:
         "durability": diag.durability,
         "provider_kind": diag.provider_kind,
         "worker_count": diag.worker_count,
+        "work_unit_storage": diag.work_unit_storage,
     }
     if diag.issues:
         output["issues"] = diag.issues

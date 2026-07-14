@@ -1,41 +1,37 @@
-"""Deterministic Send fan-out/fan-in contracts (REG-002)."""
+"""Wave fixture recipes reuse the shared work-unit component (REG-002)."""
 
 from __future__ import annotations
 
-import pytest
-
-from deerflow_deep_research.domain.state import BranchResult
-from deerflow_deep_research.graph.nodes.wave0.subgraph import build_wave0_subgraph, normalize_results
-from deerflow_deep_research.graph.nodes.wave1.subgraph import build_wave1_subgraph
+from deerflow_deep_research.graph.components.work_units import run_fixture_work_unit_component
+from deerflow_deep_research.graph.nodes.wave0 import subgraph as wave0_subgraph
+from deerflow_deep_research.graph.nodes.wave1 import subgraph as wave1_subgraph
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("builder", [build_wave0_subgraph, build_wave1_subgraph])
-async def test_wave_subgraph_dispatches_three_and_joins_in_stable_order(builder) -> None:
-    result = await builder().ainvoke({"branch_prefix": "g0-wave-a1", "branch_results": ()})
-    assert [item.branch_id for item in result["normalized_results"]] == [
-        "g0-wave-a1-b0",
-        "g0-wave-a1-b1",
-        "g0-wave-a1-b2",
-    ]
-
-
-def test_wave_join_normalizes_scheduler_order_and_rejects_duplicates() -> None:
-    values = (
-        BranchResult(branch_id="x-b2", verdict="pass"),
-        BranchResult(branch_id="x-b0", verdict="pass"),
-        BranchResult(branch_id="x-b1", verdict="pass"),
+def test_wave_recipes_use_distinct_three_item_fixture_intents() -> None:
+    assert tuple(intent.scope for intent in wave0_subgraph.WAVE0_FIXTURE_INTENTS) == (
+        ("wave0:fixture:0",),
+        ("wave0:fixture:1",),
+        ("wave0:fixture:2",),
     )
-    assert [item.branch_id for item in normalize_results(values)] == ["x-b0", "x-b1", "x-b2"]
-    with pytest.raises(ValueError, match="duplicate_branch"):
-        normalize_results((values[0], values[0], values[1]))
-
-
-@pytest.mark.asyncio
-async def test_repair_attempts_use_distinct_branch_ids() -> None:
-    graph = build_wave0_subgraph()
-    first = await graph.ainvoke({"branch_prefix": "g0-wave0-a1", "branch_results": ()})
-    second = await graph.ainvoke({"branch_prefix": "g0-wave0-a2", "branch_results": ()})
-    assert {item.branch_id for item in first["normalized_results"]}.isdisjoint(
-        item.branch_id for item in second["normalized_results"]
+    assert tuple(intent.scope for intent in wave1_subgraph.WAVE1_FIXTURE_INTENTS) == (
+        ("wave1:fixture:0",),
+        ("wave1:fixture:1",),
+        ("wave1:fixture:2",),
     )
+    assert all(
+        intent.required_outputs == ("fixture.json",)
+        for intent in (*wave0_subgraph.WAVE0_FIXTURE_INTENTS, *wave1_subgraph.WAVE1_FIXTURE_INTENTS)
+    )
+
+
+def test_both_wave_recipes_delegate_to_the_same_component_submit_path() -> None:
+    assert wave0_subgraph.run_fixture_work_unit_component is run_fixture_work_unit_component
+    assert wave1_subgraph.run_fixture_work_unit_component is run_fixture_work_unit_component
+    forbidden_local_authorities = {
+        "StateGraph",
+        "WorkUnitStore",
+        "validate_submission_candidate",
+        "commit_candidate",
+    }
+    assert not forbidden_local_authorities & set(vars(wave0_subgraph))
+    assert not forbidden_local_authorities & set(vars(wave1_subgraph))

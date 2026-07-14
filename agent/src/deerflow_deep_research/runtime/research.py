@@ -18,7 +18,7 @@ from typing import Any
 
 from langgraph.types import Command
 
-from deerflow_deep_research.domain.invocation import GraphInvocationContext
+from deerflow_deep_research.domain.invocation import GraphInvocationContext, WorkUnitControllerDependencies
 from deerflow_deep_research.domain.lifecycle import (
     DeepResearchControlResult,
     Durability,
@@ -27,6 +27,7 @@ from deerflow_deep_research.domain.lifecycle import (
     LifecycleAction,
     LifecycleStatus,
     ResultCode,
+    WorkUnitStorageReason,
 )
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies, PolicyRef
 from deerflow_deep_research.domain.state import (
@@ -47,11 +48,13 @@ from deerflow_deep_research.runtime.human_input import (
     project_suspension,
 )
 from deerflow_deep_research.runtime.projection import (
+    RuntimeWorkUnitDependencyResolver,
     build_node_dependencies,
     project_node_agent,
     project_research_scope,
 )
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
+from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 
 RESEARCH_ID_RE = re.compile(r"^r_[A-Za-z0-9_-]{43}$")
 
@@ -103,10 +106,16 @@ class ResearchActionInput:
 @dataclass(frozen=True)
 class ResearchGraphRecipe:
     builder: Any
+    requires_work_units: bool = False
+    work_unit_store_factory: Any = None
 
     @classmethod
-    def create(cls) -> ResearchGraphRecipe:
-        return cls(builder=build_research_graph())
+    def create(cls, *, work_unit_store_factory: Any = None) -> ResearchGraphRecipe:
+        return cls(
+            builder=build_research_graph(),
+            requires_work_units=True,
+            work_unit_store_factory=work_unit_store_factory,
+        )
 
 
 def _durability(envelope: TrustedRuntimeEnvelope) -> Durability:
@@ -177,12 +186,14 @@ def denial_result(
     code: ResultCode | InfrastructureResultCode,
     research_id: str | None = None,
     durability: Durability = Durability.UNAVAILABLE,
+    infrastructure_reason: WorkUnitStorageReason | None = None,
 ) -> dict[str, Any]:
     return DeepResearchControlResult(
         action=action,
         code=code,
         durability=durability,
         research_id=research_id,
+        infrastructure_reason=infrastructure_reason,
     ).model_dump(mode="json", exclude_none=True)
 
 
@@ -202,11 +213,27 @@ class ResearchActionHandler:
             research_id=action_input.research_id,
         )
 
-    def _context(self, envelope: TrustedRuntimeEnvelope, research_id: str) -> GraphInvocationContext:
+    async def _context(
+        self,
+        envelope: TrustedRuntimeEnvelope,
+        research_id: str,
+        *,
+        include_work_units: bool = True,
+    ) -> GraphInvocationContext:
         graph_context = project_research_scope(envelope, research_scope_id=research_id)
+        base_resolver = RuntimeNodeDependencyResolver(graph_context)
+        work_units = None
+        if include_work_units and self._recipe.requires_work_units:
+            store_factory = self._recipe.work_unit_store_factory or WorkUnitStore.create
+            store = await store_factory(envelope, research_id=research_id)
+            work_units = WorkUnitControllerDependencies(
+                store=store,
+                resolver=RuntimeWorkUnitDependencyResolver(graph_context, base_resolver, store),
+            )
         return GraphInvocationContext(
             graph_context=graph_context,
-            dependency_resolver=RuntimeNodeDependencyResolver(graph_context),
+            dependency_resolver=base_resolver,
+            work_units=work_units,
         )
 
 
@@ -257,7 +284,7 @@ class StartResearchHandler(ResearchActionHandler):
         values["waiting_for"] = initial.waiting_for
         values["terminal_status"] = initial.terminal_status.value if initial.terminal_status is not None else None
         values["terminal_reason"] = initial.terminal_reason.value if initial.terminal_reason is not None else None
-        await graph.ainvoke(values, config=config, context=self._context(envelope, action_input.research_id))
+        await graph.ainvoke(values, config=config, context=await self._context(envelope, action_input.research_id))
         return _project_action_result(
             action_input=action_input,
             snapshot=await graph.aget_state(config),
@@ -305,7 +332,7 @@ class ResumeResearchHandler(ResearchActionHandler):
         await graph.ainvoke(
             Command(resume=response.model_dump(mode="json")),
             config=config,
-            context=self._context(envelope, action_input.research_id),
+            context=await self._context(envelope, action_input.research_id),
         )
         return _project_action_result(
             action_input=action_input,
@@ -369,7 +396,7 @@ class CancelResearchHandler(ResearchActionHandler):
         await graph.ainvoke(
             Command(resume=InternalCancelDecision().model_dump(mode="json")),
             config=config,
-            context=self._context(envelope, action_input.research_id),
+            context=await self._context(envelope, action_input.research_id, include_work_units=False),
         )
         return _project_action_result(
             action_input=action_input,
@@ -378,8 +405,8 @@ class CancelResearchHandler(ResearchActionHandler):
         )
 
 
-def build_research_handlers() -> tuple[ResearchActionHandler, ...]:
-    recipe = ResearchGraphRecipe.create()
+def build_research_handlers(recipe: ResearchGraphRecipe | None = None) -> tuple[ResearchActionHandler, ...]:
+    recipe = recipe or ResearchGraphRecipe.create()
     return (
         StartResearchHandler(recipe),
         ResumeResearchHandler(recipe),

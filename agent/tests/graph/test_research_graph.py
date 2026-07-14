@@ -2,16 +2,33 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
+from datetime import UTC, datetime
+from pathlib import Path
+
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext
-from deerflow_deep_research.domain.invocation import GraphInvocationContext
+from deerflow_deep_research.domain.invocation import GraphInvocationContext, WorkUnitControllerDependencies
 from deerflow_deep_research.domain.lifecycle import AcceptedHumanResponse, ResponseKind
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
 from deerflow_deep_research.domain.state import FakeFixturePlan, fixture_plan_to_checkpoint
 from deerflow_deep_research.graph.builder import build_research_graph
+from deerflow_deep_research.runtime.projection import RuntimeWorkUnitDependencyResolver
+from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
+
+_WORKSPACE: Path | None = None
+
+
+@pytest.fixture(autouse=True)
+def _work_unit_workspace(tmp_path: Path):
+    global _WORKSPACE
+    _WORKSPACE = tmp_path
+    yield
+    _WORKSPACE = None
 
 
 class ForbiddenCapabilities:
@@ -48,7 +65,21 @@ def _context() -> tuple[GraphInvocationContext, Resolver]:
         outputs_root="/mnt/user-data/outputs/deep-research/r",
     )
     resolver = Resolver(graph)
-    return GraphInvocationContext(graph, resolver), resolver
+    assert _WORKSPACE is not None
+    store = WorkUnitStore(
+        workspace_host_path=_WORKSPACE,
+        research_id=graph.research_scope_id,
+        clock=lambda: datetime(2026, 7, 14, tzinfo=UTC),
+        monotonic=time.monotonic,
+        lock_sleep=time.sleep,
+        token_factory=lambda: "2" * 32,
+        fault_hook=None,
+    )
+    work_units = WorkUnitControllerDependencies(
+        store=store,
+        resolver=RuntimeWorkUnitDependencyResolver(graph, resolver, store),
+    )
+    return GraphInvocationContext(graph, resolver, work_units), resolver
 
 
 def _initial(plan: FakeFixturePlan | None = None) -> dict:
@@ -125,6 +156,20 @@ async def test_happy_path_suspends_twice_and_completes_with_fresh_attempt_depend
         ("hitl2", "g0-hitl2-a1"),
         ("hitl2", "g0-hitl2-a1"),
     ]
+    assert _WORKSPACE is not None
+    files = await asyncio.to_thread(
+        lambda: {path.relative_to(_WORKSPACE).as_posix() for path in _WORKSPACE.rglob("*") if path.is_file()}
+    )
+    assert any(path.endswith("/evidence/submissions.jsonl") for path in files)
+    assert any(path.endswith("/evidence/.submissions.lock") for path in files)
+    assert all(
+        path.endswith(("/work-spec.json", "/result.json", "/outputs/fixture.json"))
+        or path.endswith(("/evidence/submissions.jsonl", "/evidence/.submissions.lock"))
+        for path in files
+    )
+    assert not any(
+        f"/{subtree}/" in path for path in files for subtree in ("cache", "synthesis", "review", "final", "diagnostics")
+    )
 
 
 @pytest.mark.asyncio
@@ -147,7 +192,15 @@ async def test_profile_bypass_and_repair_routes_are_explicit() -> None:
     assert trace.count("wave2_synthesis") == 2
     assert trace.count("targeted_evidence") == 1
     wave0_attempts = [attempt for name, attempt in context.dependency_resolver.calls if name == "wave0"]
-    assert wave0_attempts == ["g0-wave0-a1", "g0-wave0-a2"]
+    assert [attempt for attempt in wave0_attempts if "_w" not in attempt] == ["g0-wave0-a1", "g0-wave0-a2"]
+    assert set(attempt for attempt in wave0_attempts if "_w" in attempt) == {
+        "g0_wave0_w0000_a00",
+        "g0_wave0_w0001_a00",
+        "g0_wave0_w0002_a00",
+        "g0_wave0_w0003_a00",
+        "g0_wave0_w0004_a00",
+        "g0_wave0_w0005_a00",
+    }
 
 
 @pytest.mark.asyncio

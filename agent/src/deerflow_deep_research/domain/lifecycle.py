@@ -93,6 +93,22 @@ class InfrastructureResultCode(StrEnum):
     THREAD_MISSING = "thread_missing"
     RUN_MISSING = "run_missing"
     APP_CONFIG_MISSING = "app_config_missing"
+    WORK_UNIT_STORAGE_UNAVAILABLE = "work_unit_storage_unavailable"
+    WORK_UNIT_STORE_BUSY = "work_unit_store_busy"
+
+
+class WorkUnitStorageReason(StrEnum):
+    AIO_PROVISIONER_UNMOUNTED = "aio_provisioner_unmounted"
+    E2B_UNMOUNTED = "e2b_unmounted"
+    BOXLITE_UNMOUNTED = "boxlite_unmounted"
+    PROVIDER_UNRECOGNIZED = "provider_unrecognized"
+    THREAD_MOUNT_UNAVAILABLE = "thread_mount_unavailable"
+    WORKSPACE_ALIAS_MISMATCH = "workspace_alias_mismatch"
+    POSIX_PRIMITIVES_UNAVAILABLE = "posix_primitives_unavailable"
+    PROBE_CLEANUP_FAILED = "probe_cleanup_failed"
+    LEDGER_CORRUPT = "ledger_corrupt"
+    ACCEPTED_ARTIFACT_DIVERGED = "accepted_artifact_diverged"
+    LOCK_TIMEOUT = "lock_timeout"
 
 
 class Durability(StrEnum):
@@ -270,9 +286,23 @@ class DeepResearchControlResult(FrozenContract):
     generation: int | None = Field(default=None, ge=0, le=2)
     request_id: str | None = Field(default=None, min_length=1, max_length=128)
     terminal_reason: TerminalReason | None = None
+    infrastructure_reason: WorkUnitStorageReason | None = None
 
     @model_validator(mode="after")
     def validate_lifecycle_shape(self) -> DeepResearchControlResult:
+        storage_codes = {
+            InfrastructureResultCode.WORK_UNIT_STORAGE_UNAVAILABLE,
+            InfrastructureResultCode.WORK_UNIT_STORE_BUSY,
+        }
+        if self.code in storage_codes and self.infrastructure_reason is None:
+            raise ValueError("work-unit infrastructure code requires infrastructure_reason")
+        if self.code not in storage_codes and self.infrastructure_reason is not None:
+            raise ValueError("infrastructure_reason is forbidden for this code")
+        if self.code is InfrastructureResultCode.WORK_UNIT_STORE_BUSY:
+            if self.infrastructure_reason is not WorkUnitStorageReason.LOCK_TIMEOUT:
+                raise ValueError("work_unit_store_busy requires lock_timeout")
+        elif self.infrastructure_reason is WorkUnitStorageReason.LOCK_TIMEOUT:
+            raise ValueError("lock_timeout requires work_unit_store_busy")
         lifecycle_fields = (self.status, self.phase, self.generation)
         if any(value is not None for value in lifecycle_fields) and not all(
             value is not None for value in lifecycle_fields
@@ -328,6 +358,7 @@ __all__ = [
     "ResumeDecision",
     "SynthesisVerdict",
     "TerminalReason",
+    "WorkUnitStorageReason",
     "PendingResearchInterrupt",
     "make_hitl_request_id",
     "completed_visits",

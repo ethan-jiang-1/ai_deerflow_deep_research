@@ -40,6 +40,8 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/runtime/control.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/runtime/human_input.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/runtime/research.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/runtime/work_unit_storage.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/runtime/work_unit_store.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/context.py` (file; `PRS-003`)
@@ -49,13 +51,21 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/domain/lifecycle.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/state.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/bundle.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/domain/work_units.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/fake_control.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/engine/work_units/__init__.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/engine/work_units/ids.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/engine/work_units/reducers.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/engine/work_units/validation.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/engine/work_units/kernel.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/agents/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/agents/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/graph/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/graph/__init__.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/graph/components/__init__.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/graph/components/work_units.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/graph/registry.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/builder.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/implementation_map.py` (file; `PRS-003`)
@@ -106,18 +116,27 @@ Registry: `openspec/governance/project-structure.toml`
 
 ## Current Status
 
-The current checkout contains the completed change 00 runtime substrate, the
-change 01 full-fake graph skeleton, and the change 02 typed state contracts.
-Eleven logical node packages, the normalized topology, implementation map, real
-checkpoint interrupts, lifecycle handlers, topology snapshot, and zero-API
-restart recovery are present. The fake graph binds the versioned typed
-`ResearchState` from `domain/state.py` (the sole checkpointed control
-authority), with reducer invariants, the three-authority boundary, the
-content-ref and checkpoint-size bound, the `domain/bundle.py` path-containment
-contract, and the versioned fail-closed schema. Every lifecycle result is
-`implementation_mode=full_fake`; no terminal fixture is research output. The
-Web UI and compatible generic clients support start/resume, while known IM and
-non-interactive contexts refuse those actions and retain status/cancel.
+Changes 00 through 03 are complete and archived. Active change 04 adds the
+shared work-unit kernel beneath the existing Wave0/Wave1 fixture nodes: immutable
+controller-assigned work/attempt contracts, bounded `Send`, deterministic file
+validation, one hash-chained JSONL ledger writer, crash reconciliation, and the
+shared drain/gate view. Every lifecycle result remains
+`implementation_mode=full_fake`; controlled fixture files and accepted fixture
+records are not research findings or a report.
+
+Checkpointed `ResearchState` remains control authority, the validated submission
+ledger is evidence authority, and sandbox files are content authority. The
+compatible version-2 state extension defaults absent fields for old checkpoints
+and stores only compact refs under 32-work/64-attempt/32-failure/64-accepted-ref,
+40,960-byte work-block, and 65,536-byte whole-state bounds. The manually invoked
+Wave child has `checkpointer=False`, so the whole Wave node is the replay unit and
+reconciles ledger-first crash windows before redispatch.
+
+The first store is available only after runtime proves that the parent sandbox
+and trusted host path share one mounted POSIX workspace supporting bounded lock,
+atomic replace, and durability sync. `status` and `cancel` remain checkpoint-only:
+they do not initialize a parent sandbox or construct/expose the store. Known IM
+and non-interactive contexts still refuse start/resume and retain status/cancel.
 
 ## Ownership
 
@@ -126,17 +145,20 @@ non-interactive contexts refuse those actions and retain status/cancel.
 - `engine/`: deterministic business/control primitives that depend only on
   `domain/`. Includes `gate_kernel.py` (``evaluate_gate`` + state update
   conversion), `gate_fixtures.py` (``FixtureSequenceRule`` + per-phase
-  ``GateDefinition`` registry), and `fake_control.py` (fixture mechanics).
-  Change 04 and later add work units, evidence, and artifact policy when those
-  contracts become real.
+  ``GateDefinition`` registry), `fake_control.py` (fixture mechanics), and
+  `work_units/` (ids, reducers, validation policy, retry, submit projection, and
+  drain). It owns no host path, file lock, or ledger I/O.
 - `agents/`: bounded embedded-agent construction, middleware, policies, prompts,
   and structured results. It may depend on `domain/` and public DeerFlow,
   LangChain, and LangGraph APIs, never `runtime/` or graph nodes.
 - `graph/`: nested graph recipes, explicit registry, infrastructure probe,
-  normalized research topology, and explicitly listed fake node packages. It
-  depends on pure contracts and explicitly listed nodes.
+  normalized research topology, explicitly listed node packages, and reusable
+  `components/`. Components may depend on pure engine policy; only node-local
+  `subgraph.py` modules may import them.
 - `runtime/`: the only layer that binds raw DeerFlow context, parent sandbox,
-  checkpointer providers, and embedded-agent execution to pure contracts.
+  checkpointer providers, embedded-agent execution, mounted-workspace probes,
+  contained artifact reads, POSIX locking, and atomic ledger publication to pure
+  contracts.
 - `resources/`: package-owned prompt and policy files. External source content
   is data and never replaces these instructions.
 
@@ -147,7 +169,7 @@ tool -> runtime -> graph -> nodes
                          nodes -> engine -> domain
 runtime -> graph + agents + domain + deerflow.*
 agents  -> domain + deerflow.* + langchain.*
-graph   -> domain + explicitly listed nodes
+graph   -> engine + domain + explicitly listed nodes + langgraph.*
 domain  -> stdlib + pydantic only
 ```
 
@@ -170,8 +192,10 @@ the change that owns that node. Every package has this stable surface:
   subgraph.py    # optional phase-local subgraph
 ```
 
-The package root exports exactly one `NODE_SPEC`. Nodes do not import the graph
-registry, graph implementation modules, sibling nodes, `agents/`, or `runtime/`.
+The package root exports exactly one `NODE_SPEC`. Ordinary node modules do not
+import graph implementation modules, sibling nodes, `agents/`, or `runtime/`.
+Only package-local `subgraph.py` may import registered reusable
+`graph/components/`; all other graph implementation imports remain forbidden.
 The registry loads explicitly listed package roots and never discovers topology
 from the filesystem.
 
@@ -194,10 +218,12 @@ Change 02 replaced the temporary graph-owned skeleton state with the canonical
 boundary, content-ref and checkpoint-size bound, versioned fail-closed schema)
 and the `domain/bundle.py` path-containment contract; `graph/skeleton_state.py`
 is removed. Any future `ResearchState` field addition must declare its writer,
-reader, and reducer. Later changes may add `graph/components/`.
-Change 03 and later may
-add `engine/gates/`, `work_units/`, `evidence/`, and `artifacts/`. Do not create
-these packages early merely to match a plan diagram.
+reader, and reducer. Change 03 added the gate kernel. Change 04 adds
+`domain/work_units.py`, `engine/work_units/`, `graph/components/work_units.py`,
+and runtime-owned `work_unit_storage.py`/`work_unit_store.py`. Wave0 and Wave1
+use this single path with controlled fixture artifacts; later Wave,
+targeted-evidence, and rerun changes must reuse it rather than introduce another
+submit, ledger, retry, or drain authority.
 
 ## Development Order
 

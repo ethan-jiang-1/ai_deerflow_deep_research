@@ -19,8 +19,8 @@ from deerflow_deep_research.domain.bundle import (
 from deerflow_deep_research.domain.state import ResearchState
 
 RESEARCH_ID = "r_" + "A" * 43
-WORK_ID = "w1"
-ATTEMPT_ID = "g0-wave0-a1"
+WORK_ID = "g0_wave0_w0000"
+ATTEMPT_ID = f"{WORK_ID}_a00"
 
 
 def test_bundle_root_is_research_id_scoped() -> None:
@@ -50,13 +50,13 @@ def test_in_containment_write_is_accepted() -> None:
 
 def test_out_of_attempt_write_is_rejected() -> None:
     # A worker cannot write into another work/attempt directory.
-    path = f"{BUNDLE_ROOT}/{RESEARCH_ID}/work/w2/g0-w2-a1/outputs/page.html"
+    path = f"{BUNDLE_ROOT}/{RESEARCH_ID}/work/g0_wave0_w0001/g0_wave0_w0001_a00/outputs/page.html"
     with pytest.raises(ValueError, match="path_not_contained"):
         resolve_contained_path(path, research_id=RESEARCH_ID, work_id=WORK_ID, attempt_id=ATTEMPT_ID)
 
 
 def test_parent_traversal_escape_is_rejected() -> None:
-    path = f"{BUNDLE_ROOT}/{RESEARCH_ID}/work/{WORK_ID}/{ATTEMPT_ID}/../../w2/g0-w2-a1/x"
+    path = f"{BUNDLE_ROOT}/{RESEARCH_ID}/work/{WORK_ID}/{ATTEMPT_ID}/../../g0_wave0_w0001/x"
     with pytest.raises(ValueError, match="path_not_contained"):
         resolve_contained_path(path, research_id=RESEARCH_ID, work_id=WORK_ID, attempt_id=ATTEMPT_ID)
 

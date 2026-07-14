@@ -8,6 +8,7 @@ etc.). These tests focus on gate-specific behaviors at the unit level.
 from __future__ import annotations
 
 from deerflow_deep_research.domain.state import FakeFixturePlan, fixture_plan_to_checkpoint
+from deerflow_deep_research.domain.work_units import WORK_UNIT_GATE_VIEW_KEY, WorkUnitGateView
 from deerflow_deep_research.engine.gate_fixtures import build_fixture_gate_defs
 from deerflow_deep_research.engine.gate_kernel import evaluate_gate
 
@@ -21,6 +22,13 @@ def _state(plan: FakeFixturePlan | None = None, **overrides):
         "gate_attempts_by_phase": {},
         "repair_budget_by_phase": {},
         "latest_gate_feedback": None,
+        WORK_UNIT_GATE_VIEW_KEY: WorkUnitGateView(
+            drained=True,
+            planned_work_ids=(),
+            terminal_attempt_by_work_id={},
+            accepted_record_by_work_id={},
+            failure_summaries=(),
+        ),
     }
     return {**base, **overrides}
 

@@ -640,9 +640,9 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 ```text
 00 runtime infrastructure：local editable preparation core、Docker source-mount override、public skill/per-user Agent、tool shell、RuntimeAdapter/bridge、GraphHost、node-agent policy；launcher/live smoke 已延期
 01 完整 fake graph（已实现）：全 node、全 edge、HITL、rerun、fake final；全部 lifecycle 显式 `implementation_mode=full_fake`，Web UI/兼容 generic client 可交互，known IM/non-interactive 的 start/resume fail closed
-02 typed state/checkpoint：把 fake dict 换成正式控制合同
-03 gate kernel：把直接 fixture outcome 换成通用 fake rules + repair loop
-04 work-unit kernel：把 fake phase 内直返换成 bounded Send + fake worker + submit
+02 typed state/checkpoint（已实现）：把 fake dict 换成正式控制合同
+03 gate kernel（已实现）：把直接 fixture outcome 换成通用 fake rules + repair loop
+04 work-unit kernel（apply-ready，待归档）：把 fake phase 内直返换成 bounded Send + controlled fixture worker + sole-writer submit ledger
 ```
 
 完成后得到的是“控制面、状态面、门禁面、工作调度面都真实，研究内容仍是 fixture”的完整骨架。05 才开始替换第一个真实业务 node。
@@ -712,9 +712,9 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 |---:|:---:|---|---|---|
 | 00 | ✅ | [`deep-research-00-runtime-infrastructure.md`](deep-research-00-runtime-infrastructure.md) | source package/folder structure/preparation + source-mount contract/public skill/per-user Agent/tool shell/RuntimeAdapter/GraphHost/node-agent policy；launcher/live smoke 延期 | 无 |
 | 01 | ✅ | [`deep-research-01-fake-graph-skeleton.md`](deep-research-01-fake-graph-skeleton.md) | 可 checkpoint、可 HITL 的完整 fake graph | 00 |
-| 02 | ⬜ | [`deep-research-02-state-persistence-contracts.md`](deep-research-02-state-persistence-contracts.md) | typed state、reducers、bundle refs、checkpoint schema | 01 |
-| 03 | ⬜ | [`deep-research-03-gate-kernel.md`](deep-research-03-gate-kernel.md) | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
-| 04 | ⬜ | [`deep-research-04-work-unit-kernel.md`](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded `Send`、submit ledger、fake worker | 02, 03 |
+| 02 | ✅ | [`deep-research-02-state-persistence-contracts.md`](deep-research-02-state-persistence-contracts.md) | typed state、reducers、bundle refs、checkpoint schema | 01 |
+| 03 | ✅ | [`deep-research-03-gate-kernel.md`](deep-research-03-gate-kernel.md) | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
+| 04 | ✅ | [`deep-research-04-work-unit-kernel.md`](deep-research-04-work-unit-kernel.md) | WorkSpec、bounded `Send`、sole-writer JSONL ledger、controlled fixture worker；apply-ready，待 archive | 02, 03 |
 | 05 | ⬜ | [`deep-research-05-bootstrap-node.md`](deep-research-05-bootstrap-node.md) | 替换 fake bootstrap | 02, 03 |
 | 06 | ⬜ | [`deep-research-06-hitl1-node.md`](deep-research-06-hitl1-node.md) | 替换 fake HITL1/profile interrupt | 05 |
 | 07 | ⬜ | [`deep-research-07-topic-planning-node.md`](deep-research-07-topic-planning-node.md) | 替换 fake topic planner/seed materialization | 03, 06 |
@@ -895,13 +895,12 @@ RealNode: 对应 change 落地后的真实实现
 
 ## 需要在 Phase 0 后确认的决策
 
-change 00 已定死 local editable/Docker source override 和 runtime bridge 直接调用 `create_deerflow_agent()`；`SubagentExecutor` 只保留为未来 adapter，不再是当前实现分叉。Phase 0 后仍需确认：
+change 00 已定死 local editable/Docker source override 和 runtime bridge 直接调用 `create_deerflow_agent()`；`SubagentExecutor` 只保留为未来 adapter，不再是当前实现分叉。Change 04 已选择 canonical JSONL + hash chain、per-research POSIX lock、atomic replace/fsync 和 ledger-first replay；不再把 ledger 存储格式留作 open decision。Phase 0 后仍需确认：
 
 1. 是否出现可依赖的 public Gateway lifespan hook 来优化进程级 provider；00 合同保持 per-action official context。
 2. nested progress events 能否进入现有 RunJournal；不能时第一版 UI 显示到什么粒度。
-3. submission ledger 使用 JSONL + hash chain，还是独立 SQLite/Postgres 表；04 在多 worker 前必须定。
-4. 01 固定 HITL2 顶层路由：`revise_view -> wave2_synthesis`、`repair -> targeted_evidence`、`rerun -> rerun planner -> topic_planning`；14 仍需确定 rerun generation 的精确失效范围。
-5. semantic critic 的模型隔离和成本预算。
+3. 01 固定 HITL2 顶层路由：`revise_view -> wave2_synthesis`、`repair -> targeted_evidence`、`rerun -> rerun planner -> topic_planning`；14 仍需确定 rerun generation 的精确失效范围。
+4. semantic critic 的模型隔离和成本预算。
 
 ## 成功标准
 

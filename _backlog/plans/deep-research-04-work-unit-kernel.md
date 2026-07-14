@@ -1,6 +1,7 @@
 # Plan: Deep Research 04 - Work Unit Kernel
 
-> 类型: 设计 | 更新: 2026-07-12
+> 类型: 设计 | 更新: 2026-07-14
+> 状态: OpenSpec apply-ready，全部 hard-done 门已通过，待归档
 > 对应 OpenSpec change: `build-deep-research-work-unit-kernel`
 > 依赖: 02 State Contracts、03 Gate Kernel
 > 替换范围: fake fan-out/fan-in 和 fake submit，worker 内容仍为 fixture
@@ -15,6 +16,17 @@
 ## 目标
 
 把 DPT queue → work-unit → submit → ledger 的权威链映射为 LangGraph bounded `Send`、typed reducers 和 deterministic submit node。
+
+## 已落地决策
+
+- **三权威链**: checkpointed `ResearchState` 是 control truth；hash-chained `evidence/submissions.jsonl` 是 accepted-evidence truth；sandbox artifacts 是 content truth。accepted refs 只引用 ledger record hash，不复制 record。
+- **compact state**: 保持 schema version 2 的单向兼容扩展，旧 checkpoint 缺字段时默认；活动窗口固定为 32 works / 64 attempts / 32 selected failures / 64 accepted refs，work block ≤ 40,960 bytes，whole checkpoint ≤ 65,536 bytes。
+- **ledger/lock**: 选择 LF-only canonical JSONL + SHA256 hash chain；每 research 使用稳定 mode-0600 POSIX `flock`，同目录 mode-0600 staging、atomic replace、file/directory fsync。ledger 先发布，checkpoint 通过 replay catch-up。
+- **replay unit**: 手动调用的 child graph 明确 `checkpointer=False`；整个 Wave node 是恢复单元。重启从最后 parent checkpoint 确定性重建 ids，先 reconcile ledger，再决定跳过、补 ref 或重跑未接受 attempt。
+- **部署边界**: 第一版仅支持 parent sandbox 与 trusted host path 被运行时证明为同一 mounted POSIX workspace 的 provider。remote/provisioner/custom/unverified 模式 fail closed。
+- **lifecycle 边界**: `start`/`resume` 在进入声明 controller capability 的 Wave 前异步构造 store；`status`/`cancel` 不初始化 parent sandbox，保持 checkpoint-only，因此 storage outage 不阻塞 cancel。
+- **fixture 副作用**: Wave0/Wave1 只写 controller `work-spec.json`、worker `result.json`/声明 outputs、submit ledger/lock/staging；不写 cache、synthesis、review、final report，也不调用 model/web/MCP/ACP/task。
+- **复用规则**: 后续真实 Wave、targeted evidence、rerun 只能替换 planner/worker/result-contract 内容，必须复用同一 component、validator、store、ledger、retry 和 drain 路径，不能建立第二条 delegated completion authority。
 
 ## Scope（缩减后——地基已覆盖 fan-out/fan-in 和 subgraph 结构）
 

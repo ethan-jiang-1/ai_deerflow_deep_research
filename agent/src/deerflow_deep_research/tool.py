@@ -32,6 +32,7 @@ from deerflow_deep_research.runtime.research import (
     derive_research_id,
 )
 from deerflow_deep_research.runtime.runtime_adapter import RuntimeAdapter, RuntimeAdapterError
+from deerflow_deep_research.runtime.work_unit_storage import WorkUnitStoreError
 
 ADVERTISED_ACTION = "infra_probe"
 ADVERTISED_ACTIONS = ("infra_probe", "start", "resume", "status", "cancel")
@@ -110,7 +111,11 @@ async def run_deep_research(
 
     adapter = adapter or RuntimeAdapter()
     try:
-        envelope = await adapter.adapt(runtime)
+        initialize_parent_sandbox = lifecycle_action not in {LifecycleAction.STATUS, LifecycleAction.CANCEL}
+        envelope = await adapter.adapt(
+            runtime,
+            initialize_parent_sandbox=initialize_parent_sandbox,
+        )
     except (TrustedIdentityError, RuntimeAdapterError) as exc:
         if lifecycle_action is None:
             return {"code": exc.code}
@@ -168,6 +173,14 @@ async def run_deep_research(
     )
     try:
         return await host.run_action(action=action, envelope=envelope, action_input=action_input)
+    except WorkUnitStoreError as exc:
+        return denial_result(
+            action=lifecycle_action,
+            code=exc.code,
+            research_id=resolved_research_id,
+            durability=Durability.UNAVAILABLE,
+            infrastructure_reason=exc.reason,
+        )
     except (GraphHostError, CheckpointNamespaceError, ProjectionError, HumanInputError) as exc:
         try:
             code: ResultCode | InfrastructureResultCode = ResultCode(exc.code)
@@ -180,6 +193,13 @@ async def run_deep_research(
             action=lifecycle_action,
             code=code,
             research_id=None if code is ResultCode.RESEARCH_NOT_FOUND else resolved_research_id,
+            durability=Durability.UNAVAILABLE,
+        )
+    except Exception:
+        return denial_result(
+            action=lifecycle_action,
+            code=ResultCode.CHECKPOINT_INCONSISTENT,
+            research_id=resolved_research_id,
             durability=Durability.UNAVAILABLE,
         )
 

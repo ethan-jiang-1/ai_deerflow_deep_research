@@ -23,6 +23,7 @@ from deerflow_deep_research.runtime.startup_snapshot import (
     normalize_gateway_workers,
     parse_startup_fingerprint,
 )
+from deerflow_deep_research.runtime.work_unit_storage import check_prelaunch_work_unit_storage
 
 EntryStatus = Literal["ready", "not_ready", "unknown"]
 
@@ -67,6 +68,7 @@ class ReadinessDiagnostic:
     durability: str | None = None
     fingerprint_version: str | None = None
     worker_count: int | None = None
+    work_unit_storage: EntryStatus = "unknown"
     checks: list[str] = field(default_factory=list)
     issues: list[str] = field(default_factory=list)
     redacted_provider: str | None = None
@@ -107,6 +109,7 @@ def run_diagnostics(
     expected_fingerprint: str | None = None,
     app_config: Any = None,
     entry_checks: list[Callable[[], EntryState]] | None = None,
+    work_unit_storage_base_dir: Any = None,
 ) -> ReadinessDiagnostic:
     """Return a redacted readiness diagnostic.
 
@@ -151,6 +154,24 @@ def run_diagnostics(
     diag.worker_count = worker_value
     diag.issues.extend(worker_issues)
 
+    if work_unit_storage_base_dir is None:
+        try:
+            from deerflow.config.paths import get_paths
+
+            work_unit_storage_base_dir = get_paths().base_dir
+        except Exception:
+            work_unit_storage_base_dir = None
+    if work_unit_storage_base_dir is None:
+        storage = None
+        diag.issues.append("work-unit storage base is unavailable")
+    else:
+        storage = check_prelaunch_work_unit_storage(app_config, base_dir=work_unit_storage_base_dir)
+        diag.work_unit_storage = storage.status
+        if storage.ready:
+            diag.checks.append(storage.reason)
+        else:
+            diag.issues.append(f"work-unit storage is {storage.status}: {storage.reason}")
+
     if expected_fingerprint is not None:
         # prelaunch-candidate: compare the freshly computed candidate to the
         # launcher-captured expected value, NOT the process environment.
@@ -178,7 +199,7 @@ def run_diagnostics(
                 if actual is not None and actual != env_fp:
                     diag.issues.append("live AppConfig fingerprint does not match the process-start fingerprint")
 
-    diag.runtime_ready = len(diag.issues) == 0 and worker_ok
+    diag.runtime_ready = len(diag.issues) == 0 and worker_ok and storage is not None and storage.ready
 
     if entry_checks:
         aggregate = "ready"

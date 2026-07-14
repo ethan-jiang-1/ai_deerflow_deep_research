@@ -16,6 +16,7 @@ from deerflow_deep_research.domain.gate import (
     PhaseVerdict,
 )
 from deerflow_deep_research.domain.lifecycle import completed_visits
+from deerflow_deep_research.engine.work_units.kernel import WorkUnitCompletionRule
 
 # ---------------------------------------------------------------------------
 # FixtureSequenceRule
@@ -84,6 +85,15 @@ def _make_fixture_rule(
         name=f"fixture_sequence_{phase}",
         evaluate=instance.evaluate,
         failure_code=registered_code,
+    )
+
+
+def _work_unit_completion_rule() -> GateRule:
+    instance = WorkUnitCompletionRule()
+    return GateRule(
+        name=instance.name,
+        evaluate=instance.evaluate,
+        failure_code=instance.failure_code,
     )
 
 
@@ -175,13 +185,19 @@ def build_fixture_gate_defs() -> dict[str, GateDefinition]:
     return {
         "wave0": GateDefinition(
             phase="wave0",
-            rules=(_make_fixture_rule("wave0", frozenset({"pass"}), _wave_fixture_map()),),
+            rules=(
+                _work_unit_completion_rule(),
+                _make_fixture_rule("wave0", frozenset({"pass"}), _wave_fixture_map()),
+            ),
             default_budget=3,
             route_map=_wave_route_map(),
         ),
         "wave1": GateDefinition(
             phase="wave1",
-            rules=(_make_fixture_rule("wave1", frozenset({"pass"}), _wave_fixture_map()),),
+            rules=(
+                _work_unit_completion_rule(),
+                _make_fixture_rule("wave1", frozenset({"pass"}), _wave_fixture_map()),
+            ),
             default_budget=3,
             route_map=_wave_route_map(),
         ),

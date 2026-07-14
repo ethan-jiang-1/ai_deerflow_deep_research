@@ -24,7 +24,9 @@ SHALL still exercise HITL1.
 
 Gate evaluation SHALL remain the routing authority. Every gated phase node SHALL have a
 registered `GateDefinition` containing a `FixtureSequenceRule` (fake graph) or real
-rules (later changes). After the phase-local component reports structural drain, the
+rules (later changes). Wave0 and Wave1 SHALL prepend the shared deterministic
+work-completion rule so fixture `pass` cannot override failed or unaccepted work. After
+the phase-local component reports structural drain, the
 node wrapper SHALL apply a pure reducer preview of the node's work/status/accepted-ref
 update to the input state and invoke `evaluate_gate()` against that post-work view, not
 the stale pre-node state. The preview SHALL use the same reducers and ownership checks as
@@ -47,7 +49,7 @@ logical phases.
 
 #### Scenario: Three branches join deterministically
 - **WHEN** a Wave fake runs with three fixture workers completing in any scheduler order
-- **THEN** all three unique candidates are reduced exactly once, normalized into stable order, accepted with at most one winner per attempt, and the parent phase advances only after submit fan-in and drain
+- **THEN** all three unique candidates are reduced exactly once, normalized into stable order, accepted with at most one winner per logical work across all its attempts, and the parent phase advances only after submit fan-in and drain
 
 #### Scenario: Complete profile bypass is already part of topology
 - **WHEN** the bootstrap fixture returns `profile_complete`
@@ -55,7 +57,11 @@ logical phases.
 
 #### Scenario: Wave0 repair is bounded
 - **WHEN** the Wave0 fixture gate definition sequences `repair` then `pass`
-- **THEN** gate evaluation returns `REPAIR` on the first attempt (route `"repair"`), the repair path schedules fresh work attempts where required, gate evaluation returns `PASS` on the second attempt (route `"pass"`), `gate_attempts_by_phase["wave0"]` is 2, and the topology advances to Wave1 only after pass
+- **THEN** gate evaluation returns `REPAIR` on the first attempt (route `"repair"`), the repair path retries only unaccepted failed work and allocates new logical work for already accepted quality repair, gate evaluation returns `PASS` on the second attempt (route `"pass"`), `gate_attempts_by_phase["wave0"]` is 2, and the topology advances to Wave1 only after pass
+
+#### Scenario: Invalid fixture work cannot advance on fixture pass
+- **WHEN** a Wave fixture worker omits its result or returns a conflicting candidate while the fixture sequence value is `pass`
+- **THEN** the work-completion rule keeps the phase on a typed repair/blocked path, no invalid accepted ref is created, and the graph does not advance to the next phase
 
 #### Scenario: Targeted evidence always returns through synthesis
 - **WHEN** Wave2, HITL2 repair, or readiness routes to targeted evidence
@@ -94,6 +100,17 @@ ledger, not a duplicate of ledger records; the ledger remains the sole evidence
 authority. File existence, worker final text, a tool event, or a `running` status SHALL
 NOT count as a validated submission.
 
+Within the checkpointed work block, `work_specs_by_id` SHALL be keyed by logical work id;
+`attempts_by_id` and the compatibility-named `work_status_by_id` SHALL be keyed by
+attempt id; and `active_attempt_by_work_id` SHALL identify at most one non-terminal
+attempt for each logical work. A retry SHALL append a fresh attempt/status entry without
+rewriting terminal history. The accepted-ref set SHALL contain only the sole validated
+record hash for a logical work, even when reconciliation discovers that a sibling retry
+was active. Compact map values SHALL not repeat identity derivable from their canonical
+keys; the active window SHALL be bounded to 32 works, 64 attempts, 32 keyed terminal
+failures, 64 accepted hashes, a 40,960-byte work block, and the existing 65,536-byte
+whole checkpoint.
+
 The Wave0 and Wave1 full-fake paths introduced by change 04 SHALL exercise this real
 authority split with deterministic fixture content: controller state remains in the
 checkpoint, fixture result/output bodies remain in the sandbox workspace, and only the
@@ -123,6 +140,12 @@ controller-assigned work/attempt ids; it SHALL NOT use a caller-selected path or
 phase-level `.../attempts/<id>` root. Canonical source URLs SHALL be deduplicated.
 `diagnostics/gate-attempts.jsonl` SHALL be audit-only and SHALL NOT serve as a phase
 cursor.
+
+Runtime work-unit capability probes MAY use randomized hidden files only under the
+current research `diagnostics/` subtree. They SHALL be temporary operational mechanics,
+never control/evidence/content refs, and SHALL be removed with any probe-only empty
+directories on every exit path. Prelaunch doctor's host-only filesystem probe is a
+deployment diagnostic without a research id and SHALL not call the sandbox.
 
 The Wave0 and Wave1 change-04 fixture paths MAY write only this bounded subset:
 controller-owned `work-spec.json`, worker-owned `result.json` and declared `outputs/`,

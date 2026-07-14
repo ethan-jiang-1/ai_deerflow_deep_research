@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import secrets
+import time
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +18,7 @@ from pydantic import ValidationError
 from deerflow_deep_research.runtime.control import build_control_graph_host
 from deerflow_deep_research.runtime.research import derive_research_id
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
+from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 from deerflow_deep_research.tool import DeepResearchArgs, run_deep_research
 
 
@@ -43,10 +48,30 @@ class FakeAdapter:
     def __init__(self, envelope=None) -> None:
         self.envelope = envelope or _envelope()
         self.adapted = 0
+        self.initialize_values: list[bool] = []
 
-    async def adapt(self, _runtime):
+    async def adapt(self, _runtime, *, initialize_parent_sandbox: bool = True):
         self.adapted += 1
-        return self.envelope
+        self.initialize_values.append(initialize_parent_sandbox)
+        return self.envelope if initialize_parent_sandbox else replace(self.envelope, parent_sandbox=None)
+
+
+@pytest.fixture(autouse=True)
+def _verified_work_unit_store(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    async def create(_cls, envelope, *, research_id, **_kwargs):
+        workspace = tmp_path / envelope.effective_user_id / envelope.outer_thread_id / "workspace"
+        workspace.mkdir(parents=True, exist_ok=True)
+        return WorkUnitStore(
+            workspace_host_path=workspace,
+            research_id=research_id,
+            clock=lambda: datetime(2026, 7, 14, tzinfo=UTC),
+            monotonic=time.monotonic,
+            lock_sleep=time.sleep,
+            token_factory=lambda: secrets.token_hex(16),
+            fault_hook=None,
+        )
+
+    monkeypatch.setattr(WorkUnitStore, "create", classmethod(create))
 
 
 def _runtime(messages, call_id: str, *, context: dict | None = None):
@@ -334,6 +359,38 @@ async def test_interaction_refusals_preserve_status_and_cancel_controls() -> Non
         host_factory=lambda: host,
     )
     assert cancelled["code"] == "cancelled"
+
+
+async def test_storage_outage_still_allows_checkpoint_only_cancel_without_store_or_parent_sandbox(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    host = _host()
+    adapter = FakeAdapter()
+    user = HumanMessage(content="question", id="human-start")
+    started = await run_deep_research(
+        action="start",
+        probe_id=None,
+        runtime=_runtime([user, _call("start", "call-start")], "call-start"),
+        adapter=adapter,
+        host_factory=lambda: host,
+    )
+    result, _request = _command_payload(started)
+
+    async def forbidden_create(*_args, **_kwargs):
+        raise AssertionError("cancel must not construct the work-unit store")
+
+    monkeypatch.setattr(WorkUnitStore, "create", forbidden_create)
+    cancelled = await run_deep_research(
+        action="cancel",
+        probe_id=None,
+        research_id=result["research_id"],
+        runtime=_runtime([_call("cancel", "cancel-storage-outage")], "cancel-storage-outage"),
+        adapter=adapter,
+        host_factory=lambda: host,
+    )
+    assert cancelled["code"] == "cancelled"
+    assert cancelled["status"] == "cancelled"
+    assert adapter.initialize_values[-1] is False
 
 
 @pytest.mark.asyncio

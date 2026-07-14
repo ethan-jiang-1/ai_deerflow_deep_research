@@ -11,11 +11,12 @@ from deerflow_deep_research.domain.enums import NodePhase
 from deerflow_deep_research.domain.node_spec import (
     UNAVAILABLE_REAL_FACTORY,
     NodeBuildDependencies,
+    NodeCapability,
     NodeContracts,
     NodeSpec,
     PolicyRef,
 )
-from deerflow_deep_research.graph.builder import build_research_graph
+from deerflow_deep_research.graph.builder import _route, build_research_graph
 from deerflow_deep_research.graph.implementation_map import (
     ImplementationMapError,
     resolve_implementations,
@@ -59,6 +60,22 @@ def test_normalized_topology_has_eleven_reachable_nodes_and_no_internal_workers(
     )
     validate_topology(LOGICAL_NODES, NORMALIZED_EDGES)
     assert not any("dispatch" in edge.source or "join" in edge.source for edge in NORMALIZED_EDGES)
+    assert not {"initialize", "allocate", "worker", "submit", "drain"} & set(LOGICAL_NODES)
+
+
+def test_only_wave0_and_wave1_declare_work_unit_controller_capability() -> None:
+    specs = load_research_node_specs()
+    declaring = {name for name, spec in specs.items() if NodeCapability.WORK_UNIT_CONTROLLER in spec.capabilities}
+    assert declaring == {"wave0", "wave1"}
+
+
+def test_route_remains_a_typed_direct_read_of_state_route() -> None:
+    assert _route({"route": "pass"}) == "pass"
+    assert _route({"route": "repair"}) == "repair"
+    with pytest.raises(ValueError, match="typed_route_missing"):
+        _route({})
+    with pytest.raises(ValueError, match="typed_route_missing"):
+        _route({"route": None})
 
 
 def test_full_fake_map_resolves_every_explicit_node() -> None:

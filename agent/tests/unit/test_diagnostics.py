@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -56,13 +57,14 @@ def test_in_process_malformed_fingerprint_diagnosed() -> None:
     assert any("malformed" in issue or "fingerprint" in issue for issue in diag.issues)
 
 
-def test_in_process_matching_fingerprint_is_ready() -> None:
+def test_in_process_matching_fingerprint_is_ready(tmp_path: Path) -> None:
     fp = capture_startup_fingerprint(MEMORY_CONFIG, worker_value="1")
     os.environ["DEER_FLOW_DEEP_RESEARCH_STARTUP_FINGERPRINT"] = fp
     os.environ["GATEWAY_WORKERS"] = "1"
-    diag = run_diagnostics(app_config=MEMORY_CONFIG)
+    diag = run_diagnostics(app_config=MEMORY_CONFIG, work_unit_storage_base_dir=tmp_path)
     assert diag.runtime_ready
     assert diag.durability == "same_process"
+    assert diag.work_unit_storage == "ready"
 
 
 def test_in_process_fingerprint_drift_is_not_ready() -> None:
@@ -78,12 +80,17 @@ def test_in_process_fingerprint_drift_is_not_ready() -> None:
 # ── prelaunch-candidate mode ────────────────────────────────────────────────
 
 
-def test_prelaunch_matching_candidate_is_ready() -> None:
+def test_prelaunch_matching_candidate_is_ready(tmp_path: Path) -> None:
     fp = capture_startup_fingerprint(MEMORY_CONFIG, worker_value="1")
     os.environ["GATEWAY_WORKERS"] = "1"
-    diag = run_diagnostics(expected_fingerprint=fp, app_config=MEMORY_CONFIG)
+    diag = run_diagnostics(
+        expected_fingerprint=fp,
+        app_config=MEMORY_CONFIG,
+        work_unit_storage_base_dir=tmp_path,
+    )
     assert diag.mode == "prelaunch-candidate"
     assert diag.runtime_ready
+    assert diag.work_unit_storage == "ready"
     assert "fingerprint_candidate_match" in diag.checks
 
 
@@ -97,6 +104,21 @@ def test_prelaunch_mismatched_candidate_is_not_ready() -> None:
     )
     assert not diag.runtime_ready
     assert any("does not match" in issue for issue in diag.issues)
+
+
+def test_unknown_work_unit_provider_keeps_runtime_not_ready(tmp_path: Path) -> None:
+    config = MemoryAppConfig()
+    config.sandbox = {"use": "custom.local:LocalSandboxProvider"}
+    fp = capture_startup_fingerprint(config, worker_value="1")
+    os.environ["GATEWAY_WORKERS"] = "1"
+    diag = run_diagnostics(
+        expected_fingerprint=fp,
+        app_config=config,
+        work_unit_storage_base_dir=tmp_path,
+    )
+    assert not diag.runtime_ready
+    assert diag.work_unit_storage == "unknown"
+    assert any("provider_unrecognized" in issue for issue in diag.issues)
 
 
 # ── worker count ────────────────────────────────────────────────────────────

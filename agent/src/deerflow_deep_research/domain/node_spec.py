@@ -9,7 +9,8 @@ import inspect
 import re
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol, get_type_hints, runtime_checkable
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Protocol, get_type_hints, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -20,6 +21,9 @@ from deerflow_deep_research.domain.context import (
     NodeExecutionResult,
 )
 from deerflow_deep_research.domain.enums import NodePhase
+
+if TYPE_CHECKING:
+    from deerflow_deep_research.domain.invocation import WorkUnitControllerDependencies
 
 _LOGICAL_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 _POLICY_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{1,63}$")
@@ -40,11 +44,16 @@ class NodeExecutionCapabilities(Protocol):
     ) -> NodeExecutionResult: ...
 
 
+class NodeCapability(StrEnum):
+    WORK_UNIT_CONTROLLER = "work_unit_controller"
+
+
 @dataclass(frozen=True)
 class NodeBuildDependencies:
     graph_context: GraphContextView
     agent_context: NodeAgentContext
     capabilities: NodeExecutionCapabilities
+    work_units: WorkUnitControllerDependencies | None = None
 
 
 NodeFactory = Callable[[NodeBuildDependencies], NodeCallable]
@@ -108,6 +117,7 @@ class NodeSpec:
     contracts: NodeContracts
     real_factory: NodeFactory
     fake_factory: NodeFactory
+    capabilities: frozenset[NodeCapability] = frozenset()
 
     def __post_init__(self) -> None:
         if not _LOGICAL_NAME_RE.fullmatch(self.logical_name):
@@ -118,5 +128,9 @@ class NodeSpec:
             raise TypeError("policy must be a PolicyRef")
         if not isinstance(self.contracts, NodeContracts):
             raise TypeError("contracts must be a NodeContracts")
+        if not isinstance(self.capabilities, frozenset) or any(
+            not isinstance(capability, NodeCapability) for capability in self.capabilities
+        ):
+            raise TypeError("capabilities must be a frozenset of NodeCapability")
         _validate_factory(self.real_factory, "real_factory")
         _validate_factory(self.fake_factory, "fake_factory")

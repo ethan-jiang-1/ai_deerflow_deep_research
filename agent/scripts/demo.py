@@ -6,6 +6,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import secrets
+import tempfile
+import time
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -14,7 +19,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.types import Command
 
 from deerflow_deep_research.runtime.control import build_control_graph_host
+from deerflow_deep_research.runtime.research import ResearchGraphRecipe
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
+from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 from deerflow_deep_research.tool import run_deep_research
 
 
@@ -25,14 +32,21 @@ class DemoAppConfig:
 
 class DemoAdapter:
     def __init__(self) -> None:
+        self._temporary = tempfile.TemporaryDirectory(prefix="deerflow-deep-research-demo-")
+        root = Path(self._temporary.name)
+        workspace = root / "workspace"
+        uploads = root / "uploads"
+        outputs = root / "outputs"
+        for path in (workspace, uploads, outputs):
+            path.mkdir()
         self._envelope = TrustedRuntimeEnvelope(
             effective_user_id="demo-user",
             outer_thread_id="demo-thread",
             outer_run_id="demo-run",
             app_config=DemoAppConfig(),
-            workspace_host_path=Path("/tmp/deerflow-demo/workspace"),
-            uploads_host_path=Path("/tmp/deerflow-demo/uploads"),
-            outputs_host_path=Path("/tmp/deerflow-demo/outputs"),
+            workspace_host_path=workspace,
+            uploads_host_path=uploads,
+            outputs_host_path=outputs,
             workspace_virtual_root="/mnt/user-data/workspace",
             uploads_virtual_root="/mnt/user-data/uploads",
             outputs_virtual_root="/mnt/user-data/outputs",
@@ -40,8 +54,29 @@ class DemoAdapter:
             progress=None,
         )
 
-    async def adapt(self, _runtime: Any) -> TrustedRuntimeEnvelope:
-        return self._envelope
+    async def adapt(
+        self,
+        _runtime: Any,
+        *,
+        initialize_parent_sandbox: bool = True,
+    ) -> TrustedRuntimeEnvelope:
+        if initialize_parent_sandbox:
+            return self._envelope
+        return replace(self._envelope, parent_sandbox=None)
+
+    async def create_work_unit_store(self, _envelope: Any, *, research_id: str) -> WorkUnitStore:
+        return WorkUnitStore(
+            workspace_host_path=self._envelope.workspace_host_path,
+            research_id=research_id,
+            clock=lambda: datetime.now(UTC),
+            monotonic=time.monotonic,
+            lock_sleep=time.sleep,
+            token_factory=lambda: secrets.token_hex(16),
+            fault_hook=None,
+        )
+
+    def close(self) -> None:
+        self._temporary.cleanup()
 
 
 def _tool_call(action: str, call_id: str, research_id: str | None = None) -> AIMessage:
@@ -79,8 +114,13 @@ def _answer(prompt: str, *, scripted: bool, default: str) -> str:
 async def run_demo(*, question: str, scripted: bool) -> None:
     print("DeerFlow Deep Research — Change 01 terminal demo")
     print("ZERO API / implementation_mode=full_fake / no findings or report will be produced")
-    host = build_control_graph_host(fingerprint_verifier=lambda _app_config: None)
     adapter = DemoAdapter()
+    host = build_control_graph_host(
+        fingerprint_verifier=lambda _app_config: None,
+        research_recipe=ResearchGraphRecipe.create(
+            work_unit_store_factory=adapter.create_work_unit_store,
+        ),
+    )
     start_user = HumanMessage(content=question, id="demo-human-start")
     start_call = _tool_call("start", "demo-call-start")
 
@@ -164,6 +204,7 @@ async def run_demo(*, question: str, scripted: bool) -> None:
         raise RuntimeError("demo terminal result was unexpectedly suspended")
     _show("TERMINAL RESULT", completed)
     print("\nDemo complete. This terminal state is a fixture, not completed research.")
+    adapter.close()
 
 
 def main() -> None:

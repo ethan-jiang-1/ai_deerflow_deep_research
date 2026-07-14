@@ -14,16 +14,20 @@ from typing import Any
 
 from deerflow_deep_research.runtime.graph_host import GraphHost
 from deerflow_deep_research.runtime.probe import InfraProbeHandler
-from deerflow_deep_research.runtime.research import build_research_handlers
+from deerflow_deep_research.runtime.research import ResearchGraphRecipe, build_research_handlers
 
 _default_host: GraphHost | None = None
 
 
-def build_control_graph_host(**kwargs: Any) -> GraphHost:
+def build_control_graph_host(
+    *,
+    research_recipe: ResearchGraphRecipe | None = None,
+    **kwargs: Any,
+) -> GraphHost:
     """Build an isolated combined infra-probe and research control host."""
     host = GraphHost(**kwargs)
     host.register(InfraProbeHandler())
-    for handler in build_research_handlers():
+    for handler in build_research_handlers(research_recipe):
         host.register(handler)
     return host
 

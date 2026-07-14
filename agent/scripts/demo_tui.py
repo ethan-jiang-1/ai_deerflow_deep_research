@@ -20,6 +20,7 @@ from textual.containers import Horizontal
 from textual.widgets import Button, Footer, Input, RichLog, Static
 
 from deerflow_deep_research.runtime.control import build_control_graph_host
+from deerflow_deep_research.runtime.research import ResearchGraphRecipe
 from deerflow_deep_research.tool import run_deep_research
 
 Stage = Literal["question", "hitl1", "hitl2", "terminal"]
@@ -43,8 +44,13 @@ class DeepResearchDemoTUI(App[None]):
     def __init__(self) -> None:
         super().__init__()
         self.stage: Stage = "question"
-        self.host = build_control_graph_host(fingerprint_verifier=lambda _app_config: None)
         self.adapter = DemoAdapter()
+        self.host = build_control_graph_host(
+            fingerprint_verifier=lambda _app_config: None,
+            research_recipe=ResearchGraphRecipe.create(
+                work_unit_store_factory=self.adapter.create_work_unit_store,
+            ),
+        )
         self.messages: list[Any] = []
         self.research_id: str | None = None
         self.pending: dict[str, Any] | None = None
@@ -75,6 +81,9 @@ class DeepResearchDemoTUI(App[None]):
     def on_mount(self) -> None:
         self.query_one("#composer", Input).focus()
         self._write("Ready. Press Enter to start the real full-fake lifecycle.", "cyan")
+
+    def on_unmount(self) -> None:
+        self.adapter.close()
 
     def _write(self, message: str, style: str = "") -> None:
         self.query_one("#log", RichLog).write(Text(message, style=style))

@@ -1,56 +1,54 @@
-"""Wave0 phase-local three-way Send/fan-in recipe.
+"""Wave0 fixture recipe over the shared work-unit component.
 
+@impl WOU-001
+@impl WOU-002
+@impl WOU-003
+@impl WOU-004
 @impl REG-002
 """
 
 from __future__ import annotations
 
-import operator
-from typing import Annotated, TypedDict
+from collections.abc import Callable, Mapping
+from datetime import datetime
+from typing import Any
 
-from langgraph.graph import END, START, StateGraph
-from langgraph.types import Send
+from deerflow_deep_research.domain.invocation import WorkUnitControllerDependencies
+from deerflow_deep_research.domain.node_spec import PolicyRef
+from deerflow_deep_research.engine.work_units.kernel import WorkIntent
+from deerflow_deep_research.graph.components.work_units import (
+    WorkUnitComponentResult,
+    run_fixture_work_unit_component,
+)
 
-from deerflow_deep_research.domain.lifecycle import BranchResult
-
-
-class WaveSubgraphState(TypedDict):
-    branch_prefix: str
-    branch_id: str
-    branch_results: Annotated[tuple[BranchResult, ...], operator.add]
-    normalized_results: tuple[BranchResult, ...]
-
-
-def dispatch(state: WaveSubgraphState) -> list[Send]:
-    return [
-        Send("worker", {"branch_id": f"{state['branch_prefix']}-b{index}", "branch_results": ()}) for index in range(3)
-    ]
-
-
-async def worker(state: WaveSubgraphState) -> dict:
-    return {"branch_results": (BranchResult(branch_id=state["branch_id"], verdict="pass"),)}
+WAVE0_FIXTURE_INTENTS = tuple(
+    WorkIntent(
+        worker_role="fixture_worker",
+        scope=(f"wave0:fixture:{index}",),
+        result_contract="fixture.work-unit",
+        result_schema_version=1,
+        required_outputs=("fixture.json",),
+    )
+    for index in range(3)
+)
 
 
-def normalize_results(values: tuple[BranchResult, ...]) -> tuple[BranchResult, ...]:
-    ids = [value.branch_id for value in values]
-    if len(ids) != len(set(ids)):
-        raise ValueError("duplicate_branch")
-    if len(values) != 3:
-        raise ValueError("branch_count_invalid")
-    return tuple(sorted(values, key=lambda value: value.branch_id))
+async def run_wave0_work_units(
+    state: Mapping[str, Any],
+    *,
+    controller: WorkUnitControllerDependencies,
+    clock: Callable[[], datetime],
+    fault_hook: Callable[[str], None] | None = None,
+) -> WorkUnitComponentResult:
+    return await run_fixture_work_unit_component(
+        state,
+        logical_name="wave0",
+        policy=PolicyRef(name="skeleton-wave0", version="v1"),
+        controller=controller,
+        intents=WAVE0_FIXTURE_INTENTS,
+        clock=clock,
+        fault_hook=fault_hook,
+    )
 
 
-async def join(state: WaveSubgraphState) -> dict:
-    return {"normalized_results": normalize_results(state["branch_results"])}
-
-
-def build_wave0_subgraph():
-    builder = StateGraph(WaveSubgraphState)
-    builder.add_node("dispatch", lambda _state: {})
-    builder.add_node("worker", worker)
-    builder.add_node("join", join, defer=True)
-    builder.add_edge(START, "dispatch")
-    builder.add_conditional_edges("dispatch", dispatch)
-    builder.add_edge("worker", "join")
-    builder.add_edge("join", END)
-    return builder.compile(checkpointer=None)
+__all__ = ["WAVE0_FIXTURE_INTENTS", "run_wave0_work_units"]

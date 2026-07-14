@@ -11,12 +11,14 @@ from pydantic import ValidationError
 from deerflow_deep_research.domain.lifecycle import (
     AcceptedHumanResponse,
     DeepResearchControlResult,
+    InfrastructureResultCode,
     LifecycleAction,
     LifecycleStatus,
     LogicalPhase,
     ResponseKind,
     ResultCode,
     TerminalReason,
+    WorkUnitStorageReason,
     serialize_control_result,
 )
 from deerflow_deep_research.domain.state import (
@@ -209,6 +211,45 @@ def test_control_result_rejects_free_form_code_and_authority_fields() -> None:
             code="invented_code",
             durability="unavailable",
             user_id="alice",
+        )
+
+
+@pytest.mark.parametrize("reason", tuple(WorkUnitStorageReason))
+def test_work_unit_infrastructure_reason_pairing_is_closed(reason: WorkUnitStorageReason) -> None:
+    code = (
+        InfrastructureResultCode.WORK_UNIT_STORE_BUSY
+        if reason is WorkUnitStorageReason.LOCK_TIMEOUT
+        else InfrastructureResultCode.WORK_UNIT_STORAGE_UNAVAILABLE
+    )
+    result = DeepResearchControlResult(
+        action="start",
+        code=code,
+        durability="unavailable",
+        infrastructure_reason=reason,
+    )
+    assert result.infrastructure_reason is reason
+
+
+def test_work_unit_infrastructure_reason_is_required_forbidden_and_code_paired() -> None:
+    with pytest.raises(ValidationError, match="infrastructure_reason"):
+        DeepResearchControlResult(
+            action="start",
+            code=InfrastructureResultCode.WORK_UNIT_STORAGE_UNAVAILABLE,
+            durability="unavailable",
+        )
+    with pytest.raises(ValidationError, match="infrastructure_reason"):
+        DeepResearchControlResult(
+            action="start",
+            code=ResultCode.CHECKPOINT_INCONSISTENT,
+            durability="unavailable",
+            infrastructure_reason=WorkUnitStorageReason.LEDGER_CORRUPT,
+        )
+    with pytest.raises(ValidationError, match="lock_timeout"):
+        DeepResearchControlResult(
+            action="start",
+            code=InfrastructureResultCode.WORK_UNIT_STORAGE_UNAVAILABLE,
+            durability="unavailable",
+            infrastructure_reason=WorkUnitStorageReason.LOCK_TIMEOUT,
         )
 
 

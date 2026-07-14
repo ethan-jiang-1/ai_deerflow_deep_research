@@ -90,6 +90,16 @@ kind = "file"
 owner = "PRS-001"
 
 [[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime/work_unit_storage.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime/work_unit_store.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
 path = "agent/src/deerflow_deep_research/domain"
 kind = "directory"
 owner = "PRS-001"
@@ -135,6 +145,11 @@ kind = "file"
 owner = "PRS-003"
 
 [[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/work_units.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
 path = "agent/src/deerflow_deep_research/engine"
 kind = "directory"
 owner = "PRS-001"
@@ -146,6 +161,31 @@ owner = "PRS-001"
 
 [[required_paths]]
 path = "agent/src/deerflow_deep_research/engine/fake_control.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/engine/work_units/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/engine/work_units/ids.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/engine/work_units/reducers.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/engine/work_units/validation.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/engine/work_units/kernel.py"
 kind = "file"
 owner = "PRS-001"
 
@@ -166,6 +206,16 @@ owner = "PRS-001"
 
 [[required_paths]]
 path = "agent/src/deerflow_deep_research/graph/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/components/__init__.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/components/work_units.py"
 kind = "file"
 owner = "PRS-001"
 
@@ -388,7 +438,7 @@ owner = "PRS-004"
 domain = ["stdlib", "pydantic"]
 engine = ["domain"]
 agents = ["domain", "deerflow", "langchain"]
-graph = ["domain", "nodes", "langgraph"]
+graph = ["domain", "engine", "nodes", "langgraph"]
 nodes = ["domain", "engine", "langgraph"]
 runtime = ["domain", "graph", "agents", "deerflow", "langchain", "langgraph"]
 

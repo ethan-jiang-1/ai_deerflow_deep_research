@@ -38,7 +38,7 @@ owner = "PRS-001"
 domain = ["stdlib", "pydantic"]
 engine = ["domain"]
 agents = ["domain", "deerflow", "langchain"]
-graph = ["domain", "nodes", "langgraph"]
+graph = ["domain", "engine", "nodes", "langgraph"]
 nodes = ["domain", "engine", "langgraph"]
 runtime = ["domain", "graph", "agents", "deerflow", "langchain", "langgraph"]
 
@@ -65,6 +65,7 @@ VALID_MODULES = {
         "from deerflow_deep_research.domain import models\n"
     ),
     "graph/builder.py": "from langgraph.graph import StateGraph\nfrom deerflow_deep_research.domain import models\n",
+    "graph/components/work_units.py": "from deerflow_deep_research.engine import runner\n",
     "runtime/adapter.py": (
         "from deerflow.tools.types import Runtime\n"
         "from langchain_core.tools import BaseTool\n"
@@ -77,7 +78,9 @@ VALID_MODULES = {
     "graph/nodes/alpha/contracts.py": "from deerflow_deep_research.domain import models\n",
     "graph/nodes/alpha/fake.py": "from deerflow_deep_research.engine import runner\n",
     "graph/nodes/alpha/node.py": ("from . import contracts\nfrom deerflow_deep_research.engine import runner\n"),
-    "graph/nodes/alpha/subgraph.py": "from langgraph.types import Send\n",
+    "graph/nodes/alpha/subgraph.py": (
+        "from langgraph.types import Send\nfrom deerflow_deep_research.graph.components import work_units\n"
+    ),
     "tool.py": "from deerflow_deep_research import runtime\n",
 }
 
@@ -151,6 +154,15 @@ def test_ordinary_node_module_cannot_import_langgraph(project_root: Path) -> Non
         project_root,
         "agent/src/deerflow_deep_research/graph/nodes/alpha/fake.py",
         "from langgraph.types import Send\n",
+    )
+    _assert_error(project_root, "import.boundary")
+
+
+def test_ordinary_node_module_cannot_import_graph_components(project_root: Path) -> None:
+    _write(
+        project_root,
+        "agent/src/deerflow_deep_research/graph/nodes/alpha/node.py",
+        "from deerflow_deep_research.graph.components import work_units\n",
     )
     _assert_error(project_root, "import.boundary")
 

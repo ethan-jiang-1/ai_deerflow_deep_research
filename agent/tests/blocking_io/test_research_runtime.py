@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import contextlib
 import json
+import secrets
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +17,7 @@ from langgraph.types import Command
 
 from deerflow_deep_research.runtime.control import build_control_graph_host
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
+from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 from deerflow_deep_research.tool import run_deep_research
 
 
@@ -21,7 +25,7 @@ class Adapter:
     def __init__(self, envelope: TrustedRuntimeEnvelope) -> None:
         self.envelope = envelope
 
-    async def adapt(self, _runtime):
+    async def adapt(self, _runtime, *, initialize_parent_sandbox: bool = True):
         return self.envelope
 
 
@@ -41,7 +45,10 @@ def _payload(command: Command):
     return message, message.artifact["human_input"]
 
 
-async def test_full_fake_lifecycle_does_not_block_event_loop() -> None:
+async def test_full_fake_lifecycle_does_not_block_event_loop(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     saver = InMemorySaver()
     provider_entries = 0
     provider_exits = 0
@@ -74,6 +81,21 @@ async def test_full_fake_lifecycle_does_not_block_event_loop() -> None:
         progress=None,
     )
     adapter = Adapter(envelope)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    async def create(_cls, _envelope, *, research_id, **_kwargs):
+        return WorkUnitStore(
+            workspace_host_path=workspace,
+            research_id=research_id,
+            clock=lambda: datetime(2026, 7, 14, tzinfo=UTC),
+            monotonic=time.monotonic,
+            lock_sleep=time.sleep,
+            token_factory=lambda: secrets.token_hex(16),
+            fault_hook=None,
+        )
+
+    monkeypatch.setattr(WorkUnitStore, "create", classmethod(create))
     host = build_control_graph_host(
         checkpointer_factory=provider,
         fingerprint_verifier=lambda _app_config: None,

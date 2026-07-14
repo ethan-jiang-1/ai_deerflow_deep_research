@@ -31,7 +31,7 @@ REQUIRED_IMPORT_POLICY = {
     "domain": {"stdlib", "pydantic"},
     "engine": {"domain"},
     "agents": {"domain", "deerflow", "langchain"},
-    "graph": {"domain", "nodes", "langgraph"},
+    "graph": {"domain", "engine", "nodes", "langgraph"},
     "nodes": {"domain", "engine", "langgraph"},
     "runtime": {"domain", "graph", "agents", "deerflow", "langchain", "langgraph"},
 }
@@ -477,6 +477,12 @@ def _validate_module_imports(
                     f"node {source_node} imports sibling node {target_node}: {path.relative_to(root)}",
                 )
             continue
+        if layer == "nodes" and target_layer == "graph":
+            component_prefix = f"{PACKAGE_NAME}.graph.components"
+            if path.name == "subgraph.py" and (
+                imported == component_prefix or imported.startswith(f"{component_prefix}.")
+            ):
+                continue
         if target_layer == layer or (layer == "package" and target_layer == "package"):
             continue
         if layer == "tool":

@@ -15,26 +15,31 @@ from deerflow_deep_research.domain.state import (
 )
 
 CURRENT = {"research_id": "r_" + "A" * 43, "outer_thread_id": "thread-1", "generation": 1}
+ATTEMPT_ID = "g0_wave0_w0000_a00"
+
+
+def _record_hash(index: int) -> str:
+    return "h_" + f"{index:043d}"
 
 
 def test_terminal_work_status_cannot_be_downgraded() -> None:
-    current = {"w1": WorkStatus.SUBMITTED}
+    current = {ATTEMPT_ID: WorkStatus.SUBMITTED}
     with pytest.raises(ValueError, match="work_status_terminal_conflict"):
-        merge_work_status(current, {"w1": WorkStatus.RUNNING})
+        merge_work_status(current, {ATTEMPT_ID: WorkStatus.RUNNING})
 
 
 def test_terminal_work_status_rejects_different_terminal() -> None:
-    current = {"w1": WorkStatus.FAILED}
+    current = {ATTEMPT_ID: WorkStatus.FAILED}
     with pytest.raises(ValueError, match="work_status_terminal_conflict"):
-        merge_work_status(current, {"w1": WorkStatus.CANCELLED})
+        merge_work_status(current, {ATTEMPT_ID: WorkStatus.CANCELLED})
 
 
 def test_one_terminal_winner_per_work_attempt() -> None:
-    merged = merge_work_status({}, {"w1": WorkStatus.SUBMITTED})
-    assert merged["w1"] is WorkStatus.SUBMITTED
+    merged = merge_work_status({}, {ATTEMPT_ID: WorkStatus.SUBMITTED})
+    assert merged[ATTEMPT_ID] is WorkStatus.SUBMITTED
     # replaying the same terminal value is idempotent
-    merged = merge_work_status(merged, {"w1": WorkStatus.SUBMITTED})
-    assert merged["w1"] is WorkStatus.SUBMITTED
+    merged = merge_work_status(merged, {ATTEMPT_ID: WorkStatus.SUBMITTED})
+    assert merged[ATTEMPT_ID] is WorkStatus.SUBMITTED
 
 
 def test_generation_cannot_decrease() -> None:
@@ -65,8 +70,8 @@ def test_different_hash_for_same_path_is_a_conflict() -> None:
 
 
 def test_accepted_submission_refs_dedupe_append() -> None:
-    merged = merge_accepted_refs(("rec_1", "rec_2"), ("rec_2", "rec_3"))
-    assert merged == ("rec_1", "rec_2", "rec_3")
+    merged = merge_accepted_refs((_record_hash(1), _record_hash(2)), (_record_hash(2), _record_hash(3)))
+    assert merged == (_record_hash(1), _record_hash(2), _record_hash(3))
 
 
 def test_accepted_submission_refs_reject_non_string() -> None:
@@ -108,11 +113,11 @@ def test_worker_can_write_non_gated_fields() -> None:
 
 
 def test_accepted_refs_merge_is_order_independent() -> None:
-    a = ("rec_1", "rec_2")
-    b = ("rec_2", "rec_3")
+    a = (_record_hash(1), _record_hash(2))
+    b = (_record_hash(2), _record_hash(3))
     left = merge_accepted_refs(merge_accepted_refs((), a), b)
     right = merge_accepted_refs(merge_accepted_refs((), b), a)
-    assert set(left) == set(right) == {"rec_1", "rec_2", "rec_3"}
+    assert set(left) == set(right) == {_record_hash(1), _record_hash(2), _record_hash(3)}
 
 
 def test_content_refs_merge_is_order_independent() -> None:
@@ -129,5 +134,5 @@ def test_work_status_non_terminal_is_last_write_wins() -> None:
     # Non-terminal transitions are last-write-wins; only terminal statuses are protected
     # from downgrade (REG-007: a terminal cannot be downgraded by a later running/stale
     # value). Work status is therefore intentionally not order-independent.
-    merged = merge_work_status({"w1": WorkStatus.RUNNING}, {"w1": WorkStatus.PENDING})
-    assert merged["w1"] is WorkStatus.PENDING
+    merged = merge_work_status({ATTEMPT_ID: WorkStatus.RUNNING}, {ATTEMPT_ID: WorkStatus.PENDING})
+    assert merged[ATTEMPT_ID] is WorkStatus.PENDING

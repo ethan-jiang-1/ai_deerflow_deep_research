@@ -192,3 +192,13 @@ async def test_preinitialized_sandbox_is_reused_without_new_lifecycle(paths: Fak
 async def test_sandbox_initializer_failure_fails_closed(paths: FakePaths) -> None:
     with pytest.raises(RuntimeError):
         await _adapter(paths, FakeSandboxInitializer(fail=True)).adapt(FakeRuntime(_context()))
+
+
+async def test_checkpoint_only_adaptation_skips_parent_sandbox(paths: FakePaths) -> None:
+    initializer = FakeSandboxInitializer(fail=True)
+    envelope = await _adapter(paths, initializer).adapt(
+        FakeRuntime(_context()),
+        initialize_parent_sandbox=False,
+    )
+    assert initializer.calls == 0
+    assert envelope.parent_sandbox is None

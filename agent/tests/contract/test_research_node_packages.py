@@ -11,15 +11,13 @@ import pytest
 
 from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext
 from deerflow_deep_research.domain.node_spec import UNAVAILABLE_REAL_FACTORY, NodeBuildDependencies
-from deerflow_deep_research.domain.state import FakeFixturePlan, fixture_plan_to_checkpoint
-from deerflow_deep_research.engine.gate_fixtures import build_fixture_gate_defs
-from deerflow_deep_research.engine.gate_kernel import evaluate_gate
+from deerflow_deep_research.domain.state import FakeFixturePlan
 from deerflow_deep_research.graph.registry import NodeRegistry
 from deerflow_deep_research.graph.topology import LOGICAL_NODES
 
 PACKAGE_PREFIX = "deerflow_deep_research.graph.nodes"
 IMPLEMENTED_PACKAGES = LOGICAL_NODES
-NON_HITL_PACKAGES = tuple(name for name in LOGICAL_NODES if name not in {"hitl1", "hitl2"})
+ORDINARY_NON_HITL_PACKAGES = tuple(name for name in LOGICAL_NODES if name not in {"hitl1", "hitl2", "wave0", "wave1"})
 
 
 class ForbiddenCapabilities:
@@ -74,7 +72,7 @@ async def test_deterministic_fake_nodes_follow_typed_fixture_routes_without_capa
         package_prefix=PACKAGE_PREFIX,
         package_names=tuple(f"{PACKAGE_PREFIX}.{name}" for name in IMPLEMENTED_PACKAGES),
     ).load()
-    for name in NON_HITL_PACKAGES:
+    for name in ORDINARY_NON_HITL_PACKAGES:
         node = specs[name].fake_factory(_dependencies(name))
         result = await node(_state())
         assert result["phase"] == name
@@ -87,22 +85,6 @@ async def test_repair_rerun_and_fake_final_are_bounded_and_content_free() -> Non
         package_prefix=PACKAGE_PREFIX,
         package_names=tuple(f"{PACKAGE_PREFIX}.{name}" for name in IMPLEMENTED_PACKAGES),
     ).load()
-
-    # Wave node returns work result only; gate evaluation adds routing.
-    gate_defs = build_fixture_gate_defs()
-    wave = specs["wave0"].fake_factory(_dependencies("wave0"))
-    plan = FakeFixturePlan(wave0=("repair", "pass"))
-    # The checkpoint stores fixture_plan as a dict of string tuples
-    wave_state = _state(plan) | {"fixture_plan": fixture_plan_to_checkpoint(plan)}
-    wave_result = await wave(wave_state)
-    # Node does NOT write route — gate does
-    assert "route" not in wave_result
-    assert "repair_counts" not in wave_result
-    # Gate evaluation on the same state produces the expected route
-    gate_result = evaluate_gate(wave_state, "wave0", gate_defs["wave0"])
-    assert gate_result.verdict.value == "repair"
-    assert gate_result.attempt == 1
-    assert gate_result.route == "repair"
 
     rerun = specs["rerun"].fake_factory(_dependencies("rerun"))
     assert (await rerun(_state()))["generation"] == 1

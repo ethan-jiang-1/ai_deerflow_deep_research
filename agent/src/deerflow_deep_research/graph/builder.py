@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -19,8 +20,13 @@ from langgraph.runtime import Runtime
 from deerflow_deep_research.domain.gate import GateDefinition
 from deerflow_deep_research.domain.invocation import GraphInvocationContext
 from deerflow_deep_research.domain.lifecycle import make_attempt_id
-from deerflow_deep_research.domain.node_spec import NodeSpec
-from deerflow_deep_research.domain.state import ResearchState
+from deerflow_deep_research.domain.node_spec import NodeCapability, NodeSpec
+from deerflow_deep_research.domain.state import WORK_UNIT_GATE_PREVIEW_FIELDS, ResearchState, preview_work_unit_update
+from deerflow_deep_research.domain.work_units import (
+    WORK_UNIT_GATE_VIEW_KEY,
+    WorkUnitGateView,
+    validate_wrapper_gate_view,
+)
 from deerflow_deep_research.graph.implementation_map import resolve_implementations
 from deerflow_deep_research.graph.nodes.gate_adapter import (
     default_gate_defs,
@@ -44,6 +50,13 @@ def _node_wrapper(
             attempt_id=current_attempt,
             policy=spec.policy,
         )
+        declares_work_units = NodeCapability.WORK_UNIT_CONTROLLER in spec.capabilities
+        if declares_work_units and context.work_units is None:
+            raise ValueError("work_unit_capability_missing")
+        if not declares_work_units and dependencies.work_units is not None:
+            raise ValueError("work_unit_capability_undeclared")
+        if declares_work_units:
+            dependencies = replace(dependencies, work_units=context.work_units)
         if dependencies.graph_context != context.graph_context:
             raise ValueError("dependency_context_mismatch")
         if dependencies.agent_context.node_name != logical_name:
@@ -53,11 +66,29 @@ def _node_wrapper(
         node = factory(dependencies)
         result = node(state)
         result = await result if inspect.isawaitable(result) else result
+        result = dict(result)
+
+        gate_view = result.pop(WORK_UNIT_GATE_VIEW_KEY, None)
+        if declares_work_units:
+            if not isinstance(gate_view, WorkUnitGateView):
+                raise ValueError("work_unit_gate_view_inconsistent")
+        elif gate_view is not None:
+            raise ValueError("work_unit_gate_view_undeclared")
 
         # Gate evaluation — delegated to nodes layer (architecture: graph → nodes → engine)
         gate_def = gate_defs.get(logical_name)
         if gate_def is not None:
-            gate_update = evaluate_gate_for_node(state, logical_name, gate_def)
+            gate_state: Mapping[str, Any] = state
+            if declares_work_units:
+                preview_delta = {key: value for key, value in result.items() if key in WORK_UNIT_GATE_PREVIEW_FIELDS}
+                gate_state = preview_work_unit_update(state, preview_delta)
+                assert gate_view is not None
+                validate_wrapper_gate_view(gate_view, gate_state, phase=logical_name)
+                gate_state = {**gate_state, WORK_UNIT_GATE_VIEW_KEY: gate_view}
+            gate_update = evaluate_gate_for_node(gate_state, logical_name, gate_def)
+            overlap = set(result) & set(gate_update)
+            if overlap:
+                raise ValueError(f"node_gate_write_conflict:{','.join(sorted(overlap))}")
             result = {**result, **gate_update}
 
         return result

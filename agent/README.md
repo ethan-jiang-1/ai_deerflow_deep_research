@@ -5,11 +5,43 @@ for DeerFlow 2.1. Its controller is a nested Python `StateGraph`; bounded agent
 loops execute inside graph nodes. DeerFlow remains the host runtime and does not
 import this package.
 
-Change 00's runtime substrate is complete and archived. Change 01 adds the full
-deterministic topology, real checkpoint interrupts, lifecycle actions, repair
-and rerun routes, and a fake terminal marker. Every lifecycle result is labelled
-`implementation_mode=full_fake`: no node calls a model, network, or sandbox
-research tool, and the terminal marker is not findings or a report.
+Changes 00 through 03 are complete and archived. The active change 04 adds the
+shared work-unit kernel beneath Wave0 and Wave1 while keeping every lifecycle
+result labelled `implementation_mode=full_fake`: no node calls a model, network,
+or sandbox research tool, and fixture submissions are not findings or a report.
+
+## Work-Unit Kernel
+
+The kernel keeps three authorities separate. Checkpointed `ResearchState` owns
+control and legal transitions; `evidence/submissions.jsonl` is the sole accepted-
+evidence authority; sandbox files are content authority. Deterministic controller
+code alone allocates work/attempt ids and writes canonical specs, workers receive
+only an attempt-scoped artifact writer, and deterministic submit alone validates
+files, publishes the hash-chained ledger, and returns accepted record hashes.
+
+The version-2 checkpoint schema is extended compatibly with defaulted compact
+work-unit fields. The active window is bounded to 32 works, 64 attempts, 32
+selected failures, and 64 accepted refs; the exact work block is capped at
+40,960 bytes inside the existing 65,536-byte whole-checkpoint limit. Candidate
+bodies and evidence files never enter the checkpoint.
+
+Ledger publication uses one research-scoped POSIX `flock`, mode-0600 staging,
+same-directory atomic replace, file/directory fsync, and ledger-first replay.
+The manually invoked child graph has no inherited checkpointer, so the complete
+Wave node is the replay unit: restart deterministically recreates ids, verifies
+the ledger, revalidates accepted files, and catches up missing checkpoint refs.
+
+This first store requires a verified mounted workspace shared by the parent
+sandbox and trusted host path. Local and local-container mounted modes may pass
+the runtime probe; remote, provisioner-backed, custom, or otherwise unverified
+modes fail closed. `status` and `cancel` remain checkpoint-only and deliberately
+do not initialize a parent sandbox or construct the work-unit store.
+
+Wave0/Wave1 fixtures may write only controller-owned `work-spec.json`, worker-
+owned `result.json` and declared `outputs/`, and submit-owned ledger lock/staging/
+JSONL files. Later Wave, targeted-evidence, and rerun implementations must reuse
+this component, validator, store, ledger, retry, and drain path rather than add a
+second delegated-completion authority.
 
 ## Requirements
 

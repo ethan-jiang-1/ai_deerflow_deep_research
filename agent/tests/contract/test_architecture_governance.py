@@ -55,7 +55,7 @@ owner = "PRS-001"
 domain = ["stdlib", "pydantic"]
 engine = ["domain"]
 agents = ["domain", "deerflow", "langchain"]
-graph = ["domain", "nodes", "langgraph"]
+graph = ["domain", "engine", "nodes", "langgraph"]
 nodes = ["domain", "engine", "langgraph"]
 runtime = ["domain", "graph", "agents", "deerflow", "langchain", "langgraph"]
 

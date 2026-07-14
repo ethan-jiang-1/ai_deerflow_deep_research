@@ -59,7 +59,7 @@ class TrustedRuntimeEnvelope:
     workspace_virtual_root: str
     uploads_virtual_root: str
     outputs_virtual_root: str
-    parent_sandbox: Any
+    parent_sandbox: Any | None
     progress: ProgressEmitter
 
 
@@ -105,7 +105,7 @@ class RuntimeAdapter:
         self._fingerprint_verifier = fingerprint_verifier
         self._emitter_factory = emitter_factory
 
-    async def adapt(self, runtime: Any) -> TrustedRuntimeEnvelope:
+    async def adapt(self, runtime: Any, *, initialize_parent_sandbox: bool = True) -> TrustedRuntimeEnvelope:
         user_id = require_trusted_user_id(runtime)
         thread_id = str(require_context_value(runtime, "thread_id", "thread_missing"))
         run_id = str(require_context_value(runtime, "run_id", "run_missing"))
@@ -120,9 +120,11 @@ class RuntimeAdapter:
         host_paths = await asyncio.to_thread(self._resolve_host_paths, paths, thread_id, user_id)
         self._validate_thread_data(runtime, thread_id)
 
-        parent_sandbox = await self._sandbox_initializer(runtime)
-        if parent_sandbox is None:
-            raise RuntimeAdapterError("sandbox_unavailable", "parent sandbox initialization returned nothing")
+        parent_sandbox = None
+        if initialize_parent_sandbox:
+            parent_sandbox = await self._sandbox_initializer(runtime)
+            if parent_sandbox is None:
+                raise RuntimeAdapterError("sandbox_unavailable", "parent sandbox initialization returned nothing")
 
         return TrustedRuntimeEnvelope(
             effective_user_id=user_id,

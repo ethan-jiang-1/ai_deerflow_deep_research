@@ -41,7 +41,7 @@ class FakeAdapter:
         self._error = error
         self.adapted = 0
 
-    async def adapt(self, _runtime):
+    async def adapt(self, _runtime, *, initialize_parent_sandbox: bool = True):
         self.adapted += 1
         if self._error is not None:
             raise self._error

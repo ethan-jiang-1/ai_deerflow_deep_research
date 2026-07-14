@@ -53,7 +53,7 @@ def test_invocation_context_contains_only_reduced_context_and_resolver() -> None
         ),
         dependency_resolver=resolver,
     )
-    assert {item.name for item in fields(context)} == {"graph_context", "dependency_resolver"}
+    assert {item.name for item in fields(context)} == {"graph_context", "dependency_resolver", "work_units"}
     assert isinstance(context.dependency_resolver, NodeDependencyResolver)
     with pytest.raises(TypeError):
         GraphInvocationContext(context.graph_context, resolver, fixture_plan={})

@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 import sys
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,6 +23,7 @@ from deerflow_deep_research.runtime.control import build_control_graph_host
 from deerflow_deep_research.runtime.human_input import SelectedStartMessage
 from deerflow_deep_research.runtime.research import ResearchActionInput, derive_research_id
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
+from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 
 
 def _envelope(app_config: object) -> TrustedRuntimeEnvelope:
@@ -52,6 +56,21 @@ async def _main() -> None:
         database=None,
     )
     envelope = _envelope(app_config)
+    workspace = Path(db_path).parent / "workspace"
+    workspace.mkdir(exist_ok=True)
+
+    async def create(_cls, _envelope, *, research_id, **_kwargs):
+        return WorkUnitStore(
+            workspace_host_path=workspace,
+            research_id=research_id,
+            clock=lambda: datetime(2026, 7, 14, tzinfo=UTC),
+            monotonic=time.monotonic,
+            lock_sleep=time.sleep,
+            token_factory=lambda: secrets.token_hex(16),
+            fault_hook=None,
+        )
+
+    WorkUnitStore.create = classmethod(create)
     research_id = derive_research_id(
         effective_user_id=envelope.effective_user_id,
         outer_thread_id=envelope.outer_thread_id,

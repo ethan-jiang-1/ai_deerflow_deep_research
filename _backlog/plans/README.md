@@ -1,6 +1,6 @@
 # Active Plans — 活跃 plan/分析文档列表
 
-> 最后更新: 2026-07-14 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
+> 最后更新: 2026-07-15 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
 >
 > **plan 没有编号，文件名即标识。完成后文件名不变，位置即状态。**
 
@@ -19,10 +19,9 @@
 
 | Plan | 简述 |
 |------|------|
-| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00–18 路线图（00–04 ✅ 已归档，05 起待做） |
+| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00–18 路线图（00–05 ✅ 已归档，06 起待做） |
 | [deep-research-spec-gates-and-coverage.md](deep-research-spec-gates-and-coverage.md) | 治理：spec 门禁与 requirement-test 覆盖目录（提案，未立 change） |
 | [deep-research-structured-output-linting.md](deep-research-structured-output-linting.md) | 治理：agent YAML/JSON 结构化输出 lint（提案，Phase 2 已随 04 解锁） |
-| [deep-research-05-bootstrap-node.md](deep-research-05-bootstrap-node.md) | 真实 bootstrap/instantiation/setup node |
 | [deep-research-06-hitl1-node.md](deep-research-06-hitl1-node.md) | 真实 HITL1 profile interrupt/resume node |
 | [deep-research-07-topic-planning-node.md](deep-research-07-topic-planning-node.md) | 真实 topic planning 与 seed materialization node |
 | [deep-research-08-wave0-node.md](deep-research-08-wave0-node.md) | 真实 Wave0 source-intake phase |
@@ -37,7 +36,7 @@
 | [deep-research-17-runtime-operations.md](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress 与 operator recovery |
 | [deep-research-18-evaluation-hardening.md](deep-research-18-evaluation-hardening.md) | 全链路质量评估、故障注入与 production hardening |
 
-**Next available plan ID: CLS-001**（移入 `_closed_plans/` 时分配）
+**Next available plan ID: CLS-003**（移入 `_closed_plans/` 时分配）
 
 ---
 

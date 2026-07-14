@@ -57,6 +57,16 @@ def _node_wrapper(
             raise ValueError("work_unit_capability_undeclared")
         if declares_work_units:
             dependencies = replace(dependencies, work_units=context.work_units)
+        declares_bootstrap = NodeCapability.BOOTSTRAP_BUNDLE in spec.capabilities
+        if declares_bootstrap and factory is spec.real_factory:
+            # The bootstrap store is a real-factory filesystem capability; the fake
+            # factory is zero-IO (REG-002) and does not consume it, so it is attached
+            # only when the real factory is selected.
+            if context.bootstrap_bundle is None:
+                raise ValueError("bootstrap_bundle_capability_missing")
+            dependencies = replace(dependencies, bootstrap_bundle=context.bootstrap_bundle)
+        elif dependencies.bootstrap_bundle is not None:
+            raise ValueError("bootstrap_bundle_capability_undeclared")
         if dependencies.graph_context != context.graph_context:
             raise ValueError("dependency_context_mismatch")
         if dependencies.agent_context.node_name != logical_name:
@@ -134,7 +144,7 @@ def build_research_graph(
     builder.add_conditional_edges(
         "bootstrap",
         _route,
-        {"needs_input": "hitl1", "profile_complete": "topic_planning"},
+        {"needs_input": "hitl1", "profile_complete": "topic_planning", "exhausted": END},
     )
     builder.add_conditional_edges("hitl1", _route, {"accepted": "topic_planning", "cancel": END})
     builder.add_edge("topic_planning", "wave0")

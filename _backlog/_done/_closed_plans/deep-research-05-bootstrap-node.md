@@ -1,6 +1,7 @@
 # Plan: Deep Research 05 - Bootstrap Node
 
 > 类型: 设计 | 更新: 2026-07-12
+> 状态: 已实现 (OpenSpec change `implement-deep-research-bootstrap-node`, 2026-07-15)
 > 对应 OpenSpec change: `implement-deep-research-bootstrap-node`
 > 依赖: 02 State Contracts、03 Gate Kernel
 > 替换范围: fake bootstrap node（`agent/src/deerflow_deep_research/graph/nodes/bootstrap/fake.py`）

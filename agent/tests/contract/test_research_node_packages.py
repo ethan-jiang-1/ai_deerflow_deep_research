@@ -10,7 +10,7 @@ import importlib
 import pytest
 
 from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext
-from deerflow_deep_research.domain.node_spec import UNAVAILABLE_REAL_FACTORY, NodeBuildDependencies
+from deerflow_deep_research.domain.node_spec import UNAVAILABLE_REAL_FACTORY, NodeBuildDependencies, NodeCapability
 from deerflow_deep_research.domain.state import FakeFixturePlan
 from deerflow_deep_research.graph.registry import NodeRegistry
 from deerflow_deep_research.graph.topology import LOGICAL_NODES
@@ -62,7 +62,12 @@ def test_explicit_registry_loads_package_root_only_specs() -> None:
     for name, spec in specs.items():
         package = importlib.import_module(f"{PACKAGE_PREFIX}.{name}")
         assert package.__all__ == ["NODE_SPEC"]
-        assert spec.real_factory is UNAVAILABLE_REAL_FACTORY
+        if name == "bootstrap":
+            # Change 05 implements the real bootstrap; every other phase stays fake.
+            assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
+            assert NodeCapability.BOOTSTRAP_BUNDLE in spec.capabilities
+        else:
+            assert spec.real_factory is UNAVAILABLE_REAL_FACTORY
         assert spec.logical_name == name
 
 

@@ -29,6 +29,7 @@
 # check_project_reqs.py 自动忽略。首个 capability 落地时在此登记缩写。
 # ──────────────────────────────────────────────
 prefixes:
+  BON: bootstrap-node
   DEC: deployment-configuration
   GAK: gate-kernel
   NOA: node-agent-runtime
@@ -46,6 +47,13 @@ prefixes:
 #   CUT-001: custom-tool — <一句话稳定语义描述>
 #
 # ──────────────────────────────────────────────
+
+# bootstrap-node
+BON-001: bootstrap-node — The real bootstrap atomically establishes the minimal research bundle directory tree and a schema/version marker under the canonical bundle root with crash recovery so a partial bundle is never observable as active or completed
+BON-002: bootstrap-node — A real bootstrap gate built on the gate kernel validates bundle, control state, and checkpoint-bundle binding and solely determines the bootstrap route replacing the fake fixture pass without a research model call
+BON-003: bootstrap-node — Bootstrap failure performs deterministic cleanup and bounded retry with typed failure codes and never invokes a research LLM or publishes an inconsistent bundle or route, failing closed to a terminal lifecycle when unrecoverable
+BON-004: bootstrap-node — The real bootstrap preserves REG-004 start/resume/status/cancel invariants, keeps bundle establishment research-scoped, and fails closed on marker schema mismatch or cross-research binding without re-implementing path/user/thread isolation
+BON-005: bootstrap-node — The real bootstrap swaps into the mixed implementation map in place of the fake while every other phase remains fake, preserving the normalized topology and the full-fake lifecycle end-to-end path
 
 # deployment-configuration
 DEC-001: deployment-configuration — Deep Research source loads through project-owned local, production, and Docker launch paths

@@ -7,6 +7,7 @@ class BootstrapRequest(FrozenContract):
 
 class BootstrapResult(FrozenContract):
     route: BootstrapRoute
+    marker_ref: str | None = None
 
 
 CONTRACTS = (BootstrapRequest, BootstrapResult)

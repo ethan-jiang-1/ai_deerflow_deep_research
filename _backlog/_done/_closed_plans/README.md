@@ -1,6 +1,6 @@
 # Closed Plans Index — 已完成 plan 归档
 
-> 最后更新: 2026-07-10 | `_backlog/_done/_closed_plans/` — 已完成 plan 的归档目录。
+> 最后更新: 2026-07-15 | `_backlog/_done/_closed_plans/` — 已完成 plan 的归档目录。
 > 接收来自 [`../../plans/`](../../plans/) 的 plan。`_` 前缀 = coding agent 默认忽略。
 >
 > **plan 完成后文件名不变，位置即状态。** 移入时分配 `CLS-NNN` 序号（Closed），按完成时间递增。
@@ -20,5 +20,6 @@ plan 完成后从 `_backlog/plans/` 通过 `git mv` 移入本目录：
 | ID | Date | File | Summary |
 |----|------|------|---------|
 | CLS-001 | 2026-07-13 | [deep-research-tui-hitl-terminal-workbench.md](deep-research-tui-hitl-terminal-workbench.md) | HITL in Terminal Workbench — demo TUI split to `add-deep-research-lifecycle-demo-tui`; formal integration deferred to backlog |
+| CLS-002 | 2026-07-15 | [deep-research-05-bootstrap-node.md](deep-research-05-bootstrap-node.md) | Real bootstrap node — atomic bundle establishment + schema/version marker, non-gated binding-validation replacing the fake fixture pass (OpenSpec `implement-deep-research-bootstrap-node`, archived 2026-07-15) |
 
-**Next available plan ID: CLS-002**
+**Next available plan ID: CLS-003**

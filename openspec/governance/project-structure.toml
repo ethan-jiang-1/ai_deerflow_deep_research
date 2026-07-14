@@ -100,6 +100,11 @@ kind = "file"
 owner = "PRS-001"
 
 [[required_paths]]
+path = "agent/src/deerflow_deep_research/runtime/bootstrap_bundle.py"
+kind = "file"
+owner = "PRS-001"
+
+[[required_paths]]
 path = "agent/src/deerflow_deep_research/domain"
 kind = "directory"
 owner = "PRS-001"
@@ -128,6 +133,11 @@ owner = "PRS-003"
 path = "agent/src/deerflow_deep_research/domain/invocation.py"
 kind = "file"
 owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/bootstrap.py"
+kind = "file"
+owner = "PRS-001"
 
 [[required_paths]]
 path = "agent/src/deerflow_deep_research/domain/lifecycle.py"

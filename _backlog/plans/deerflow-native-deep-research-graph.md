@@ -1,7 +1,7 @@
 # Plan: DeerFlow 原生 Deep Research Graph
 
-> 类型: 设计 / 架构映射 | 更新: 2026-07-13
-> 状态: 00–04 ✅ 已归档 · 05 ⬜ ← 当前 · 06–18 ⬜
+> 类型: 设计 / 架构映射 | 更新: 2026-07-15
+> 状态: 00–05 ✅ 已归档 · 06 ⬜ ← 当前 · 07–18 ⬜
 > 参考: [`../_reference/dpt/`](../_reference/dpt/) 全部 9 份架构分析，以及 DPT 原始 workflow、gate、queue、work-unit、trace 实现
 
 ## 结论先行
@@ -715,7 +715,7 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 | 02 | ✅ | deep-research-02-state-persistence-contracts *(已归档)* | typed state、reducers、bundle refs、checkpoint schema | 01 |
 | 03 | ✅ | deep-research-03-gate-kernel *(已归档)* | 通用 gate/repair/retry/fatigue 内核，先接 fake rules | 02 |
 | 04 | ✅ | deep-research-04-work-unit-kernel *(已归档)* | WorkSpec、bounded `Send`、sole-writer JSONL ledger、controlled fixture worker | 02, 03 |
-| 05 | ⬜ | [`deep-research-05-bootstrap-node.md`](deep-research-05-bootstrap-node.md) | 替换 fake bootstrap | 02, 03 |
+| 05 | ✅ | deep-research-05-bootstrap-node *(已归档)* | 替换 fake bootstrap：原子 bundle 建立 + schema/version marker + 非门控 binding-validation 替换 fixture pass | 02, 03 |
 | 06 | ⬜ | [`deep-research-06-hitl1-node.md`](deep-research-06-hitl1-node.md) | 替换 fake HITL1/profile interrupt | 05 |
 | 07 | ⬜ | [`deep-research-07-topic-planning-node.md`](deep-research-07-topic-planning-node.md) | 替换 fake topic planner/seed materialization | 03, 06 |
 | 08 | ⬜ | [`deep-research-08-wave0-node.md`](deep-research-08-wave0-node.md) | 替换 fake Wave0 intake phase | 04, 07 |
@@ -925,10 +925,10 @@ change 00 已定死 local editable/Docker source override 和 runtime bridge 直
 
 ## 落地关联
 
-00–04（runtime substrate、fake graph skeleton、typed state、gate kernel、work-unit kernel）
-均已完成并归档；launcher、Docker live smoke 与 Postgres profile 已明确转入 deployment
-follow-up，不阻塞 graph 路线。下一步从 05 bootstrap node 起，严格按 05→18 的依赖关系
-逐项推进，不提前合并真实 nodes，也不把延期的 deployment 工作塞入未完成的 change。
+00–05（runtime substrate、fake graph skeleton、typed state、gate kernel、work-unit kernel、
+bootstrap node）均已完成并归档；launcher、Docker live smoke 与 Postgres profile 已明确转入
+deployment follow-up，不阻塞 graph 路线。下一步从 06 HITL1 node 起，严格按 06→18 的依赖
+关系逐项推进，不提前合并真实 nodes，也不把延期的 deployment 工作塞入未完成的 change。
 
 当前稳定原则是：**graph 控制确定性流程与小型控制 state，agent loop 控制开放式研究判断，sandbox/ledger 控制大内容与证据权威。**
 
@@ -949,7 +949,7 @@ follow-up，不阻塞 graph 路线。下一步从 05 bootstrap node 起，严格
 
 | Plan | 难度 | 说明 |
 |---|---|---|
-| 05 Bootstrap | 低 | 90% 逻辑在 01 fake 已实现。只剩原子 mkdir + real gate |
+| 05 Bootstrap | 低 | 90% 逻辑在 01 fake 已实现。只剩原子 mkdir + real gate（✅ 已归档 2026-07-15）|
 | 16 Final Delivery | 低 | writer agent + integrity gate 是单向管道，hash 验证机械操作 |
 
 #### 🟡 中低 —— 有清晰模式，需要仔细的 schema 设计

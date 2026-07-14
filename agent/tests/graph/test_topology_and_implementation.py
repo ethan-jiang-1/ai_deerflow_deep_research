@@ -113,3 +113,20 @@ def test_explicit_mixed_override_preserves_identical_graph_shape() -> None:
     }
     with pytest.raises(ImplementationMapError, match="implementation_unavailable.*wave0"):
         build_research_graph(implementation_modes=modes)
+
+
+def test_mixed_real_bootstrap_resolves_and_preserves_shape() -> None:
+    specs = load_research_node_specs()
+    # Change 05 ships the real bootstrap factory (no longer the unavailable sentinel).
+    assert specs["bootstrap"].real_factory is not UNAVAILABLE_REAL_FACTORY
+    modes = {name: "fake" for name in LOGICAL_NODES} | {"bootstrap": "real"}
+    resolved = resolve_implementations(specs, modes)
+    assert resolved["bootstrap"] is specs["bootstrap"].real_factory
+    for name in LOGICAL_NODES:
+        if name != "bootstrap":
+            assert resolved[name] is specs[name].fake_factory
+    mixed = build_research_graph(implementation_modes=modes).compile()
+    fake = build_research_graph().compile()
+    assert {(edge.source, edge.target) for edge in mixed.get_graph().edges} == {
+        (edge.source, edge.target) for edge in fake.get_graph().edges
+    }

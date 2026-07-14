@@ -27,6 +27,7 @@
 
 ```text
 __start__ --start--> bootstrap
+bootstrap --exhausted--> blocked
 bootstrap --needs_input--> hitl1
 bootstrap --profile_complete--> topic_planning
 final_delivery --evidence_blocked--> readiness

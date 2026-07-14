@@ -13,6 +13,7 @@ import base64
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -37,6 +38,7 @@ from deerflow_deep_research.domain.state import (
     project_lifecycle_status,
 )
 from deerflow_deep_research.graph.builder import build_research_graph
+from deerflow_deep_research.runtime.bootstrap_bundle import BootstrapBundleStore
 from deerflow_deep_research.runtime.checkpoint import derive_research_thread_key, resolve_effective_provider
 from deerflow_deep_research.runtime.human_input import (
     ConsumedResponseRetry,
@@ -107,13 +109,22 @@ class ResearchActionInput:
 class ResearchGraphRecipe:
     builder: Any
     requires_work_units: bool = False
+    requires_bootstrap_bundle: bool = False
     work_unit_store_factory: Any = None
 
     @classmethod
-    def create(cls, *, work_unit_store_factory: Any = None) -> ResearchGraphRecipe:
+    def create(
+        cls,
+        *,
+        work_unit_store_factory: Any = None,
+        implementation_modes: Mapping[str, str] | None = None,
+    ) -> ResearchGraphRecipe:
         return cls(
-            builder=build_research_graph(),
+            builder=build_research_graph(implementation_modes=implementation_modes),
             requires_work_units=True,
+            requires_bootstrap_bundle=(
+                implementation_modes is not None and implementation_modes.get("bootstrap") == "real"
+            ),
             work_unit_store_factory=work_unit_store_factory,
         )
 
@@ -223,6 +234,7 @@ class ResearchActionHandler:
         graph_context = project_research_scope(envelope, research_scope_id=research_id)
         base_resolver = RuntimeNodeDependencyResolver(graph_context)
         work_units = None
+        bootstrap_bundle = None
         if include_work_units and self._recipe.requires_work_units:
             store_factory = self._recipe.work_unit_store_factory or WorkUnitStore.create
             store = await store_factory(envelope, research_id=research_id)
@@ -230,10 +242,13 @@ class ResearchActionHandler:
                 store=store,
                 resolver=RuntimeWorkUnitDependencyResolver(graph_context, base_resolver, store),
             )
+            if self._recipe.requires_bootstrap_bundle:
+                bootstrap_bundle = await BootstrapBundleStore.create(envelope, research_id=research_id)
         return GraphInvocationContext(
             graph_context=graph_context,
             dependency_resolver=base_resolver,
             work_units=work_units,
+            bootstrap_bundle=bootstrap_bundle,
         )
 
 

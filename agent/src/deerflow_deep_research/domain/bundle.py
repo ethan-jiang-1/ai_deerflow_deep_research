@@ -41,6 +41,7 @@ BUNDLE_SUBTREES = (
 DIAGNOSTICS_GATE_ATTEMPTS = "gate-attempts.jsonl"
 EVIDENCE_LEDGER = "submissions.jsonl"
 EVIDENCE_LOCK = ".submissions.lock"
+MARKER_FILENAME = "marker.json"
 
 _PROBE_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 _STAGING_RE = re.compile(r"^\.submissions\.[0-9a-f]{32}\.tmp$")
@@ -89,6 +90,11 @@ def _require_work_attempt(work_id: str, attempt_id: str) -> tuple[str, str]:
 
 def bundle_root(research_id: str) -> str:
     return f"{BUNDLE_ROOT}/{_require_research_id(research_id)}"
+
+
+def marker_path(research_id: str) -> str:
+    """Canonical path of the bootstrap schema/version marker under the request subtree."""
+    return f"{bundle_root(research_id)}/{REQUEST_SUBTREE}/{MARKER_FILENAME}"
 
 
 def attempt_dir(research_id: str, work_id: str, attempt_id: str) -> str:
@@ -261,6 +267,7 @@ __all__ = [
     "EVIDENCE_LOCK",
     "EVIDENCE_SUBTREE",
     "FINAL_SUBTREE",
+    "MARKER_FILENAME",
     "RESEARCH_ID_RE",
     "REQUEST_SUBTREE",
     "REVIEW_SUBTREE",
@@ -279,6 +286,7 @@ __all__ = [
     "evidence_staging_path",
     "first_work_spec_path",
     "is_audit_only",
+    "marker_path",
     "is_evidence_staging_name",
     "output_path",
     "prelaunch_fs_probe_names",

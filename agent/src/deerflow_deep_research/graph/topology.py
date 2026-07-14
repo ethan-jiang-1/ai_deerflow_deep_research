@@ -39,6 +39,7 @@ NORMALIZED_EDGES = tuple(
             TopologyEdge(START, "start", "bootstrap"),
             TopologyEdge("bootstrap", "needs_input", "hitl1"),
             TopologyEdge("bootstrap", "profile_complete", "topic_planning"),
+            TopologyEdge("bootstrap", "exhausted", "blocked"),
             TopologyEdge("hitl1", "accepted", "topic_planning"),
             TopologyEdge("hitl1", "cancel", "cancelled"),
             TopologyEdge("topic_planning", "next", "wave0"),

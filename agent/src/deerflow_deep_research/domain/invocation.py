@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from deerflow_deep_research.domain.bootstrap import BootstrapBundleStoreProtocol
 from deerflow_deep_research.domain.context import GraphContextView
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies, PolicyRef
 from deerflow_deep_research.domain.work_units import Attempt, AttemptArtifactWriter, WorkSpec, WorkUnitStoreProtocol
@@ -56,12 +57,15 @@ class GraphInvocationContext:
     graph_context: GraphContextView
     dependency_resolver: NodeDependencyResolver
     work_units: WorkUnitControllerDependencies | None = None
+    bootstrap_bundle: BootstrapBundleStoreProtocol | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.graph_context, GraphContextView):
             raise TypeError("graph_context must be a GraphContextView")
         if not isinstance(self.dependency_resolver, NodeDependencyResolver):
             raise TypeError("dependency_resolver must implement NodeDependencyResolver")
+        if self.bootstrap_bundle is not None and not isinstance(self.bootstrap_bundle, BootstrapBundleStoreProtocol):
+            raise TypeError("bootstrap_bundle must implement BootstrapBundleStoreProtocol")
 
 
 __all__ = ["GraphInvocationContext", "NodeDependencyResolver"]

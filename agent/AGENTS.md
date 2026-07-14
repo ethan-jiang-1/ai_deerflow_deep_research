@@ -42,12 +42,14 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/runtime/research.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/runtime/work_unit_storage.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/runtime/work_unit_store.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/runtime/bootstrap_bundle.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/context.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/enums.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/node_spec.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/invocation.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/domain/bootstrap.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/lifecycle.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/state.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/bundle.py` (file; `PRS-003`)
@@ -137,6 +139,17 @@ and trusted host path share one mounted POSIX workspace supporting bounded lock,
 atomic replace, and durability sync. `status` and `cancel` remain checkpoint-only:
 they do not initialize a parent sandbox or construct/expose the store. Known IM
 and non-interactive contexts still refuse start/resume and retain status/cancel.
+
+Change 05 replaces the change-01 fake bootstrap with a real bootstrap node. It atomically
+establishes the minimal `request/` bundle subtree plus a schema/version marker (bound to the
+checkpoint identity) through a runtime-owned `BootstrapBundleStore` that reuses the change-04
+shared-workspace capability, then runs a pure binding-validation (reusing gate-kernel
+`FailureCode` values) that replaces the fake fixture pass and routes `needs_input` to HITL1, or
+`exhausted` to a terminal on a post-establish divergence. The store is injected via a new
+`NodeCapability.BOOTSTRAP_BUNDLE` and is constructed only when the mixed implementation map
+selects the real bootstrap (`ResearchGraphRecipe.requires_bootstrap_bundle`); the full-fake
+lifecycle still selects the fake bootstrap and writes no marker. Identity derivation and
+start/resume/status/cancel semantics are unchanged.
 
 ## Ownership
 

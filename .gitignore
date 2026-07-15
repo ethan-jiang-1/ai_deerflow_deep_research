@@ -72,3 +72,6 @@ config.yaml.bak
 # Local symlinks to external knowledge (machine-specific absolute paths)
 _ln_*
 
+.agents
+
+

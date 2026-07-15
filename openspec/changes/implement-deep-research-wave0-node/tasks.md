@@ -1,9 +1,9 @@
 ## 1. Domain: source-intake result contract and validation registry
 
-- [ ] 1.1 Add red tests for a frozen `Wave0SourceIntakeResult` result-contract model (canonical source URLs, source metadata, baseline facts, fetch/cache refs, limitations, `schema_version=1`): reject unknown fields, oversized text, non-canonical URLs, missing required fields; canonical JSON serialization. @impl WAN-003
-- [ ] 1.2 Implement the result-contract model inside the wave0 package (extend `contracts.py` or add a bounded module) until 1.1 is green. @impl WAN-003
-- [ ] 1.3 Add red tests that `engine/work_units/validation.py` dispatches through a registry keyed by `(result_contract, result_schema_version)`, still accepts the existing `fixture.work-unit` v1 contract, and accepts the new `wave0.source-intake` v1 contract with the real model; an unregistered contract fails with `result_contract_unsupported`. @impl WAN-003
-- [ ] 1.4 Generalize the hard-coded result-contract check into the registry and register both contracts until 1.3 is green; existing fixture submit tests stay green. @impl WAN-003
+- [x] 1.1 Add red tests for a frozen `Wave0SourceIntakeResult` result-contract model (canonical source URLs, source metadata, baseline facts, fetch/cache refs, limitations, `schema_version=1`): reject unknown fields, oversized text, non-canonical URLs, missing required fields; canonical JSON serialization. @impl WAN-003
+- [x] 1.2 Implement the result-contract model inside the wave0 package (extend `contracts.py` or add a bounded module) until 1.1 is green. @impl WAN-003
+- [x] 1.3 Add red tests that `engine/work_units/validation.py` dispatches through a registry keyed by `(result_contract, result_schema_version)`, still accepts the existing `fixture.work-unit` v1 contract, and accepts the new `wave0.source-intake` v1 contract with the real model; an unregistered contract fails with `result_contract_unsupported`. @impl WAN-003
+- [x] 1.4 Generalize the hard-coded result-contract check into the registry and register both contracts until 1.3 is green; existing fixture submit tests stay green. @impl WAN-003
 
 ## 2. Source canonicalization and submit-validation checks
 

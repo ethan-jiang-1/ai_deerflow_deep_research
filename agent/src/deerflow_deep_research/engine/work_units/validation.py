@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import hashlib
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 from deerflow_deep_research.domain.bundle import output_path, result_path, work_spec_path
 from deerflow_deep_research.domain.work_units import (
@@ -19,12 +20,80 @@ from deerflow_deep_research.domain.work_units import (
     PlannedRead,
     SubmissionRecord,
     SubmissionValidationCode,
+    Wave0SourceIntakeResult,
     WorkSpec,
     WorkUnitValidationPlan,
     canonical_json_bytes,
     canonicalize_source_url,
     compute_candidate_hash,
 )
+
+
+@dataclass(frozen=True)
+class ResultContractHandler:
+    """A registered ``(result_contract, result_schema_version)`` validator model.
+
+    Later phases register their own result-contract model (WOU-003); the shared
+    envelope validation (identity / result_contract / output_paths / source_ids)
+    is contract-agnostic because every result document carries those fields.
+    """
+
+    contract: str
+    schema_version: int
+    model: type
+
+
+_RESULT_CONTRACT_REGISTRY: dict[tuple[str, int], ResultContractHandler] = {}
+
+
+def register_result_contract(handler: ResultContractHandler) -> ResultContractHandler:
+    """Register a result-contract model for deterministic submit validation."""
+    _RESULT_CONTRACT_REGISTRY[(handler.contract, handler.schema_version)] = handler
+    return handler
+
+
+def get_result_contract_handler(contract: str, schema_version: int) -> ResultContractHandler | None:
+    return _RESULT_CONTRACT_REGISTRY.get((contract, schema_version))
+
+
+register_result_contract(ResultContractHandler("fixture.work-unit", 1, FixtureResultDocument))
+register_result_contract(ResultContractHandler("wave0.source-intake", 1, Wave0SourceIntakeResult))
+
+
+def _validate_result_doc_envelope(
+    spec: WorkSpec,
+    attempt: Attempt,
+    candidate: CandidateResult,
+    doc: object,
+) -> list[SubmissionValidationCode]:
+    doc_identity = (
+        getattr(doc, "research_id"),
+        getattr(doc, "generation"),
+        getattr(doc, "phase"),
+        getattr(doc, "work_id"),
+        getattr(doc, "attempt_id"),
+        getattr(doc, "worker_role"),
+        getattr(doc, "spec_hash"),
+    )
+    expected_identity = (
+        spec.research_id,
+        spec.generation,
+        spec.phase,
+        spec.work_id,
+        attempt.attempt_id,
+        spec.worker_role,
+        spec.spec_hash,
+    )
+    codes: list[SubmissionValidationCode] = []
+    if doc_identity != expected_identity:
+        codes.append(SubmissionValidationCode.IDENTITY_MISMATCH)
+    if (
+        getattr(doc, "result_contract") != spec.result_contract
+        or getattr(doc, "output_paths") != spec.required_outputs
+        or getattr(doc, "source_ids") != tuple(ref.source_id for ref in candidate.source_refs)
+    ):
+        codes.append(SubmissionValidationCode.INVALID_OUTPUT_SCHEMA)
+    return codes
 
 
 def _content_hash(data: bytes) -> str:
@@ -101,7 +170,8 @@ def validate_submission_candidate(
         codes.append(SubmissionValidationCode.SPEC_HASH_MISMATCH)
     if candidate.schema_version != 1 or candidate.result_schema_version != 1:
         codes.append(SubmissionValidationCode.SCHEMA_VERSION_UNSUPPORTED)
-    if (candidate.result_contract, candidate.result_schema_version) != ("fixture.work-unit", 1):
+    handler = get_result_contract_handler(candidate.result_contract, candidate.result_schema_version)
+    if handler is None:
         codes.append(SubmissionValidationCode.RESULT_CONTRACT_UNSUPPORTED)
 
     expected_spec_ref = work_spec_path(spec.research_id, spec.work_id, attempt.attempt_id)
@@ -133,38 +203,13 @@ def validate_submission_candidate(
             expected_bytes=candidate.result_byte_count,
         )
     )
-    if result_read is not None and result_read.data:
+    if result_read is not None and result_read.data and handler is not None:
         try:
-            fixture = FixtureResultDocument.model_validate_json(result_read.data)
+            result_doc = handler.model.model_validate_json(result_read.data)
         except ValueError:
             codes.append(SubmissionValidationCode.INVALID_OUTPUT_SCHEMA)
         else:
-            fixture_identity = (
-                fixture.research_id,
-                fixture.generation,
-                fixture.phase,
-                fixture.work_id,
-                fixture.attempt_id,
-                fixture.worker_role,
-                fixture.spec_hash,
-            )
-            expected_fixture_identity = (
-                spec.research_id,
-                spec.generation,
-                spec.phase,
-                spec.work_id,
-                attempt.attempt_id,
-                spec.worker_role,
-                spec.spec_hash,
-            )
-            if fixture_identity != expected_fixture_identity:
-                codes.append(SubmissionValidationCode.IDENTITY_MISMATCH)
-            if (
-                fixture.result_contract != spec.result_contract
-                or fixture.output_paths != spec.required_outputs
-                or fixture.source_ids != tuple(ref.source_id for ref in candidate.source_refs)
-            ):
-                codes.append(SubmissionValidationCode.INVALID_OUTPUT_SCHEMA)
+            codes.extend(_validate_result_doc_envelope(spec, attempt, candidate, result_doc))
 
     if candidate_outputs != expected_outputs or len(candidate.output_refs) != len(spec.required_outputs):
         codes.append(SubmissionValidationCode.INVALID_OUTPUT_SCHEMA)
@@ -206,7 +251,10 @@ def validate_submission_candidate(
 __all__ = [
     "ArtifactRead",
     "PlannedRead",
+    "ResultContractHandler",
     "WorkUnitValidationPlan",
     "build_validation_plan",
+    "get_result_contract_handler",
+    "register_result_contract",
     "validate_submission_candidate",
 ]

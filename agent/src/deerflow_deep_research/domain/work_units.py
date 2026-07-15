@@ -47,6 +47,10 @@ MAX_PARENT_FAILURES = 32
 MAX_PARENT_ACCEPTED_REFS = 64
 MAX_CHILD_BATCH = 16
 MAX_CHILD_TERMINAL_UPDATES = 64
+MAX_SOURCE_TITLE_CHARS = 256
+MAX_BASELINE_FACTS = 32
+MAX_BASELINE_FACT_CHARS = 512
+MAX_SOURCE_LIMITATIONS_CHARS = 2_048
 
 RESEARCH_ID_RE = re.compile(r"^r_[A-Za-z0-9_-]{43}$")
 CONTENT_HASH_RE = re.compile(r"^h_[A-Za-z0-9_-]{43}$")
@@ -693,6 +697,73 @@ class FixtureResultDocument(_FrozenModel):
         return self
 
 
+class Wave0SourceMeta(_FrozenModel):
+    """One fetched (or degraded) source recorded by a Wave0 source-intake worker."""
+
+    source_id: str = Field(pattern=SOURCE_ID_RE.pattern)
+    canonical_url: str = Field(min_length=1, max_length=2048)
+    title: str = Field(min_length=1, max_length=MAX_SOURCE_TITLE_CHARS)
+    content_ref: str
+    fetch_status: Literal["fetched", "degraded"]
+
+    @field_validator("canonical_url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        if canonicalize_source_url(value) != value:
+            raise ValueError("canonical_url_not_canonical")
+        return value
+
+    @field_validator("content_ref")
+    @classmethod
+    def validate_content_ref(cls, value: str) -> str:
+        return _validate_bundle_ref(value, field_name="content_ref")
+
+
+class Wave0SourceIntakeResult(_FrozenModel):
+    """The real Wave0 source-intake result document (WAN-003)."""
+
+    schema_version: Literal[1]
+    research_id: str = Field(pattern=RESEARCH_ID_RE.pattern)
+    generation: int = Field(ge=0, le=2)
+    phase: LogicalPhase
+    work_id: str
+    attempt_id: str
+    worker_role: str = Field(pattern=WORKER_ROLE_RE.pattern)
+    spec_hash: str = Field(pattern=CONTENT_HASH_RE.pattern)
+    result_contract: Literal["wave0.source-intake"]
+    output_paths: Annotated[tuple[str, ...], Field(max_length=MAX_REQUIRED_OUTPUTS)] = ()
+    source_ids: Annotated[tuple[str, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
+    sources: Annotated[tuple[Wave0SourceMeta, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
+    baseline_facts: Annotated[tuple[str, ...], Field(max_length=MAX_BASELINE_FACTS)] = ()
+    limitations: str = Field(default="", max_length=MAX_SOURCE_LIMITATIONS_CHARS)
+
+    @field_validator("baseline_facts")
+    @classmethod
+    def validate_baseline_facts(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        for item in values:
+            if not isinstance(item, str) or not item.strip() or len(item) > MAX_BASELINE_FACT_CHARS:
+                raise ValueError("baseline_fact_invalid")
+        return values
+
+    @field_validator("output_paths")
+    @classmethod
+    def validate_output_paths(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        canonical = tuple(_validate_relative_posix_path(value, field_name="output_paths") for value in values)
+        sorted_values = tuple(sorted(canonical, key=lambda value: value.encode("ascii")))
+        if canonical != sorted_values or len(set(canonical)) != len(canonical):
+            raise ValueError("output_paths_not_canonical")
+        return canonical
+
+    @model_validator(mode="after")
+    def validate_identity(self) -> Wave0SourceIntakeResult:
+        work_id, generation, phase, _work_ordinal, _attempt_ordinal = _parse_attempt_id(self.attempt_id)
+        if work_id != self.work_id or generation != self.generation or phase is not self.phase:
+            raise ValueError("attempt_id_identity_mismatch")
+        if tuple(source.source_id for source in self.sources) != self.source_ids:
+            raise ValueError("source_ids_mismatch")
+        return self
+
+
 class WorkSpecRef(_FrozenModel):
     worker_role: str = Field(pattern=WORKER_ROLE_RE.pattern)
     spec_hash: str = Field(pattern=CONTENT_HASH_RE.pattern)
@@ -1043,6 +1114,8 @@ __all__ = [
     "AttemptTerminalUpdate",
     "CandidateResult",
     "FixtureResultDocument",
+    "Wave0SourceIntakeResult",
+    "Wave0SourceMeta",
     "OutputRef",
     "PlannedRead",
     "SourceRef",

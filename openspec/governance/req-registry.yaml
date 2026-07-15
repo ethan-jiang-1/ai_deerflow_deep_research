@@ -38,6 +38,7 @@ prefixes:
   RED: research-demo-tui
   REG: research-graph-lifecycle
   RUI: runtime-integration
+  TOP: topic-planning-node
   WOU: work-unit-kernel
 
 # ──────────────────────────────────────────────
@@ -116,6 +117,13 @@ HIN-002: hitl1-node — Real HITL1 presents structured brief and follow-up promp
 HIN-003: hitl1-node — Real HITL1 parses JSON or free-text human responses deterministically, accumulates durable partial profile progress, bounds follow-up rounds, and rejects forged or mismatched responses
 HIN-004: hitl1-node — Real HITL1 records the validated profile as request-bundle profile.json plus checkpoint ContentRef and short controller-owned profile fields without bumping ResearchState schema version
 HIN-005: hitl1-node — Real HITL1 integrates into the mixed graph with explicit follow-up and blocked routes while preserving full-fake behavior and downstream boundary constraints
+
+# topic-planning-node
+TOP-001: topic-planning-node — Real topic planning generates a validated structured topic plan from the checkpointed HITL1 profile via the runtime node-agent bridge with closed topic contracts, one bounded repair, and fail-closed schema validation
+TOP-002: topic-planning-node — A deterministic materializer normalizes the validated plan into a stable topic registry with model-independent ids/slugs plus a must-answer coverage map and rejects duplicate or overlapping topics
+TOP-003: topic-planning-node — Topic coverage and expansion are bounded by hard checks that reject empty or uncovered coverage and over-expansion and fail closed to terminal blocked after one bounded repair
+TOP-004: topic-planning-node — Real topic planning records bounded planner-owned checkpoint topic state read from checkpoint profile fields without reading profile.json, declaring request-bundle or work-unit capabilities, producing a WorkSpec, writing a sandbox file, or bumping the schema version
+TOP-005: topic-planning-node — Real topic planning integrates into the mixed graph only off real bootstrap and real HITL1 with one explicit exhausted route while preserving full-fake behavior and the backend/frontend boundary
 
 # work-unit-kernel
 WOU-001: work-unit-kernel — Immutable work, attempt, candidate, and submission contracts preserve controller-assigned identity and spec integrity

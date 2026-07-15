@@ -1,12 +1,7 @@
-# research-graph-lifecycle Specification
+> req: REG-001, REG-002, REG-003, REG-005, REG-006, REG-007, REG-008, REG-009, REG-010, REG-011
 
-> req: REG-001, REG-002, REG-003, REG-004, REG-005, REG-006, REG-007, REG-008, REG-009, REG-010, REG-011
+## MODIFIED Requirements
 
-## Purpose
-The stable Deep Research graph topology, deterministic implementation selection,
-full-fake routing and fan-in, graph-owned HITL lifecycle, and durable checkpoint
-semantics that later changes replace node by node without redefining control flow.
-## Requirements
 ### Requirement: One explicit topology and implementation map own every phase
 
 The downstream package SHALL declare one normalized top-level Deep Research topology
@@ -211,113 +206,6 @@ pending request copy.
 #### Scenario: Incomplete real-HITL1 answer creates a fresh pending request
 - **WHEN** real HITL1 consumes a matching incomplete response and routes `needs_followup`
 - **THEN** the next suspended checkpoint contains exactly one new HITL1 interrupt with an incremented ordinal, and the consumed response cannot be replayed as the follow-up answer
-
-### Requirement: Lifecycle actions enforce typed and idempotent transitions
-
-The reflected control surface SHALL support `start`, `resume`, `status`, and `cancel`
-for the research graph in addition to the independent `infra_probe`. Start SHALL accept
-no caller-selected research id or question. It SHALL bind the newest visible genuine
-user `HumanMessage` candidate, require its stable message id and bounded exact text, and derive a
-URL-safe collision-resistant opaque research id from a versioned domain-separated hash
-of a canonical boundary-preserving encoding of trusted user/thread scope. Repeating
-start for the same message SHALL inspect and reproject the same pending or terminal
-lifecycle; it SHALL NOT invoke a
-second graph or reset state. A different eligible start message in the same outer thread
-SHALL return `thread_research_exists` with the existing opaque id/status and SHALL NOT
-create a second lifecycle or reset state. New research requires a new outer thread. An
-existing checkpoint with malformed stored start correlation SHALL fail closed. Every
-fresh resume SHALL require one pending interrupt; an exact checkpointed
-consumed-response retry SHALL only reproject the current durable outcome. Status SHALL
-inspect without mutating. Cancel SHALL
-route a checkpointed suspended lifecycle through a typed cancel
-decision to terminal `cancelled`; it SHALL NOT rewrite checkpoint values around the
-topology or claim to preempt an active task on another worker. Status SHALL always be
-read-only. Cancel on `completed | stopped | cancelled | blocked` SHALL return that
-terminal result idempotently. Resume without exactly one pending interrupt, including
-every terminal lifecycle, SHALL return `invalid_transition`; an already consumed
-response SHALL instead reproject the current pending or terminal durable result without
-graph invocation; wrong user/thread scope and absence SHALL both return
-`research_not_found`; unsupported checkpoint schema SHALL return
-`schema_unsupported`. None SHALL create or mutate a lifecycle. Every action SHALL
-return a bounded version-1 control-result envelope. Schema version, action, code,
-durability, and `implementation_mode=full_fake` SHALL always be present. A validated or
-generated research id SHALL be present only when safe and applicable. Status, phase,
-and generation SHALL be present only once a lifecycle is known; a pre-lifecycle denial
-SHALL omit them rather than invent graph state and SHALL use `unavailable` durability
-if provider classification has not occurred. A suspended result SHALL add its pending
-request id, and a terminal result MAY add its terminal reason. Every result SHALL omit
-raw identity, internal namespace, host paths, fixtures, and checkpoint values. Exact
-start text SHALL be limited to 16,384 characters and serialized control results to
-4,096 characters; semantic content SHALL fail validation rather than be silently
-truncated. Gate fatigue escalation or budget exhaustion SHALL produce typed `blocked`
-with `terminal_reason=GATE_BLOCKED`; the change-01 `REPAIR_EXHAUSTED` reason SHALL be
-retained in the enum but no longer produced (gate-produced `GATE_BLOCKED` replaces it).
-
-After strict schema and registered-action validation, version-1 lifecycle-owned result
-codes SHALL be closed to normal `suspended | completed | stopped | cancelled | blocked`,
-read-only `status_ok`, and denial `start_message_invalid | thread_research_exists |
-response_mismatch | response_invalid | invalid_transition | research_not_found |
-schema_unsupported | checkpoint_inconsistent | interactive_required |
-human_input_transport_unavailable | exclusive_control_call_required |
-implementation_unavailable`. RuntimeAdapter/GraphHost MAY preserve an existing
-change-00 redacted infrastructure code such as `restart_required`; arbitrary free-form
-codes SHALL be rejected. Strict schema diagnostics and unknown-action
-`action_unavailable` SHALL remain pre-lifecycle tool contracts.
-
-Generated and accepted research ids SHALL match `^r_[A-Za-z0-9_-]{43}$`; malformed
-lifecycle ids SHALL fail strict validation before trusted runtime or provider access and
-SHALL remain distinct from the infra-probe id domain.
-
-Fake final delivery SHALL emit only a typed terminal fixture marker. It SHALL NOT emit
-or imply research findings, evidence, citations, report content, or user-ready research
-completion.
-
-Start selection SHALL ignore non-Human and hidden synthetic/summary/dynamic-context
-messages only while locating the newest visible genuine HumanMessage, and SHALL NOT
-fall back to an older visible request when that newest candidate is a human-input
-response, lacks a stable id, or has invalid content. Start and plain-response content
-SHALL accept either a string or an ordered list containing only text blocks, concatenate
-list text in order without an inserted separator, and reject non-text/malformed blocks,
-empty text, or oversized content rather than silently dropping or normalizing it. A
-structured human-input response MAY remain genuine when hidden by the UI; every other
-hidden HumanMessage SHALL remain ineligible. Fresh resume SHALL deny a failing newest
-candidate without substituting an older response.
-
-#### Scenario: Start returns an opaque scope and suspends
-- **WHEN** a trusted user/thread starts a new fake research lifecycle
-- **THEN** the handler binds the latest eligible visible HumanMessage, derives a stable opaque research id, records its message correlation and request digest, runs to HITL1, and returns the versioned suspended result without exposing the internal checkpoint key
-
-#### Scenario: Repeated start reprojects instead of duplicating
-- **WHEN** the same start is retried after the nested HITL checkpoint was committed but before its outer ToolMessage was delivered
-- **THEN** the same research id and pending request are recovered and reprojected with the current tool-call id, no node runs twice, and no orphan lifecycle is created
-
-#### Scenario: Invalid start message is denied
-- **WHEN** no visible genuine HumanMessage remains after synthetic-context filtering, or the newest visible candidate is missing a stable id, empty/oversized, a human-input response, or otherwise ineligible as a new research request
-- **THEN** start returns redacted `start_message_invalid` before namespace derivation or checkpoint mutation
-
-#### Scenario: Different start in the same thread does not create a multi-active run
-- **WHEN** a different eligible HumanMessage requests start in an outer thread that already owns a suspended or terminal research lifecycle
-- **THEN** the action returns `thread_research_exists` with the existing opaque id/status and does not invoke or reset the graph
-
-#### Scenario: Status is read-only
-- **WHEN** status is requested for a suspended or terminal lifecycle
-- **THEN** it reports the bounded version-1 control result with typed phase, generation, status, pending request metadata if any, and durability class without invoking a node or changing the checkpoint
-
-#### Scenario: Full-fake terminal cannot masquerade as research output
-- **WHEN** the fake lifecycle reaches final delivery
-- **THEN** the result is marked `implementation_mode=full_fake`, contains only a terminal fixture marker, and contains no finding, evidence, citation, report, or claim that real research completed
-
-#### Scenario: Cancel follows graph routing
-- **WHEN** cancel targets a suspended lifecycle
-- **THEN** the pending interrupt receives an internal cancel decision, the graph records terminal `cancelled`, and a repeated cancel returns the same terminal state
-
-#### Scenario: Cross-scope and invalid transitions fail closed
-- **WHEN** another outer thread reuses the research id, a fresh response resumes with no pending interrupt or targets a terminal lifecycle, or start targets an existing namespace
-- **THEN** wrong scope returns `research_not_found`, fresh no-pending or terminal resume returns `invalid_transition`, same-message start reprojects, different-message start returns `thread_research_exists`, and no path mutates or discloses another scope's lifecycle
-
-#### Scenario: Gate-blocked terminal reason replaces fixture exhaustion
-- **WHEN** gate fatigue escalation or budget exhaustion produces a `BLOCKED` verdict
-- **THEN** `terminal_reason` is `GATE_BLOCKED`, not the change-01 `REPAIR_EXHAUSTED`, and the lifecycle transitions to typed terminal `blocked`
 
 ### Requirement: Checkpoints and topology contracts remain durable and deterministic
 
@@ -641,4 +529,3 @@ SHALL NOT be bumped by this change.
 #### Scenario: Unsupported schema still fails before HITL1 runs
 - **WHEN** a stored checkpoint carries an unsupported `schema_version`
 - **THEN** the handler returns `schema_unsupported` before constructing HITL1 dependencies, writing `profile.json`, or mutating profile fields
-

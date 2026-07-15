@@ -22,6 +22,14 @@ Real HITL1 SHALL add only canonical downstream production paths owned by this ch
 - **WHEN** the folder contract inspects this change after implementation
 - **THEN** the new profile, HITL1 prompt, and `runtime/request_bundle.py` paths appear under the canonical downstream package and no Deep Research source appears under `backend/` or `frontend/`
 
+#### Scenario: Canonical scaffold passes
+- **WHEN** the folder contract inspects a fresh change 00 checkout
+- **THEN** it finds the required owned roots, package metadata, module guide, and mirrored test roots at their canonical paths
+
+#### Scenario: Second source tree is rejected
+- **WHEN** a fixture places Deep Research implementation source at repository root or under an upstream tree
+- **THEN** the folder contract fails and identifies the non-canonical owner
+
 ### Requirement: Import and shared-code boundaries are mechanical
 
 The project SHALL enforce import direction with an AST-based contract. Domain code
@@ -38,6 +46,10 @@ nodes. Runtime SHALL be the only layer allowed to bind graph execution to raw De
 context, request-bundle host I/O, and the embedded-agent factory; production downstream
 code SHALL not import `app.*`; and generic shared modules named `utils`, `helpers`, or
 `common` SHALL be rejected.
+
+#### Scenario: Valid dependency direction passes
+- **WHEN** the contract scans the canonical downstream package including a node-owned phase-local subgraph using public LangGraph and a HITL fake importing only public `interrupt`
+- **THEN** every import resolves within the allowed layer direction and the subgraph does not gain access to other graph implementation modules, runtime, agents, or sibling nodes
 
 #### Scenario: Real HITL interrupt import passes narrowly
 - **WHEN** the contract scans `agent/src/deerflow_deep_research/graph/nodes/hitl1/node.py` and it imports exactly `langgraph.types.interrupt`
@@ -67,6 +79,18 @@ request-bundle profile writer for `request/profile.json`. It SHALL NOT declare o
 receive `NodeCapability.BOOTSTRAP_BUNDLE` or `NodeCapability.WORK_UNIT_CONTROLLER`.
 Fake HITL1 SHALL declare no request-bundle capability.
 
+#### Scenario: Valid node package is discoverable
+- **WHEN** a fixture supplies the required node files, a valid `NODE_SPEC`, and an optional phase-local subgraph using only its permitted public LangGraph and `graph/components/` imports
+- **THEN** registry discovery returns the stable logical node name, real/fake factories, contracts, phase, and policy reference without exposing internal subgraph components as top-level nodes
+
+#### Scenario: Partial node package is refused
+- **WHEN** a node package omits its fake, exports internal callables directly, uses an unstable logical name, imports a reusable graph component from an ordinary node module, or exposes a phase-local worker as a top-level node
+- **THEN** registry validation fails before graph compilation
+
+#### Scenario: Node-to-registry cycle is refused
+- **WHEN** a node package imports `graph.registry`, another graph implementation module outside the narrow `subgraph.py -> graph.components` exception, or a sibling node to construct its spec or subgraph
+- **THEN** the import contract fails and directs the node to the pure domain NodeSpec, package-local subgraph contract, or registered reusable graph component
+
 #### Scenario: Real HITL1 NodeSpec declares only its capabilities
 - **WHEN** the HITL1 package root `NODE_SPEC` is loaded after this change
 - **THEN** the real factory is available, its contract routes include `accepted`, `cancel`, `needs_followup`, and `exhausted`, it declares the request-bundle capability, and it does not declare bootstrap or work-unit controller capabilities
@@ -87,7 +111,19 @@ archived deltas SHALL be historical only and SHALL NOT remain authority.
 `openspec/governance/architecture-policy.md` SHALL define the authority and
 synchronized-change protocol without maintaining a competing path enumeration.
 `agent/AGENTS.md` SHALL contain one bounded checker-rendered structural block derived
-from the registry plus human-authored operational guidance.
+from the registry plus human-authored operational guidance. Archived proposals,
+designs, and tasks SHALL be historical context only. A deterministic
+zero-external-dependency governance checker SHALL reject a missing or invalid registry,
+a missing lifecycle-appropriate normative spec reference, controlled-block drift, or a
+mismatch between the registry and the repository.
+
+#### Scenario: Active truth is discoverable after archive
+- **WHEN** change 00 has been archived and a later contributor starts from the active `project-structure` main spec
+- **THEN** the spec identifies the permanent policy, exact structure registry, generated `agent/AGENTS.md` block, and deterministic checker without requiring the archived design
+
+#### Scenario: Synchronized structure passes governance
+- **WHEN** the one pending owning delta before first archive or the active main spec afterward references the valid registry, the controlled `agent/AGENTS.md` block matches its deterministic rendering, and the required repository paths and boundaries conform
+- **THEN** the architecture-governance checker passes without semantic inference
 
 #### Scenario: Synchronized HITL1 structure passes governance
 - **WHEN** this change updates `project-structure.toml`, the architecture checker rule/fixtures, and the generated `agent/AGENTS.md` block for real HITL1 paths and import exceptions

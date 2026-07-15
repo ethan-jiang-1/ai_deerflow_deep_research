@@ -39,6 +39,7 @@ prefixes:
   REG: research-graph-lifecycle
   RUI: runtime-integration
   TOP: topic-planning-node
+  WAN: wave0-node
   WOU: work-unit-kernel
 
 # ──────────────────────────────────────────────
@@ -124,6 +125,13 @@ TOP-002: topic-planning-node — A deterministic materializer normalizes the val
 TOP-003: topic-planning-node — Topic coverage and expansion are bounded by hard checks that reject empty or uncovered coverage and over-expansion and fail closed to terminal blocked after one bounded repair
 TOP-004: topic-planning-node — Real topic planning records bounded planner-owned checkpoint topic state read from checkpoint profile fields without reading profile.json, declaring request-bundle or work-unit capabilities, producing a WorkSpec, writing a sandbox file, or bumping the schema version
 TOP-005: topic-planning-node — Real topic planning integrates into the mixed graph only off real bootstrap and real HITL1 with one explicit exhausted route while preserving full-fake behavior and the backend/frontend boundary
+
+# wave0-node
+WAN-001: wave0-node — Real Wave0 reads the planner topic registry and materializes one immutable source-intake WorkSpec per topic through the existing work-unit controller and shared fan-out/fan-in component without a second controller or work authority
+WAN-002: wave0-node — A bounded web worker agent performs per-topic source intake under a real attempt-scoped tool policy with all fetched content treated as untrusted data and writes only its own attempt artifacts
+WAN-003: wave0-node — A real wave0.source-intake result contract is registered in the generalized validation registry and deterministic submit validation canonicalizes URLs, verifies fetch/cache refs, checks path/hash/source identity, and counts only accepted SubmissionRecords as coverage
+WAN-004: wave0-node — A real source-floor gate replaces the fixture rule, enforces per-topic independent-source coverage at submit time with honest degraded capture, and preserves the completion/drain rule and the repair/pass/exhausted routes
+WAN-005: wave0-node — Real Wave0 integrates into the mixed graph only off the real topic chain with unchanged topology while preserving the full-fake fixture path and the backend/frontend boundary
 
 # work-unit-kernel
 WOU-001: work-unit-kernel — Immutable work, attempt, candidate, and submission contracts preserve controller-assigned identity and spec integrity

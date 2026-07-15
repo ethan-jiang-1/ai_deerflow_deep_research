@@ -22,7 +22,6 @@
 | [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00–18 路线图（00–05 ✅ 已归档，06 起待做） |
 | [deep-research-spec-gates-and-coverage.md](deep-research-spec-gates-and-coverage.md) | 治理：spec 门禁与 requirement-test 覆盖目录（提案，未立 change） |
 | [deep-research-structured-output-linting.md](deep-research-structured-output-linting.md) | 治理：agent YAML/JSON 结构化输出 lint（提案，Phase 2 已随 04 解锁） |
-| [deep-research-07-topic-planning-node.md](deep-research-07-topic-planning-node.md) | 真实 topic planning 与 seed materialization node |
 | [deep-research-08-wave0-node.md](deep-research-08-wave0-node.md) | 真实 Wave0 source-intake phase |
 | [deep-research-09-evidence-critic-nodes.md](deep-research-09-evidence-critic-nodes.md) | 独立 source diagnostic 与 claim verifier nodes |
 | [deep-research-10-wave1-node.md](deep-research-10-wave1-node.md) | 真实 Wave1 evidence-depth phase |

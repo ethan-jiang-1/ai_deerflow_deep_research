@@ -131,14 +131,17 @@ class ResearchGraphRecipe:
         modes = dict(implementation_modes or {})
         hitl1_real = modes.get("hitl1") == "real"
         bootstrap_real = modes.get("bootstrap") == "real"
+        topic_planning_real = modes.get("topic_planning") == "real"
         if hitl1_real and not bootstrap_real:
             raise ValueError("hitl1_real_requires_bootstrap_real")
+        if topic_planning_real and not hitl1_real:
+            raise ValueError("topic_planning_real_requires_hitl1_real")
         return cls(
             builder=build_research_graph(implementation_modes=implementation_modes),
             requires_work_units=True,
             requires_bootstrap_bundle=bootstrap_real,
             requires_request_bundle=hitl1_real,
-            requires_node_agent_bridge=hitl1_real,
+            requires_node_agent_bridge=hitl1_real or topic_planning_real,
             work_unit_store_factory=work_unit_store_factory,
             request_bundle_store_factory=request_bundle_store_factory,
             node_agent_bridge_factory=node_agent_bridge_factory,
@@ -173,6 +176,13 @@ def _hitl1_node_agent_policy(graph_context: Any) -> ExecutionPolicy:
 
 
 def _build_hitl1_capabilities(envelope: TrustedRuntimeEnvelope, graph_context: Any, factory: Any) -> Any:
+    """Construct the shared node-agent bridge for real HITL1 and real topic planning.
+
+    When both hitl1 and topic_planning are real, the same bridge serves both nodes
+    under a single zero-tool, one-model-call ExecutionPolicy. The policy is the
+    enforcement upper bound; each node's NodeExecutionRequest carries its own
+    objective and structured-output schema within that bound.
+    """
     policy = _hitl1_node_agent_policy(graph_context)
     bridge_factory = factory or RuntimeNodeAgentBridge
     return bridge_factory(

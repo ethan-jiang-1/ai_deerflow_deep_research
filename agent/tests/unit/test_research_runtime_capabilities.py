@@ -36,6 +36,7 @@ from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 _RID = "r_" + "A" * 43
 _FULL_FAKE = {name: "fake" for name in LOGICAL_NODES}
 _MIXED_HITL1 = _FULL_FAKE | {"bootstrap": "real", "hitl1": "real"}
+_MIXED_TOPIC = _FULL_FAKE | {"bootstrap": "real", "hitl1": "real", "topic_planning": "real"}
 
 
 class FakeAppConfig:
@@ -111,6 +112,33 @@ def test_recipe_detects_real_hitl1_and_requires_real_bootstrap() -> None:
 
     with pytest.raises(ValueError, match="hitl1_real_requires_bootstrap_real"):
         ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"hitl1": "real"})
+
+
+def test_recipe_detects_real_topic_planning_and_requires_real_hitl1() -> None:
+    recipe = ResearchGraphRecipe.create(implementation_modes=_MIXED_TOPIC)
+    assert recipe.requires_bootstrap_bundle is True
+    assert recipe.requires_request_bundle is True  # from real hitl1, not topic planning
+    assert recipe.requires_node_agent_bridge is True
+
+    with pytest.raises(ValueError, match="topic_planning_real_requires_hitl1_real"):
+        ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"topic_planning": "real"})
+    with pytest.raises(ValueError, match="topic_planning_real_requires_hitl1_real"):
+        ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"bootstrap": "real", "topic_planning": "real"})
+
+
+async def test_real_topic_planning_context_constructs_zero_tool_bridge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_stores(monkeypatch)
+    handler = StartResearchHandler(ResearchGraphRecipe.create(implementation_modes=_MIXED_TOPIC))
+    ctx = await handler._context(_envelope(), _RID, include_work_units=True)
+    deps = ctx.dependency_resolver.resolve(
+        logical_name="topic_planning", attempt_id="g0-tp-a1", policy=ctx_builder_policy()
+    )
+    assert isinstance(deps.capabilities, RuntimeNodeAgentBridge)
+    assert deps.capabilities.policy.allowed_tool_names == frozenset()
+    assert deps.capabilities.policy.budget.max_model_calls == 1
+    assert tuple(deps.capabilities.tools_resolver(_envelope(), deps.capabilities.policy)) == ()
 
 
 async def test_real_hitl1_context_constructs_zero_tool_one_model_bridge_and_request_writer(

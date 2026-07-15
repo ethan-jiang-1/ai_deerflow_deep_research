@@ -5,11 +5,13 @@ for DeerFlow 2.1. Its controller is a nested Python `StateGraph`; bounded agent
 loops execute inside graph nodes. DeerFlow remains the host runtime and does not
 import this package.
 
-Changes 00 through 05 are complete. Change 06 adds real HITL1 on top of the real
-bootstrap bundle while keeping every lifecycle result labelled
-`implementation_mode=full_fake`: topic planning, research waves, synthesis,
-HITL2, readiness, and final delivery are still deterministic fakes and produce
-no findings or report.
+Changes 00 through 06 are complete. Change 06 added real HITL1 on top of the real
+bootstrap bundle. Change 07 adds real topic planning on top of real HITL1: a
+bounded planner turns the checkpointed profile into a stable topic registry and
+must-answer coverage map (planner-owned checkpoint state), while keeping every
+lifecycle result labelled `implementation_mode=full_fake`: research waves,
+synthesis, HITL2, readiness, and final delivery are still deterministic fakes and
+produce no findings or report.
 
 ## Work-Unit Kernel
 

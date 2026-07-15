@@ -170,6 +170,11 @@ kind = "file"
 owner = "PRS-003"
 
 [[required_paths]]
+path = "agent/src/deerflow_deep_research/domain/topics.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
 path = "agent/src/deerflow_deep_research/engine"
 kind = "directory"
 owner = "PRS-001"
@@ -292,6 +297,11 @@ owner = "PRS-003"
 [[required_paths]]
 path = "agent/src/deerflow_deep_research/graph/nodes/topic_planning"
 kind = "directory"
+owner = "PRS-003"
+
+[[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/topic_planning/prompts.py"
+kind = "file"
 owner = "PRS-003"
 
 [[required_paths]]

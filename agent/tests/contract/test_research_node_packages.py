@@ -70,6 +70,10 @@ def test_explicit_registry_loads_package_root_only_specs() -> None:
             # Change 06 implements real HITL1 and gives it only the request-bundle capability.
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
             assert spec.capabilities == frozenset({NodeCapability.REQUEST_BUNDLE})
+        elif name == "topic_planning":
+            # Change 07 implements real topic planning; it declares no capability.
+            assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
+            assert spec.capabilities == frozenset()
         else:
             assert spec.real_factory is UNAVAILABLE_REAL_FACTORY
         assert spec.logical_name == name

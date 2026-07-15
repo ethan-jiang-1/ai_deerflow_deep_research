@@ -53,4 +53,13 @@
 
 ## 落地关联
 
-08 只从 accepted topic registry 生成 Wave0 work，不重新解释用户范围。
+本 change (07) 已按 OpenSpec design 实施：
+
+- `domain/topics.py`：`TopicPlan`/`ResearchTopic` 冻结 extra-forbid 契约 + 确定性 `materialize_topic_plan`（模型无关的稳定 id/slug、coverage map、dedup/overlap/coverage 硬检查）。
+- `graph/nodes/topic_planning/prompts.py`：`PlannerInputs` typed struct + `build_planner_prompt`；node 从 checkpoint 短字段读 profile 约束（不读 `request/profile.json`）。
+- `graph/nodes/topic_planning/node.py`：真实 planner 工厂，`run_agent` 一次 + 一次修复，失败 fail-closed 到 `route=exhausted`（terminal BLOCKED）。
+- topic_planning 保持**非门控**控制节点，仅新增 `topic_planning --exhausted--> blocked` 路由；不声明任何 `NodeCapability`，不写 sandbox 文件。
+- topic registry 作为 planner-owned checkpoint 字段（`topic_refs`/`topic_registry`，`WriterRole.PLANNER`），schema 版本不变（v2 兼容）。
+- `topic_planning=real` 要求 `bootstrap=real` + `hitl1=real`。
+
+08 (Wave0) 只从 checkpointed topic registry 生成 work，不重新解释用户范围。

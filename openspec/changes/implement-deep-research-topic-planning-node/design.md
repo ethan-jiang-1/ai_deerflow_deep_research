@@ -78,11 +78,29 @@ would entangle planner validation with gate-attempt/fatigue state.
 
 ### Decision 2: Read profile constraints from checkpoint short fields, not profile.json
 
-The planner objective is built from the controller-owned profile fields already in
-`ResearchState` (`domain/state.py:629-638`): depth/audience/format/cost/time enums,
-`must_answer_questions`, and `degraded_profile`. topic_planning reads them off the
-`state` mapping passed to `run(state)`, the way `hitl1/node.py:152` reads
-`request_text`.
+The planner objective is built from the controller-owned fields already in
+`ResearchState`: `request_text`, the profile enum short fields
+(`research_depth`, `target_audience`, `output_format`, `cost_tolerance`,
+`time_budget`), `must_answer_questions`, and `degraded_profile`.
+topic_planning reads them off the `state` mapping passed to `run(state)`, the
+way `hitl1/node.py:152` reads `request_text`. `request_text` is included so the
+planner has the original research question for context beyond the structured
+profile dimensions.
+
+**Empty `must_answer_questions` fallback:** `ResearchProfile.must_answer` has
+`min_length=1`, so a non-degraded profile always has ≥1 question. However, when
+`degraded_profile=True` the model validator skips the completeness check
+(`profile.py:120-127`), and `must_answer_questions` may be empty. In that case
+the planner SHALL treat `request_text` as a synthetic single must-answer
+question for coverage binding, so the materializer can still validate a
+covering plan. The prompt SHALL include a note that the profile is degraded and
+the original request text is the authoritative question.
+
+**`degraded_profile` handling:** When `degraded_profile=True`, the prompt SHALL
+instruct the model to plan broader, more conservative topics that do not
+depend on precise profile completeness. The planner SHALL still produce a
+valid `TopicPlan` bound by the same hard checks; degraded mode relaxes only
+the model's internal assumptions, not the structural validation.
 
 Why: `RequestBundleStoreProtocol` is write-only by design (change-06 Decision 6
 reserved checkpoint reads for change 07 to avoid a sandbox round-trip and a second
@@ -98,8 +116,8 @@ round-trip the architecture explicitly avoids.
 ### Decision 3: Validated topic registry is bounded planner-owned checkpoint state, not a file
 
 The materialized topic registry and coverage map are stored as bounded
-planner-owned fields in `ResearchState`/`ResearchCheckpoint`, reusing/extending the
-existing PLANNER-owned `topic_refs` (`domain/state.py:921`). No sandbox file is
+planner-owned fields in `ResearchState`/`ResearchCheckpoint` (`topic_refs` and
+`topic_registry`, under PLANNER ownership). No sandbox file is
 written and no `ContentRef` is fabricated.
 
 Why: topics are small control/planning data, not large research content, so the
@@ -125,6 +143,14 @@ write with `route=exhausted`, `phase_status=TERMINAL`, `terminal_status=BLOCKED`
 `terminal_reason=GATE_BLOCKED`. Invalid model output never reaches Wave0 or the
 checkpoint.
 
+`terminal_reason=GATE_BLOCKED` is reused from change-04's gate-fatigue semantics
+even though topic_planning is non-gated. This is the established pattern for
+non-gated controller nodes that exhaust their bounded repair: HITL1 already uses
+`GATE_BLOCKED` for brief-generation exhaustion (change-06 Decision 5).
+`REPAIR_EXHAUSTED` is retained in the enum for compatibility but is no longer
+produced; `GATE_BLOCKED` is the canonical terminal reason for any bounded-repair
+exhaustion regardless of whether the node uses the gate kernel.
+
 ### Decision 5: Deterministic materializer owns stability and hard checks
 
 A pure function (not the LLM) converts the validated `TopicPlan` into the registry:
@@ -149,11 +175,21 @@ rejected at validation. A deterministic parser validates the model `summary` int
 `ResearchGraphRecipe.create` (`runtime/research.py:122-145`) gains
 `topic_planning_real` detection and rejects `topic_planning=real` unless
 `hitl1=real` (which already requires `bootstrap=real`), because the planner
-consumes the real profile that only real HITL1 records. The runtime constructs a
-real `RuntimeNodeAgentBridge` and attaches it to the topic_planning context only
-when real topic planning is selected (`runtime/research.py:280-315` attachment
-site). Full-fake and fake-topic-planning recipes keep unavailable/test
-capabilities and never call `run_agent`.
+consumes the real profile that only real HITL1 records.
+
+Since `topic_planning=real` always implies `hitl1=real`, the existing
+`requires_node_agent_bridge` flag is already True and the single
+`RuntimeNodeAgentBridge` created in `_context()` (`runtime/research.py:280-315`)
+serves both nodes. The bridge's `ExecutionPolicy` (zero-tool, one-model-call,
+bounded tokens/wall-time) is a shared upper bound; hitl1's brief generation and
+topic_planning's plan generation both fit within it. The policy name
+(`"hitl1-structured-brief"`) is retained as-is; it accurately reflects the
+policy's origin while remaining a valid enforcement envelope for topic planning.
+If a later change needs materially different policy parameters for the two
+nodes, the recipe can construct separate bridges keyed by logical node name.
+
+Full-fake and fake-topic-planning recipes keep unavailable/test capabilities
+and never call `run_agent`.
 
 Alternative considered: allow real topic planning with fake HITL1. Rejected — fake
 HITL1 records no profile, so there are no real constraints to plan from.
@@ -166,6 +202,14 @@ conditional edge `{next: wave0, exhausted: END}`, and `NORMALIZED_EDGES`
 Inbound edges (`bootstrap/hitl1 -> topic_planning`, `rerun -> topic_planning`) and
 the `next` route are unchanged. This mirrors change-06 Decision 10 (explicit,
 minimal route addition).
+
+When `rerun` (change 14) routes back to `topic_planning` in a later generation,
+the planner re-executes against the same profile. The new plan overwrites the old
+via `last_write_wins` on `topic_refs` and `topic_registry`. Since the profile is
+unchanged, re-planning is deterministic enough: the coverage and bounds are
+re-validated, and the materializer guarantees stable ids/slugs for identical
+topic proposals. Rerun diff/invalidation logic (which topics changed, which
+Wave0 work to redo) is deferred to change 14.
 
 ### Decision 9: No new NodeCapability
 
@@ -187,9 +231,12 @@ topic data is the only new planner-owned checkpoint surface.
 ## Risks / Trade-offs
 
 - **LLM produces overlapping or low-coverage topics:** the materializer's hard
-  checks reject overlap and require full must-answer coverage; one repair
-  re-prompts with the specific failures, then the node fails closed to
-  `exhausted`. → No invalid plan reaches Wave0.
+  checks reject exact scope duplication and require full must-answer coverage;
+  semantic overlap (different scope strings describing the same research area)
+  is not detected in v1. One repair re-prompts with the specific failures, then
+  the node fails closed to `exhausted`. → No structurally invalid plan reaches
+  Wave0; residual semantic overlap is bounded by the topic cap and must-answer
+  bindings and can be handled by downstream dedup in Wave0.
 - **Over-expansion:** a bounded topic cap (≤8) plus per-topic text bounds keeps
   the checkpoint small and the plan focused. → Hard reject past the cap.
 - **Unstable topic ids across repair:** ids/slugs are derived deterministically by
@@ -201,6 +248,12 @@ topic data is the only new planner-owned checkpoint surface.
   `topic_planning=real` unless `hitl1=real`. → Fails before graph invocation.
 - **Repair never converges:** bounded to one retry, then terminal `blocked`. → No
   infinite loop; lifecycle remains resumable/cancelable.
+- **Degraded profile with empty must-answer questions:** when `degraded_profile=True`
+  and `must_answer_questions` is empty (allowed by `ResearchProfile`'s degraded-path
+  validator skip), the planner falls back to `request_text` as a synthetic
+  must-answer question for coverage binding. → The prompt instructs the model to
+  plan broader topics, and coverage is validated against the synthetic question.
+  Generation quality degrades gracefully rather than failing closed.
 
 ## Migration Plan
 

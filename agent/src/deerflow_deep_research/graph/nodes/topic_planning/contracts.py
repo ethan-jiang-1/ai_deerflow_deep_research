@@ -8,7 +8,7 @@ class TopicPlanningRequest(FrozenContract):
 
 
 class TopicPlanningResult(FrozenContract):
-    route: Literal["next"] = "next"
+    route: Literal["next", "exhausted"]
 
 
 CONTRACTS = (TopicPlanningRequest, TopicPlanningResult)

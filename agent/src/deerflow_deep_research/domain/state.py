@@ -53,6 +53,7 @@ from deerflow_deep_research.domain.lifecycle import (
     SynthesisVerdict,
     TerminalReason,
 )
+from deerflow_deep_research.domain.topics import MAX_TOPICS
 from deerflow_deep_research.domain.work_units import (
     ATTEMPT_ID_RE,
     MAX_PARENT_ACCEPTED_REFS,
@@ -82,6 +83,7 @@ MAX_PROFILE_QUESTIONS = 8
 MAX_PROFILE_QUESTION_CHARS = 256
 MAX_PROFILE_SHORT_FIELD_CHARS = 64
 MAX_PROFILE_FOLLOWUP_ROUND = 3
+MAX_TOPIC_REGISTRY_BYTES = 16_384
 
 RESEARCH_ID_RE = re.compile(r"^r_[A-Za-z0-9_-]{43}$")
 REQUEST_DIGEST_RE = re.compile(r"^d_[A-Za-z0-9_-]{43}$")
@@ -251,6 +253,21 @@ def _validate_pending_profile(value: Mapping[str, Any] | None) -> dict[str, Any]
     if len(encoded.encode("utf-8")) > MAX_PROFILE_PENDING_BYTES:
         raise ValueError("pending_profile_too_large")
     return payload
+
+
+def _validate_topic_registry(value: Iterable[Any]) -> tuple[dict[str, Any], ...]:
+    registry = tuple(value)
+    if len(registry) > MAX_TOPICS:
+        raise ValueError("topic_registry_invalid")
+    normalized: list[dict[str, Any]] = []
+    for item in registry:
+        if not isinstance(item, Mapping):
+            raise ValueError("topic_registry_invalid")
+        normalized.append(dict(item))
+    encoded = json.dumps(normalized, sort_keys=True, separators=(",", ":"), default=_json_default)
+    if len(encoded.encode("utf-8")) > MAX_TOPIC_REGISTRY_BYTES:
+        raise ValueError("topic_registry_too_large")
+    return tuple(normalized)
 
 
 def _enum_sequence(values: Iterable[Any], enum_type: type, field_name: str) -> tuple[Any, ...]:
@@ -597,6 +614,8 @@ def apply_research_update(
         "degraded_profile": frozenset({WriterRole.CONTROLLER}),
         "pending_profile": frozenset({WriterRole.CONTROLLER}),
         "profile_followup_round": frozenset({WriterRole.CONTROLLER}),
+        "topic_refs": frozenset({WriterRole.PLANNER}),
+        "topic_registry": frozenset({WriterRole.PLANNER}),
     }
     forbidden = sorted(name for name in incoming if name in allowed_writers and writer not in allowed_writers[name])
     if forbidden:
@@ -646,6 +665,7 @@ class ResearchCheckpoint:
     terminal_reason: TerminalReason | None = None
     # planning
     topic_refs: tuple[str, ...] = ()
+    topic_registry: tuple[dict[str, Any], ...] = ()
     active_wave: str | None = None
     pending_work_ids: tuple[str, ...] = ()
     batch_cursor: int = 0
@@ -710,6 +730,7 @@ class ResearchCheckpoint:
         ):
             raise ValueError("profile_followup_round_invalid")
         object.__setattr__(self, "pending_profile", _validate_pending_profile(self.pending_profile))
+        object.__setattr__(self, "topic_registry", _validate_topic_registry(self.topic_registry))
         if isinstance(self.fixture_plan, dict):
             object.__setattr__(self, "fixture_plan", FakeFixturePlan(**self.fixture_plan))
         if not isinstance(self.fixture_plan, FakeFixturePlan):
@@ -819,6 +840,7 @@ class ResearchState(TypedDict, total=False):
     terminal_reason: str
     # planning
     topic_refs: tuple[str, ...]
+    topic_registry: tuple[dict[str, Any], ...]
     active_wave: str
     pending_work_ids: tuple[str, ...]
     batch_cursor: int
@@ -900,7 +922,9 @@ OWNERSHIP_TABLE: tuple[FieldOwnership, ...] = (
         (WriterRole.CONTROLLER, WriterRole.PLANNER),
         "last_write_wins",
     ),
-    FieldOwnership("degraded_profile", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
+    FieldOwnership(
+        "degraded_profile", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.PLANNER), "last_write_wins"
+    ),
     FieldOwnership("pending_profile", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
     FieldOwnership("profile_followup_round", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
     FieldOwnership("phase", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "apply_research_update"),
@@ -919,6 +943,7 @@ OWNERSHIP_TABLE: tuple[FieldOwnership, ...] = (
         "terminal_reason", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "apply_research_update"
     ),
     FieldOwnership("topic_refs", WriterRole.PLANNER, (WriterRole.CONTROLLER, WriterRole.WORKER), "last_write_wins"),
+    FieldOwnership("topic_registry", WriterRole.PLANNER, (WriterRole.CONTROLLER, WriterRole.WORKER), "last_write_wins"),
     FieldOwnership(
         "active_wave", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.WORKER), "apply_research_update"
     ),
@@ -1081,6 +1106,7 @@ __all__ = [
     "GATED_FIELDS",
     "MAX_CHECKPOINT_STATE_BYTES",
     "MAX_WORK_UNIT_BLOCK_BYTES",
+    "MAX_TOPIC_REGISTRY_BYTES",
     "MAX_CONTROL_RESULT_CHARS",
     "MAX_FAKE_REPAIR_ATTEMPTS",
     "MAX_FAKE_RERUN_GENERATIONS",

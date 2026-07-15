@@ -158,7 +158,7 @@ def build_research_graph(
         _route,
         {"accepted": "topic_planning", "cancel": END, "needs_followup": "hitl1", "exhausted": END},
     )
-    builder.add_edge("topic_planning", "wave0")
+    builder.add_conditional_edges("topic_planning", _route, {"next": "wave0", "exhausted": END})
     builder.add_conditional_edges("wave0", _route, {"repair": "wave0", "pass": "wave1", "exhausted": END})
     builder.add_conditional_edges(
         "wave1",

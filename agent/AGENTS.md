@@ -56,6 +56,7 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/domain/bundle.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/work_units.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/profile.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/domain/topics.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/engine/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/fake_control.py` (file; `PRS-001`)
@@ -81,6 +82,7 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/graph/nodes/hitl1/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/hitl1/prompts.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/topic_planning/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/topic_planning/prompts.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/wave0/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/wave1/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/wave2_synthesis/` (directory; `PRS-003`)
@@ -121,30 +123,41 @@ Registry: `openspec/governance/project-structure.toml`
 
 ## Current Status
 
-Changes 00 through 05 are complete. Change 04 added the shared work-unit kernel
+Changes 00 through 06 are complete. Change 04 added the shared work-unit kernel
 beneath Wave0/Wave1 fixture nodes: immutable controller-assigned work/attempt
 contracts, bounded `Send`, deterministic file validation, one hash-chained JSONL
 ledger writer, crash reconciliation, and the shared drain/gate view. Change 05
 replaced fake bootstrap with a real bootstrap node that atomically establishes
-the minimal `request/` bundle subtree and `request/marker.json`.
+the minimal `request/` bundle subtree and `request/marker.json`. Change 06
+replaced fake HITL1 with the first real model-calling node.
 
-Active change 06 replaces fake HITL1 with the first real model-calling node.
-Real HITL1 uses the runtime node-agent bridge to generate a validated structured
-brief, interrupts through the existing `PendingResearchInterrupt` wire schema,
-parses deterministic JSON/free-text profile answers, loops through checkpointed
-`pending_profile` follow-up state on missing fields, and writes the final
-`request/profile.json` through a runtime-owned `RequestBundleStore`. Every
-lifecycle result still reports `implementation_mode=full_fake` because topic
-planning, evidence collection, synthesis, HITL2, and final delivery remain fake.
+Change 06's real HITL1 uses the runtime node-agent bridge to generate a validated
+structured brief, interrupts through the existing `PendingResearchInterrupt` wire
+schema, parses deterministic JSON/free-text profile answers, loops through
+checkpointed `pending_profile` follow-up state on missing fields, and writes the
+final `request/profile.json` through a runtime-owned `RequestBundleStore`.
+
+Active change 07 replaces fake topic planning with the second real model-calling
+node. Real topic planning uses the runtime node-agent bridge to generate a
+validated structured topic plan from the checkpointed HITL1 profile constraints;
+a deterministic materializer derives stable topic ids/slugs and a must-answer
+coverage map; and the bounded registry is recorded as planner-owned checkpoint
+state (`topic_refs`/`topic_registry`) for Wave0 to consume. It reads profile
+constraints from checkpoint short fields only (never `request/profile.json`),
+declares no capability, writes no sandbox file, and adds one
+`topic_planning --exhausted--> blocked` route. Every lifecycle result still
+reports `implementation_mode=full_fake` because evidence collection, synthesis,
+HITL2, and final delivery remain fake.
 
 Checkpointed `ResearchState` remains control authority, the validated submission
 ledger is evidence authority, and sandbox files are content authority. The
 compatible version-2 state extension defaults absent HITL1 profile fields for
 old checkpoints and stores only compact refs/short values: `profile_ref`, enum
 strings, `must_answer_questions`, `degraded_profile`, and bounded transient
-`pending_profile` / `profile_followup_round`. The final profile body lives only
-in sandbox content at `request/profile.json`; `RESEARCH_STATE_SCHEMA_VERSION`
-remains `2`.
+`pending_profile` / `profile_followup_round`. Change 07 adds bounded
+planner-owned `topic_refs`/`topic_registry` fields under `WriterRole.PLANNER`,
+also version-2 compatible. The final profile body lives only in sandbox content
+at `request/profile.json`; `RESEARCH_STATE_SCHEMA_VERSION` remains `2`.
 
 The work-unit/bootstrap/request-bundle stores are available only after runtime
 proves that the parent sandbox and trusted host path share one mounted POSIX
@@ -155,12 +168,16 @@ refuse start/resume and retain status/cancel.
 
 Real HITL1 is available only in the mixed recipe with `bootstrap=real` and
 `hitl1=real`; selecting `hitl1=real` without real bootstrap fails before graph
-invocation. The real node declares `NodeCapability.REQUEST_BUNDLE` and does not
-receive bootstrap or work-unit capabilities. The normalized topology adds only
-`hitl1 --needs_followup--> hitl1` and `hitl1 --exhausted--> blocked`; full-fake
-HITL1 remains deterministic and does not construct the node-agent bridge or
-request-bundle writer. `backend/`, `frontend/`, config examples, extensions,
-skills, MCP/ACP, and Agent/SOUL surfaces stay unchanged.
+invocation. Real topic planning is available only with `bootstrap=real`,
+`hitl1=real`, and `topic_planning=real`; selecting `topic_planning=real` without
+real HITL1 fails before graph invocation. The real nodes declare only the
+capabilities they consume (HITL1: `NodeCapability.REQUEST_BUNDLE`; topic
+planning: none) and do not receive bootstrap or work-unit capabilities. The
+normalized topology adds only `hitl1 --needs_followup--> hitl1`,
+`hitl1 --exhausted--> blocked`, and `topic_planning --exhausted--> blocked`;
+full-fake HITL1 and topic planning remain deterministic and do not construct
+the node-agent bridge or request-bundle writer. `backend/`, `frontend/`, config
+examples, extensions, skills, MCP/ACP, and Agent/SOUL surfaces stay unchanged.
 
 ## Ownership
 
@@ -252,8 +269,12 @@ reader, and reducer. Change 03 added the gate kernel. Change 04 adds
 and runtime-owned `work_unit_storage.py`/`work_unit_store.py`. Wave0 and Wave1
 use this single path with controlled fixture artifacts. Change 06 adds
 `domain/profile.py`, `graph/nodes/hitl1/prompts.py`, and
-`runtime/request_bundle.py`; later topic planning consumes the checkpoint short
-profile fields and `profile_ref` rather than reparsing user text. Later Wave,
+`runtime/request_bundle.py`; topic planning consumes the checkpoint short
+profile fields and `profile_ref` rather than reparsing user text. Change 07 adds
+`domain/topics.py` (frozen topic contracts + deterministic materializer) and
+`graph/nodes/topic_planning/prompts.py` (planner prompt); it records the bounded
+topic registry as planner-owned checkpoint state (`topic_refs`/`topic_registry`)
+for Wave0 to consume. Later Wave,
 targeted-evidence, and rerun changes must reuse the work-unit component rather
 than introduce another submit, ledger, retry, or drain authority.
 

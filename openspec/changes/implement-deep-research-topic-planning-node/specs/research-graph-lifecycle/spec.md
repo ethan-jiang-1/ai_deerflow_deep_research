@@ -95,3 +95,7 @@ real-topic-planning blocked path.
 #### Scenario: Real HITL1 follow-up survives restart
 - **WHEN** real HITL1 commits partial profile progress, routes `needs_followup`, and suspends with a follow-up interrupt before the provider is closed
 - **THEN** a fresh process resumes the follow-up using the checkpointed profile progress and the new pending request, without relying on Python closure state
+
+#### Scenario: Real topic planning blocked terminal is durable
+- **WHEN** real topic planning fails validation or coverage after its bounded repair and routes `exhausted` with terminal `BLOCKED`
+- **THEN** the checkpoint records `terminal_status=BLOCKED` and `terminal_reason=GATE_BLOCKED`, no planner-owned topic state is written, status/cancel return the terminal result idempotently, and resume returns `invalid_transition` because no interrupt is pending

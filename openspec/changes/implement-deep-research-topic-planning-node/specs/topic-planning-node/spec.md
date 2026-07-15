@@ -6,9 +6,13 @@
 
 The real topic planning node SHALL call `capabilities.run_agent()` exactly once per
 planning attempt to produce a structured topic plan derived from the checkpointed
-HITL1 profile constraints (`research_depth`, `target_audience`, `output_format`,
-`cost_tolerance`, `time_budget`, `must_answer_questions`, and `degraded_profile`)
-read directly from `ResearchState`. The node SHALL build a bounded
+HITL1 profile constraints (`request_text`, `research_depth`, `target_audience`,
+`output_format`, `cost_tolerance`, `time_budget`, `must_answer_questions`, and
+`degraded_profile`) read directly from `ResearchState`. When `must_answer_questions`
+is empty (possible only with a degraded profile whose completeness check was
+skipped), the node SHALL treat `request_text` as a synthetic must-answer question
+for coverage binding. When `degraded_profile` is True, the prompt SHALL instruct the
+model to plan broader, more conservative topics. The node SHALL build a bounded
 `NodeExecutionRequest` whose objective carries those profile constraints and whose
 expected output is one JSON object matching the `TopicPlan` schema. The node SHALL
 validate the agent result's `summary` as that JSON object before recording any
@@ -91,9 +95,9 @@ cover every root `must_answer` question without exceeding the topic bound.
 ### Requirement: Topic planning records bounded planner-owned checkpoint state from checkpoint profile fields
 
 Real topic planning SHALL record the validated topic registry and coverage map as
-bounded planner-owned fields in `ResearchState`/`ResearchCheckpoint` (reusing
-`topic_refs`), declared with explicit writer, reader, and reducer entries under
-`WriterRole.PLANNER`. It SHALL read profile constraints only from the checkpoint
+bounded planner-owned fields in `ResearchState`/`ResearchCheckpoint`
+(`topic_refs` and `topic_registry`), declared with explicit writer, reader, and
+reducer entries under `WriterRole.PLANNER`. It SHALL read profile constraints only from the checkpoint
 short fields; it SHALL NOT read `request/profile.json`, SHALL NOT declare
 `NodeCapability.REQUEST_BUNDLE`, `BOOTSTRAP_BUNDLE`, or `WORK_UNIT_CONTROLLER`,
 SHALL produce no `WorkSpec`, and SHALL write no sandbox artifact. The new fields
@@ -110,7 +114,11 @@ SHALL default to empty and be backward-compatible with version-2 checkpoints, so
 
 #### Scenario: Profile is read from checkpoint, not the bundle
 - **WHEN** real topic planning builds its planning objective
-- **THEN** it reads depth/audience/format/cost/time/must-answer/degraded from `ResearchState`, declares no request-bundle capability, and never opens `request/profile.json`
+- **THEN** it reads `request_text`, depth/audience/format/cost/time enums, `must_answer_questions`, and `degraded_profile` from `ResearchState`, declares no request-bundle capability, and never opens `request/profile.json`
+
+#### Scenario: Empty must-answer questions fall back to request text
+- **WHEN** `must_answer_questions` is empty and `degraded_profile` is True
+- **THEN** the planner uses `request_text` as a synthetic must-answer question, generates topics covering the original request, and the materializer validates coverage against that synthetic question
 
 #### Scenario: Non-planner writers cannot mutate topic authority
 - **WHEN** a controller, worker, repair agent, or model-derived update attempts to set the topic registry or coverage map

@@ -367,6 +367,46 @@ def test_hitl1_profile_checkpoint_fields_validate_and_stay_version_two() -> None
         ResearchCheckpoint(**_base_values(profile_followup_round=4))
 
 
+def test_topic_planning_fields_are_state_owned_and_planner_authorized() -> None:
+    state_fields = research_state_fields()
+    topic_fields = {"topic_refs", "topic_registry"}
+    assert topic_fields <= state_fields
+    assert topic_fields <= ownership_fields()
+    # Planner-owned topic authority is not gated authority (controller/gate only).
+    assert topic_fields.isdisjoint(GATED_FIELDS)
+
+    current = _base_values()
+    for field_name in topic_fields:
+        with pytest.raises(ValueError, match="writer_not_authorized"):
+            apply_research_update(current, {field_name: "x"}, writer=WriterRole.WORKER)
+        with pytest.raises(ValueError, match="writer_not_authorized"):
+            apply_research_update(current, {field_name: "x"}, writer=WriterRole.CONTROLLER)
+
+    update = apply_research_update(
+        current,
+        {"topic_refs": ("batteries",), "topic_registry": ({"topic_id": "batteries"},)},
+        writer=WriterRole.PLANNER,
+    )
+    assert update["topic_refs"] == ("batteries",)
+
+
+def test_topic_planning_checkpoint_fields_validate_and_stay_version_two() -> None:
+    registry = ({"topic_id": "batteries", "slug": "batteries", "title": "Batteries"},)
+    checkpoint = ResearchCheckpoint(**_base_values(topic_refs=("batteries",), topic_registry=registry))
+    assert checkpoint.schema_version == 2
+    assert checkpoint.topic_refs == ("batteries",)
+    assert checkpoint.topic_registry == registry
+
+    default = ResearchCheckpoint(**_base_values())
+    assert default.topic_registry == ()
+    assert default.topic_refs == ()
+
+    with pytest.raises(ValueError, match="topic_registry_invalid"):
+        ResearchCheckpoint(**_base_values(topic_registry=("not-a-mapping",)))
+    with pytest.raises(ValueError, match="topic_registry_invalid"):
+        ResearchCheckpoint(**_base_values(topic_registry=tuple({} for _ in range(9))))
+
+
 def test_fixture_plan_rejects_unknown_routes() -> None:
     with pytest.raises(ValueError):
         FakeFixturePlan(wave0=("teleport",))

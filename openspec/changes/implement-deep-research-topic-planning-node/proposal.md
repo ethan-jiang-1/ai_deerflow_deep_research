@@ -15,11 +15,14 @@ established three-authority boundary.
 
 - Replace the fake/sentinel topic planner with an LLM-generated structured topic
   plan derived from the checkpointed HITL1 profile constraints
-  (`research_depth`, `target_audience`, `output_format`, `cost_tolerance`,
-  `time_budget`, `must_answer_questions`, `degraded_profile`), produced through
-  `capabilities.run_agent()` — the same injected agent capability used by HITL1.
-  The prompt constrains the agent to one structured-output object; the model
-  cannot invent topic ids, author the registry format, or mutate state.
+  (`request_text`, `research_depth`, `target_audience`, `output_format`,
+  `cost_tolerance`, `time_budget`, `must_answer_questions`, `degraded_profile`),
+  produced through `capabilities.run_agent()` — the same injected agent
+  capability used by HITL1. When `must_answer_questions` is empty (possible
+  only with a degraded profile), the planner falls back to `request_text` as a
+  synthetic must-answer question for coverage binding. The prompt constrains
+  the agent to one structured-output object; the model cannot invent topic ids,
+  author the registry format, or mutate state.
 - Add frozen closed topic contracts under `domain/topics.py`
   (`TopicPlan`/`ResearchTopic` with stable id/slug/title/scope, must-answer
   bindings, search dimensions, and exclusions) and an LLM-prompt template under
@@ -36,7 +39,7 @@ established three-authority boundary.
   before Wave0. topic_planning stays a non-gated controller node (like bootstrap
   and HITL1) and writes its own route directly.
 - Record the validated topic registry as bounded planner-owned checkpoint state
-  (extending the planning block; reusing `topic_refs`) so Wave0 can read it
+  (extending the planning block with `topic_refs` and `topic_registry`) so Wave0 can read it
   without a sandbox round-trip. topic_planning reads profile constraints from
   checkpoint short fields only — it does **not** read `request/profile.json`,
   does **not** declare `REQUEST_BUNDLE` or `WORK_UNIT_CONTROLLER`, produces no
@@ -92,11 +95,11 @@ profile writer are unchanged. topic_planning does not interrupt.
   registry and generated `agent/AGENTS.md` block via the existing PRS-004 sync.
 - **Typed state/checkpoint data affected:** bounded planner-owned topic data is
   added to `ResearchState`/`ResearchCheckpoint` under `WriterRole.PLANNER`
-  ownership (a topic registry/coverage structure and refs; `topic_refs` is
-  reused). These fields default to empty and are backward-compatible with
+  ownership (`topic_refs` and `topic_registry`). These fields default to empty and are backward-compatible with
   version-2 checkpoints, so `RESEARCH_STATE_SCHEMA_VERSION` is **not bumped**.
-  topic_planning reads the existing controller-owned profile short fields; it
-  adds no raw runtime capability or large content to the checkpoint.
+  topic_planning reads the existing controller-owned `request_text` and profile
+  short fields; it adds no raw runtime capability or large content to the
+  checkpoint.
 - **Graph nodes/components affected:** only `topic_planning` swaps from
   fake/sentinel to real in the mixed graph; every other phase remains fake.
   topic_planning stays a non-gated controller node that writes its own route.

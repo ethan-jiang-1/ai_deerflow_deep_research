@@ -1,54 +1,63 @@
 ## Context
 
-Change 05 delivered a real bootstrap node that atomically establishes the research
-bundle and routes `needs_input → HITL1`. The fake HITL1 (`graph/nodes/hitl1/fake.py`)
-already uses the real LangGraph `interrupt()` mechanism, real `PendingResearchInterrupt`/
-`AcceptedHumanResponse` types, and real resume handling through `ResumeResearchHandler`.
-Only the prompt content is a hardcoded fixture.
+Change 05 delivered a real bootstrap node that atomically establishes the minimal
+research bundle and routes `needs_input -> hitl1`. The fake HITL1
+(`graph/nodes/hitl1/fake.py`) already uses the real LangGraph `interrupt()` mechanism,
+real `PendingResearchInterrupt` / `AcceptedHumanResponse` types, and real resume
+handling through `ResumeResearchHandler`. Only the prompt content and acceptance logic
+are fake.
 
-The HITL1 node is the first model-calling node in the graph. Unlike bootstrap (which
-is a deterministic control node with zero model calls), HITL1 must call an LLM to
-generate a structured brief from the user's original question, present it to the user
-for confirmation and refinement, parse the human response, and store the resulting
-profile for downstream phases.
+Real HITL1 is the first model-calling node in the graph. It must call the existing
+runtime-owned node-agent bridge to generate a structured brief from the original user
+question, present that brief to the user through the existing HITL wire protocol, parse
+the human response deterministically, and publish a recorded research profile for
+downstream planning.
 
-The design must answer: what profile dimensions exist, how the LLM is prompted and
-constrained, how the human response is parsed and validated, what state fields hold
-the profile, and how incomplete answers trigger re-entrant follow-up without leaving
-the HITL1 phase.
+The hard parts are not the question text itself. The hard parts are authority and
+durability: partial profile answers must survive checkpoint restart, `profile.json`
+must be a real request-bundle artifact rather than an invented `ContentRef`, real HITL1
+must receive a real node-agent capability while full-fake stays zero-model, and the
+topology must explicitly represent follow-up and blocked paths.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Define a frozen `ResearchProfile` with closed-enum dimensions that the model cannot
-  silently substitute
-- Generate a structured brief via a single bounded `run_agent` call with a constrained
-  output schema
-- Present the brief + profile dimensions through the existing `interrupt()` protocol
-- Parse free-text human responses back into validated profile values
-- Support re-entrant follow-up interrupts for incomplete answers (same checkpoint,
-  same phase)
-- Store the profile as both a sandbox `ContentRef` and short checkpoint fields
-- Keep the `accepted`/`cancel` routes and the interrupt/resume wire format unchanged
-- Swap into the mixed graph preserving the full-fake E2E path
+- Define closed-enum profile contracts that the model cannot silently extend or
+  reinterpret.
+- Generate a structured brief through the existing `capabilities.run_agent()` protocol.
+- Present HITL1 prompts through `interrupt(PendingResearchInterrupt(...))` with the
+  existing version-1 human-input wire schemas.
+- Parse JSON or free-text human responses deterministically into validated profile
+  progress.
+- Support restart-durable follow-up interrupts for incomplete answers.
+- Write the final profile to `request/profile.json` and checkpoint short fields needed
+  by topic planning.
+- Swap real HITL1 into the mixed graph while preserving the full-fake E2E path.
+- Keep `backend/`, `frontend/`, config examples, extensions config, skills, Agent/SOUL,
+  MCP, ACP, and lead-agent middleware unchanged.
 
 **Non-Goals:**
-- No topic generation or search execution (that is change 07)
-- No structured choice/option UI mode — HITL1 uses `mode=TEXT` only (choice mode is
-  reserved for HITL2)
-- No HITL2 or scheduled auto-proceed
-- No modification to the LangGraph `interrupt()` mechanism, `PendingResearchInterrupt`,
-  `AcceptedHumanResponse`, or `InternalCancelDecision` wire format
-- No new `NodeCapability` enum member — HITL1 uses the existing
-  `capabilities.run_agent()` bridge
-- No `backend/` or `frontend/` changes
+- No topic generation or search execution; change 07 consumes the recorded profile.
+- No structured choice UI for HITL1; HITL1 remains `HumanInputMode.TEXT`.
+- No HITL2 or scheduled auto-proceed.
+- No change to `PendingResearchInterrupt`, `HumanInputRequest`,
+  `AcceptedHumanResponse`, or `InternalCancelDecision` wire schemas.
+- No new model-execution capability enum member; brief generation uses the existing
+  `NodeExecutionCapabilities.run_agent()` protocol.
 
 ## Decisions
 
-### Decision 1: Profile as a frozen Pydantic model with closed enums
+### Decision 1: Separate final profile from durable partial progress
 
-The `ResearchProfile` is a frozen Pydantic model (`extra="forbid"`) with these
-dimensions:
+Use frozen extra-forbid Pydantic contracts in `domain/profile.py`:
+
+| Contract | Purpose |
+|---|---|
+| `StructuredBrief` | Validated model output for the user-facing draft brief. |
+| `PartialResearchProfile` | Durable parsed progress while HITL1 is asking follow-ups. |
+| `ResearchProfile` | Final recorded profile written to `profile.json` and checkpoint fields. |
+
+Closed dimensions:
 
 | Dimension | Enum Type | Values |
 |---|---|---|
@@ -57,136 +66,195 @@ dimensions:
 | `format` | `OutputFormat` | `executive_brief`, `detailed_report`, `annotated_bibliography`, `faq` |
 | `cost_tolerance` | `CostTolerance` | `minimal`, `moderate`, `extensive` |
 | `time_budget` | `TimeBudget` | `very_quick`, `standard`, `thorough`, `overnight` |
-| `must_answer` | `tuple[str, ...]` | User-supplied concrete questions (1–8, each ≤ 256 chars) |
-| `scope_boundaries` | `str` | Free-text scope notes (≤ 2,048 chars) |
-| `custom_notes` | `str` | Free-text additional context (≤ 1,024 chars) |
 
-**Why closed enums over free text:** Later phases (topic planning, wave depth
-selection, output formatting) branch on these values. If the model could invent
-`depth="super_deep_bro"`, every downstream consumer would need a fallback path.
-Closed enums make the contract explicit and testable.
+Shared bounded text fields:
 
-**Why Pydantic over a TypedDict:** The profile must be serializable to JSON for
-the sandbox `ContentRef` and validatable on parse. Pydantic gives us `model_validate`
-with clear error messages for incomplete/malformed responses.
+- `must_answer`: 1 to 8 concrete questions, each at most 256 chars.
+- `scope_boundaries`: at most 2,048 chars.
+- `custom_notes`: at most 1,024 chars.
+- `schema_version=1`.
 
-**Alternatives considered:**
-- Store only free-text notes and let the topic planner infer everything — rejected
-  because it moves the ambiguity downstream and the planner (change 07) shouldn't
-  re-do HITL1's job.
-- Use `HumanInputMode.CHOICE` with structured options — rejected for HITL1 because
-  the user needs to express nuanced scope boundaries and must-answer questions;
-  choice mode is a better fit for HITL2's constrained proceed/revise/rerun options.
+`ResearchProfile` may carry missing closed dimensions only when
+`degraded_profile=True`. Otherwise the final profile validator requires all closed
+dimensions and at least one `must_answer` question. This keeps normal downstream
+planning simple while preserving a bounded escape hatch after repeated incomplete
+answers.
 
-### Decision 2: Single bounded run_agent call for brief generation
+### Decision 2: Structured brief generation uses `NodeExecutionResult.summary`
 
-HITL1 calls `capabilities.run_agent()` exactly once per generation with:
-- A system prompt that includes the original question and constrains the agent to
-  produce a structured brief
-- A constrained output schema (JSON Schema derived from a `StructuredBrief` pydantic
-  model) so the agent returns machine-parseable dimensions plus human-readable
-  commentary
-- No tools, no web search, no MCP/ACP/DeerFlow-task access — the agent is a pure
-  reasoning call
+HITL1 calls `capabilities.run_agent()` once per brief-generation attempt, with at most
+one repair attempt after schema-invalid model output. It builds a bounded
+`NodeExecutionRequest` whose objective includes `state["request_text"]` and whose
+expected output instructs the agent to return exactly one `StructuredBrief` JSON object
+in `NodeExecutionResult.summary`.
 
-**Why single call, not iterative:** The brief is a draft for user confirmation.
-The iteration happens through the human-in-the-loop (user refines in their
-response), not through repeated model calls before the first interrupt.
+The node validates `summary` as JSON with `StructuredBrief.model_validate`. If validation
+fails once, HITL1 re-prompts once with failure metadata and the original question. If
+validation fails twice, or if `run_agent()` raises / returns a non-success result, HITL1
+fails closed before user interruption with:
 
-**Why constrained output schema:** The model must produce structured dimensions
-the node can validate before presenting to the user. If the model's output fails
-schema validation, the node re-prompts once; a second failure is a terminal
-`BLOCKED` route (fail closed rather than present unchecked model output to the
-user).
+- `phase_status=TERMINAL`
+- `terminal_status=BLOCKED`
+- `terminal_reason=GATE_BLOCKED`
+- `route=exhausted`
 
-### Decision 3: Re-entrant HITL1 through visit ordinal tracking
+The invalid model output is never presented to the user, written to the checkpoint, or
+stored in the bundle.
 
-The fake HITL1 already tracks `completed_visits(state, "hitl1")` to compute the
-interrupt `request_id`. The real HITL1 uses the same mechanism:
+### Decision 3: Real HITL1 gets real runtime capabilities only in the mixed recipe
 
-- **First visit (ordinal 1):** Generate the structured brief via LLM, present the
-  full interrupt with all dimensions.
-- **Re-entrant visits (ordinal > 1):** The previous human response was incomplete
-  or ambiguous. Parse what we can, generate a follow-up prompt asking only for
-  the missing/ambiguous dimensions, and re-interrupt with the same `request_id`
-  prefix but an incremented ordinal.
-- **Max re-entrant visits:** bounded at 3 total visits (ordinals 1, 2, 3). On the
-  4th visit, accept the best-effort partial profile and route `accepted` with a
-  `degraded_profile` marker.
+The existing full-fake runtime resolver injects `FakeUnavailableCapabilities`, which is
+correct for fake nodes. Real HITL1 needs the existing `RuntimeNodeAgentBridge`:
 
-**Why same-checkpoint re-entry rather than advancing and coming back:** The
-topology has no edge from later phases back to HITL1 (unlike HITL2 which has
-`revise_view → wave2_synthesis`). Re-entrant HITL1 keeps the graph simple and
-the checkpoint consistent — the phase stays `hitl1` until the profile is
-accepted or cancelled.
+- `ResearchGraphRecipe` records whether the selected implementation map contains
+  `hitl1=real` and rejects `hitl1=real` unless `bootstrap=real` is also selected.
+- `ResearchActionHandler._context()` constructs a real `RuntimeNodeAgentBridge` only
+  when real HITL1 is selected.
+- Each bridge invocation uses a zero-tool, one-model-call `ExecutionPolicy`, a small
+  wall-time budget, and no web, MCP, ACP, or DeerFlow `task` access. HITL1 may invoke
+  the bridge a second time only for structured-brief schema repair.
+- The request-bundle writer is constructed only when the real bootstrap bundle root is
+  required and established for the same research id.
+- Full-fake and fake-HITL1 recipes keep unavailable/test capabilities, and tests assert
+  they never call `run_agent`.
 
-### Decision 4: Dual storage — ContentRef in sandbox + short fields in checkpoint
+This keeps raw model/runtime authority in `runtime/`. HITL1 sees only the pure
+`NodeExecutionCapabilities` protocol.
 
-The full `ResearchProfile` is serialized to `workspace/deep-research/<rid>/request/profile.json`
-and referenced via a `ContentRef` in `state["profile_ref"]`. Additionally, the
-closed-enum values and must-answer questions are denormalized into short checkpoint
-fields so the topic planner (change 07) can read them without a sandbox round-trip:
+### Decision 4: Follow-up is a checkpointed self-route, not closure state
 
-- `research_depth: str` (enum value)
-- `target_audience: str` (enum value)
-- `output_format: str` (enum value)
-- `cost_tolerance: str` (enum value)
-- `time_budget: str` (enum value)
+Incomplete answers cannot be stored in a Python closure because closures do not survive
+SQLite restart, process restart, or graph recompilation. HITL1 uses explicit checkpoint
+state instead:
+
+1. First visit generates the brief and interrupts with ordinal 1.
+2. Resume validates the request id and parses the answer.
+3. If incomplete, the node writes `pending_profile` and `profile_followup_round`,
+   consumes the response ids, and routes `needs_followup`.
+4. The graph follows `hitl1 --needs_followup--> hitl1`.
+5. The next visit loads `pending_profile`, computes ordinal 2 from checkpointed
+   `execution_trace`, and interrupts with a compact follow-up asking only for missing
+   fields.
+
+HITL1 permits at most three user-answer rounds (ordinals 1, 2, 3). If the third answer
+is still incomplete, HITL1 records a best-effort `ResearchProfile` with
+`degraded_profile=True`, clears `pending_profile`, and routes `accepted`.
+
+### Decision 5: Human response parsing is deterministic and closed
+
+`parse_profile_response(text)` accepts either:
+
+- A compact JSON object with stable machine values, or
+- Free text containing explicit machine values or documented deterministic synonyms.
+
+The parser never calls an LLM. Unknown enum values are treated as unset, not coerced. A
+value becomes part of `PartialResearchProfile` only if it maps to a closed enum member
+or to an explicit custom/free-text field such as `scope_boundaries` or `custom_notes`.
+
+This preserves the requirement that profile values must come from closed enums or an
+explicit custom payload, never from model substitution.
+
+### Decision 6: Final profile storage is dual-authority by design
+
+The full final profile is serialized as canonical JSON and written to:
+
+```text
+workspace/deep-research/<research_id>/request/profile.json
+```
+
+The checkpoint stores only:
+
+- `profile_ref: ContentRef | None`
+- `research_depth: str`
+- `target_audience: str`
+- `output_format: str`
+- `cost_tolerance: str`
+- `time_budget: str`
 - `must_answer_questions: tuple[str, ...]`
+- `degraded_profile: bool`
+- Transient follow-up fields `pending_profile` and `profile_followup_round`
 
-**Why dual storage:** The architecture rule is "large content stays out of the
-checkpoint." The full profile (with `scope_boundaries` and `custom_notes` text)
-belongs in the sandbox. But the topic planner needs the enum dimensions to
-configure its agent prompts — forcing a sandbox read for every topic-planning
-invocation adds latency and I/O coupling. The short enum fields (≤ 30 chars each)
-are well within the checkpoint size budget and eliminate that dependency.
+`profile_ref`, final short fields, and transient progress fields are controller-owned
+state. They are listed in `ResearchState`, `ResearchCheckpoint`, `OWNERSHIP_TABLE`, and
+controller-authorized reducer checks; they use the local authority-writer guard where
+the existing `domain/state.py` policy requires it. `RESEARCH_STATE_SCHEMA_VERSION` stays
+at 2 because all new fields have backward-compatible defaults.
 
-**Why not store the whole profile in the checkpoint:** `scope_boundaries` can be
-up to 2,048 chars and `custom_notes` up to 1,024 — together they approach the
-checkpoint size concern. The `ContentRef` pattern (already used by `synthesis_ref`,
-`decision_brief_ref`, `report_refs`) is the established answer.
+### Decision 7: `profile.json` is written by a narrow request-bundle capability
 
-### Decision 5: Profile written by the node, not the agent
+HITL1 must not fabricate a `ContentRef` for a file that does not exist. This change adds
+a narrow runtime-owned request-bundle protocol backed by
+`agent/src/deerflow_deep_research/runtime/request_bundle.py`:
 
-The `run_agent` call generates the structured brief and proposed dimensions, but
-the **node** — not the agent — constructs the final `ResearchProfile` from the
-validated human response. The agent's brief is advisory input to the user; the
-user's response is the authority for the profile values.
+```text
+write_profile(profile: ResearchProfile) -> ContentRef
+```
 
-**Why:** This follows the architecture rule "agents cannot write the profile to the
-checkpoint, set the route, or advance the phase." The node is the controller; the
-agent is a reasoning tool.
+The implementation:
 
-### Decision 6: Interrupt context carries structured JSON
+- Reuses the established bootstrap bundle root.
+- Writes only under the current research `request/` subtree.
+- Uses atomic same-directory replace and content hashing.
+- Returns a bounded `ContentRef` with the canonical sandbox path.
+- Keeps host paths, locks, file descriptors, parent sandbox, and AppConfig out of node
+  contracts, model prompts, and checkpoint state.
 
-The `HumanInputRequest.context` field (max 2,048 chars) carries a compact JSON
-payload with:
-- The LLM-generated brief summary (human-readable paragraph)
-- The proposed dimension values (so the frontend can pre-fill if it supports
-  structured rendering)
-- The list of must-answer dimensions for validation
+The capability is attached only when the selected real HITL1 factory declares it and the
+recipe also selects `bootstrap=real`. It is not available to full-fake nodes or later
+fake phases.
 
-The frontend is not modified in this change; it continues to render `context` as
-markdown text. The structured JSON is a forward-compatible payload that future
-frontend changes can parse for a richer UI.
+### Decision 8: HITL1 context is compact JSON inside existing text mode
+
+`HumanInputRequest.context` remains a string capped at 2,048 chars. HITL1 fills it with
+compact JSON containing:
+
+- `context_schema_version: 1`
+- `brief_summary`
+- `proposed_dimensions`
+- `required_dimensions`
+- `missing_dimensions`
+- `valid_options`
+- `instructions`
+
+The frontend is not changed. Existing clients can display the JSON/text as plain
+context; future clients can parse it for richer controls.
+
+### Decision 9: Real HITL1 uses the same public interrupt exception as HITL fakes
+
+Current architecture policy allows the HITL fake to import exactly
+`langgraph.types.interrupt`. Real HITL1 has the same graph-owned reason to call the
+public interrupt API. This change extends the exception to graph-owned HITL node
+modules while keeping ordinary node modules forbidden from importing LangGraph directly.
+
+The checker should still reject broader LangGraph imports from ordinary node files,
+node-to-runtime imports, node-to-agent imports, and sibling-node imports.
+
+### Decision 10: Topology change is explicit and minimal
+
+Real HITL1 adds exactly two route labels:
+
+```text
+hitl1 --accepted------> topic_planning
+hitl1 --cancel--------> END/cancelled
+hitl1 --needs_followup-> hitl1
+hitl1 --exhausted-----> END/blocked
+```
+
+`needs_followup` is the durable same-phase loop. `exhausted` is for pre-interrupt
+brief-generation failure or unrecoverable validation failure. Both are controller routes
+from a non-gated node. Gate-kernel route ownership remains unchanged for gated phases.
 
 ## Risks / Trade-offs
 
-- **[Risk] LLM generates a brief that doesn't match the question** → The user
-  sees the brief in the interrupt and can correct it in their response. The node
-  validates the human-supplied dimensions, not the model's proposal.
-- **[Risk] Human writes a response the parser cannot interpret** → The re-entrant
-  follow-up asks specifically for the unparseable dimensions. After 3 attempts,
-  best-effort partial profile is accepted.
-- **[Risk] Profile dimensions evolve between changes** → The `ResearchProfile`
-  model has a `schema_version` field. Future changes can add dimensions with a
-  version bump and a migration path. The current version is 1.
-- **[Risk] run_agent bridge fails (model unavailable, timeout)** → The node fails
-  closed with a typed error. If the failure occurs before any interrupt, the
-  lifecycle handler surfaces it as a terminal error (no partial state). If it
-  occurs during re-entrant follow-up, the prior partial profile is preserved.
-- **[Trade-off] Checkpoint fields duplicate sandbox data** → The enum fields are
-  short (~30 chars each, ~200 bytes total). This is a deliberate trade-off to
-  let the topic planner read profile dimensions without a sandbox I/O dependency,
-  consistent with how `request_text` already lives in the checkpoint despite the
-  original message being available in the thread history.
+- **LLM generates a poor brief:** The user can correct it, and the final profile comes
+  from validated human input, not the model proposal.
+- **Human response remains incomplete:** Follow-up prompts ask only for missing fields;
+  after three rounds HITL1 records a degraded best-effort profile.
+- **Partial profile lost on restart:** Partial progress is checkpointed before the
+  self-route; no closure is used as authority.
+- **Request-bundle writer widens authority:** The node receives only a narrow pure
+  protocol. Runtime owns host paths and atomic I/O.
+- **Topology snapshot changes:** The change explicitly owns the HITL1 self-edge and
+  blocked edge, and the snapshot/tests must be updated in the same task group.
+- **Checkpoint duplicates short profile data:** The enum fields are small and let change
+  07 read planning constraints without loading `profile.json`.

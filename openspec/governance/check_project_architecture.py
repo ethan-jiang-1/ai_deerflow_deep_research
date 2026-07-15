@@ -457,7 +457,11 @@ def _validate_module_imports(
         target_layer, target_node = _target_owner(imported)
         if target_layer is None:
             if layer == "nodes" and module_root == "langgraph":
-                hitl_interrupt = path.name == "fake.py" and imported == "langgraph.types.interrupt"
+                hitl_interrupt = (
+                    source_node in {"hitl1", "hitl2"}
+                    and path.name in {"fake.py", "node.py"}
+                    and imported == "langgraph.types.interrupt"
+                )
                 if path.name != "subgraph.py" and not hitl_interrupt:
                     raise ContractViolation(
                         "import.boundary",

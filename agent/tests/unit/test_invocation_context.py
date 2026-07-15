@@ -9,6 +9,8 @@ import pytest
 from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext
 from deerflow_deep_research.domain.invocation import GraphInvocationContext, NodeDependencyResolver
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies, PolicyRef
+from deerflow_deep_research.domain.profile import RequestBundleStoreProtocol, ResearchProfile
+from deerflow_deep_research.domain.state import ContentRef
 
 
 class NoopCapabilities:
@@ -58,10 +60,33 @@ def test_invocation_context_contains_only_reduced_context_and_resolver() -> None
         "dependency_resolver",
         "work_units",
         "bootstrap_bundle",
+        "request_bundle",
     }
     assert isinstance(context.dependency_resolver, NodeDependencyResolver)
     with pytest.raises(TypeError):
         GraphInvocationContext(context.graph_context, resolver, fixture_plan={})
+
+
+def test_invocation_context_accepts_pure_request_bundle_protocol() -> None:
+    resolver = RecordingResolver()
+    graph = GraphContextView(
+        research_scope_id="r_" + "A" * 43,
+        workspace_root="/mnt/user-data/workspace/deep-research/r",
+        uploads_root="/mnt/user-data/uploads",
+        outputs_root="/mnt/user-data/outputs/deep-research/r",
+    )
+
+    class Store:
+        async def write_profile(self, profile: ResearchProfile) -> ContentRef:
+            return ContentRef(
+                sandbox_path=f"workspace/deep-research/{graph.research_scope_id}/request/profile.json",
+                content_hash="h_" + "A" * 43,
+            )
+
+    context = GraphInvocationContext(graph_context=graph, dependency_resolver=resolver, request_bundle=Store())
+    assert isinstance(context.request_bundle, RequestBundleStoreProtocol)
+    with pytest.raises(TypeError, match="request_bundle"):
+        GraphInvocationContext(graph_context=graph, dependency_resolver=resolver, request_bundle=object())
 
 
 def test_resolver_gets_stable_retry_and_next_committed_attempt_ids() -> None:

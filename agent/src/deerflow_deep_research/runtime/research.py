@@ -19,6 +19,7 @@ from typing import Any
 
 from langgraph.types import Command
 
+from deerflow_deep_research.agents.policies import ExecutionBudget, ExecutionPolicy
 from deerflow_deep_research.domain.invocation import GraphInvocationContext, WorkUnitControllerDependencies
 from deerflow_deep_research.domain.lifecycle import (
     DeepResearchControlResult,
@@ -49,12 +50,14 @@ from deerflow_deep_research.runtime.human_input import (
     pending_from_snapshot,
     project_suspension,
 )
+from deerflow_deep_research.runtime.node_agent_bridge import RuntimeNodeAgentBridge
 from deerflow_deep_research.runtime.projection import (
     RuntimeWorkUnitDependencyResolver,
     build_node_dependencies,
     project_node_agent,
     project_research_scope,
 )
+from deerflow_deep_research.runtime.request_bundle import RequestBundleStore
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 
@@ -81,9 +84,9 @@ class FakeUnavailableCapabilities:
 
 
 class RuntimeNodeDependencyResolver:
-    def __init__(self, graph_context) -> None:
+    def __init__(self, graph_context, capabilities: Any | None = None) -> None:
         self._graph_context = graph_context
-        self._capabilities = FakeUnavailableCapabilities()
+        self._capabilities = capabilities if capabilities is not None else FakeUnavailableCapabilities()
 
     def resolve(self, *, logical_name: str, attempt_id: str, policy: PolicyRef) -> NodeBuildDependencies:
         agent_context = project_node_agent(
@@ -110,23 +113,73 @@ class ResearchGraphRecipe:
     builder: Any
     requires_work_units: bool = False
     requires_bootstrap_bundle: bool = False
+    requires_request_bundle: bool = False
+    requires_node_agent_bridge: bool = False
     work_unit_store_factory: Any = None
+    request_bundle_store_factory: Any = None
+    node_agent_bridge_factory: Any = None
 
     @classmethod
     def create(
         cls,
         *,
         work_unit_store_factory: Any = None,
+        request_bundle_store_factory: Any = None,
+        node_agent_bridge_factory: Any = None,
         implementation_modes: Mapping[str, str] | None = None,
     ) -> ResearchGraphRecipe:
+        modes = dict(implementation_modes or {})
+        hitl1_real = modes.get("hitl1") == "real"
+        bootstrap_real = modes.get("bootstrap") == "real"
+        if hitl1_real and not bootstrap_real:
+            raise ValueError("hitl1_real_requires_bootstrap_real")
         return cls(
             builder=build_research_graph(implementation_modes=implementation_modes),
             requires_work_units=True,
-            requires_bootstrap_bundle=(
-                implementation_modes is not None and implementation_modes.get("bootstrap") == "real"
-            ),
+            requires_bootstrap_bundle=bootstrap_real,
+            requires_request_bundle=hitl1_real,
+            requires_node_agent_bridge=hitl1_real,
             work_unit_store_factory=work_unit_store_factory,
+            request_bundle_store_factory=request_bundle_store_factory,
+            node_agent_bridge_factory=node_agent_bridge_factory,
         )
+
+
+def _hitl1_node_agent_policy(graph_context: Any) -> ExecutionPolicy:
+    """Zero-tool, one-model-call policy for HITL1 brief generation.
+
+    @impl HIN-001
+    @impl NOA-001
+    @impl NOA-002
+    """
+    return ExecutionPolicy(
+        policy_name="hitl1-structured-brief",
+        allowed_tool_names=frozenset(),
+        read_roots=(graph_context.workspace_root, graph_context.uploads_root),
+        write_roots=(),
+        attempt_root=graph_context.workspace_root,
+        budget=ExecutionBudget(
+            max_model_calls=1,
+            max_total_tool_calls=1,
+            max_tool_calls_per_response=1,
+            max_parallel_tool_calls=1,
+            total_token_budget=8_192,
+            per_call_output_token_cap=2_048,
+            per_tool_result_bytes=1,
+            structured_result_bytes=4_096,
+            wall_time_seconds=30.0,
+        ),
+    )
+
+
+def _build_hitl1_capabilities(envelope: TrustedRuntimeEnvelope, graph_context: Any, factory: Any) -> Any:
+    policy = _hitl1_node_agent_policy(graph_context)
+    bridge_factory = factory or RuntimeNodeAgentBridge
+    return bridge_factory(
+        envelope=envelope,
+        policy=policy,
+        tools_resolver=lambda _envelope, _policy: (),
+    )
 
 
 def _durability(envelope: TrustedRuntimeEnvelope) -> Durability:
@@ -232,9 +285,15 @@ class ResearchActionHandler:
         include_work_units: bool = True,
     ) -> GraphInvocationContext:
         graph_context = project_research_scope(envelope, research_scope_id=research_id)
-        base_resolver = RuntimeNodeDependencyResolver(graph_context)
+        capabilities = (
+            _build_hitl1_capabilities(envelope, graph_context, self._recipe.node_agent_bridge_factory)
+            if include_work_units and self._recipe.requires_node_agent_bridge
+            else None
+        )
+        base_resolver = RuntimeNodeDependencyResolver(graph_context, capabilities)
         work_units = None
         bootstrap_bundle = None
+        request_bundle = None
         if include_work_units and self._recipe.requires_work_units:
             store_factory = self._recipe.work_unit_store_factory or WorkUnitStore.create
             store = await store_factory(envelope, research_id=research_id)
@@ -244,11 +303,15 @@ class ResearchActionHandler:
             )
             if self._recipe.requires_bootstrap_bundle:
                 bootstrap_bundle = await BootstrapBundleStore.create(envelope, research_id=research_id)
+            if self._recipe.requires_request_bundle:
+                request_factory = self._recipe.request_bundle_store_factory or RequestBundleStore.create
+                request_bundle = await request_factory(envelope, research_id=research_id)
         return GraphInvocationContext(
             graph_context=graph_context,
             dependency_resolver=base_resolver,
             work_units=work_units,
             bootstrap_bundle=bootstrap_bundle,
+            request_bundle=request_bundle,
         )
 
 

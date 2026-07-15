@@ -67,6 +67,13 @@ def _node_wrapper(
             dependencies = replace(dependencies, bootstrap_bundle=context.bootstrap_bundle)
         elif dependencies.bootstrap_bundle is not None:
             raise ValueError("bootstrap_bundle_capability_undeclared")
+        declares_request_bundle = NodeCapability.REQUEST_BUNDLE in spec.capabilities
+        if declares_request_bundle and factory is spec.real_factory:
+            if context.request_bundle is None:
+                raise ValueError("request_bundle_capability_missing")
+            dependencies = replace(dependencies, request_bundle=context.request_bundle)
+        elif dependencies.request_bundle is not None:
+            raise ValueError("request_bundle_capability_undeclared")
         if dependencies.graph_context != context.graph_context:
             raise ValueError("dependency_context_mismatch")
         if dependencies.agent_context.node_name != logical_name:
@@ -146,7 +153,11 @@ def build_research_graph(
         _route,
         {"needs_input": "hitl1", "profile_complete": "topic_planning", "exhausted": END},
     )
-    builder.add_conditional_edges("hitl1", _route, {"accepted": "topic_planning", "cancel": END})
+    builder.add_conditional_edges(
+        "hitl1",
+        _route,
+        {"accepted": "topic_planning", "cancel": END, "needs_followup": "hitl1", "exhausted": END},
+    )
     builder.add_edge("topic_planning", "wave0")
     builder.add_conditional_edges("wave0", _route, {"repair": "wave0", "pass": "wave1", "exhausted": END})
     builder.add_conditional_edges(

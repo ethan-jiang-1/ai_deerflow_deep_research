@@ -14,6 +14,7 @@ from deerflow_deep_research.domain.bundle import (
     is_audit_only,
     output_path,
     prelaunch_fs_probe_names,
+    profile_path,
     relative_to_workspace_path,
     resolve_contained_path,
     result_path,
@@ -21,6 +22,8 @@ from deerflow_deep_research.domain.bundle import (
     runtime_fs_probe_paths,
     work_spec_path,
 )
+from deerflow_deep_research.domain.profile import RequestBundleStoreProtocol, ResearchProfile
+from deerflow_deep_research.domain.state import ContentRef
 
 RESEARCH_ID = "r_" + "A" * 43
 WORK_ID = "g0_wave0_w0000"
@@ -121,6 +124,24 @@ def test_probe_paths_are_audit_only_and_never_authority() -> None:
     assert classify_bundle_path(alias) is BundlePathKind.AUDIT
     assert classify_bundle_path(evidence_ledger_path(RESEARCH_ID)) is BundlePathKind.EVIDENCE
     assert classify_bundle_path(result_path(RESEARCH_ID, WORK_ID, ATTEMPT_ID)) is BundlePathKind.CONTENT
+
+
+def test_profile_path_is_request_scoped_content() -> None:
+    path = profile_path(RESEARCH_ID)
+    assert path == f"workspace/deep-research/{RESEARCH_ID}/request/profile.json"
+    assert classify_bundle_path(path) is BundlePathKind.CONTENT
+    assert resolve_contained_path(path, research_id=RESEARCH_ID) == path
+    with pytest.raises(ValueError, match="research_id"):
+        profile_path("not-a-research-id")
+
+
+def test_request_bundle_store_protocol_is_pure_and_runtime_checkable() -> None:
+    class Store:
+        async def write_profile(self, profile: ResearchProfile) -> ContentRef:
+            return ContentRef(sandbox_path=profile_path(RESEARCH_ID), content_hash="h_" + "A" * 43)
+
+    assert isinstance(Store(), RequestBundleStoreProtocol)
+    assert "host" not in RequestBundleStoreProtocol.write_profile.__annotations__
 
 
 @pytest.mark.parametrize("name", ["queue.json", "index.json", "status.json", "claims.queue"])

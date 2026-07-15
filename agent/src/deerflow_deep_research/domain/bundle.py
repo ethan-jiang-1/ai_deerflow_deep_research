@@ -42,6 +42,7 @@ DIAGNOSTICS_GATE_ATTEMPTS = "gate-attempts.jsonl"
 EVIDENCE_LEDGER = "submissions.jsonl"
 EVIDENCE_LOCK = ".submissions.lock"
 MARKER_FILENAME = "marker.json"
+PROFILE_FILENAME = "profile.json"
 
 _PROBE_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 _STAGING_RE = re.compile(r"^\.submissions\.[0-9a-f]{32}\.tmp$")
@@ -95,6 +96,11 @@ def bundle_root(research_id: str) -> str:
 def marker_path(research_id: str) -> str:
     """Canonical path of the bootstrap schema/version marker under the request subtree."""
     return f"{bundle_root(research_id)}/{REQUEST_SUBTREE}/{MARKER_FILENAME}"
+
+
+def profile_path(research_id: str) -> str:
+    """Canonical path of the HITL1 profile artifact under the request subtree."""
+    return f"{bundle_root(research_id)}/{REQUEST_SUBTREE}/{PROFILE_FILENAME}"
 
 
 def attempt_dir(research_id: str, work_id: str, attempt_id: str) -> str:
@@ -227,6 +233,10 @@ def classify_bundle_path(path: str) -> BundlePathKind:
             return BundlePathKind.EVIDENCE
         if name == EVIDENCE_LOCK or _STAGING_RE.fullmatch(name):
             return BundlePathKind.AUDIT
+    if subtree == REQUEST_SUBTREE and len(tail) == 2:
+        name = tail[1]
+        if name in {MARKER_FILENAME, PROFILE_FILENAME}:
+            return BundlePathKind.CONTENT
     if subtree == WORK_SUBTREE and len(tail) >= 4:
         work_id, attempt_id = tail[1], tail[2]
         try:
@@ -268,6 +278,7 @@ __all__ = [
     "EVIDENCE_SUBTREE",
     "FINAL_SUBTREE",
     "MARKER_FILENAME",
+    "PROFILE_FILENAME",
     "RESEARCH_ID_RE",
     "REQUEST_SUBTREE",
     "REVIEW_SUBTREE",
@@ -287,6 +298,7 @@ __all__ = [
     "first_work_spec_path",
     "is_audit_only",
     "marker_path",
+    "profile_path",
     "is_evidence_staging_name",
     "output_path",
     "prelaunch_fs_probe_names",

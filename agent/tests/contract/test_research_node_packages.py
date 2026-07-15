@@ -63,9 +63,13 @@ def test_explicit_registry_loads_package_root_only_specs() -> None:
         package = importlib.import_module(f"{PACKAGE_PREFIX}.{name}")
         assert package.__all__ == ["NODE_SPEC"]
         if name == "bootstrap":
-            # Change 05 implements the real bootstrap; every other phase stays fake.
+            # Change 05 implements the real bootstrap.
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
             assert NodeCapability.BOOTSTRAP_BUNDLE in spec.capabilities
+        elif name == "hitl1":
+            # Change 06 implements real HITL1 and gives it only the request-bundle capability.
+            assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
+            assert spec.capabilities == frozenset({NodeCapability.REQUEST_BUNDLE})
         else:
             assert spec.real_factory is UNAVAILABLE_REAL_FACTORY
         assert spec.logical_name == name

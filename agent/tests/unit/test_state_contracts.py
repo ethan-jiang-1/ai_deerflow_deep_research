@@ -28,6 +28,7 @@ from deerflow_deep_research.domain.state import (
     OWNERSHIP_TABLE,
     RESEARCH_STATE_SCHEMA_VERSION,
     BranchResult,
+    ContentRef,
     FakeFixturePlan,
     PhaseStatus,
     ResearchCheckpoint,
@@ -140,6 +141,16 @@ def test_schema_version_is_two() -> None:
     assert RESEARCH_STATE_SCHEMA_VERSION == 2
     checkpoint = ResearchCheckpoint(**_base_values())
     assert checkpoint.schema_version == RESEARCH_STATE_SCHEMA_VERSION
+    assert checkpoint.profile_ref is None
+    assert checkpoint.research_depth == ""
+    assert checkpoint.target_audience == ""
+    assert checkpoint.output_format == ""
+    assert checkpoint.cost_tolerance == ""
+    assert checkpoint.time_budget == ""
+    assert checkpoint.must_answer_questions == ()
+    assert checkpoint.degraded_profile is False
+    assert checkpoint.pending_profile is None
+    assert checkpoint.profile_followup_round == 0
 
 
 def test_validate_research_state_fail_closes_on_skeleton_version_without_reset() -> None:
@@ -279,6 +290,81 @@ def test_research_checkpoint_has_no_duplicate_pending_authority() -> None:
             fixture_plan=FakeFixturePlan(),
             pending_hitl={"forbidden": True},
         )
+
+
+def test_hitl1_profile_fields_are_state_owned_and_controller_authorized() -> None:
+    fields = research_state_fields()
+    profile_fields = {
+        "profile_ref",
+        "research_depth",
+        "target_audience",
+        "output_format",
+        "cost_tolerance",
+        "time_budget",
+        "must_answer_questions",
+        "degraded_profile",
+        "pending_profile",
+        "profile_followup_round",
+    }
+    assert profile_fields <= fields
+    assert profile_fields <= ownership_fields()
+    assert profile_fields <= GATED_FIELDS
+
+    current = _base_values()
+    for field in profile_fields:
+        with pytest.raises(ValueError, match="writer_not_authorized"):
+            apply_research_update(current, {field: "x"}, writer=WriterRole.WORKER)
+
+    update = apply_research_update(
+        current,
+        {
+            "research_depth": "standard",
+            "target_audience": "practitioner",
+            "output_format": "detailed_report",
+            "cost_tolerance": "moderate",
+            "time_budget": "standard",
+            "must_answer_questions": ("Q1",),
+            "degraded_profile": False,
+            "pending_profile": {"depth": "standard"},
+            "profile_followup_round": 1,
+        },
+        writer=WriterRole.CONTROLLER,
+    )
+    assert update["pending_profile"] == {"depth": "standard"}
+
+
+def test_hitl1_profile_checkpoint_fields_validate_and_stay_version_two() -> None:
+    ref = ContentRef(
+        sandbox_path=f"workspace/deep-research/{RESEARCH_ID}/request/profile.json",
+        content_hash="h_" + "A" * 43,
+    )
+    checkpoint = ResearchCheckpoint(
+        **_base_values(
+            profile_ref=ref,
+            research_depth="deep_dive",
+            target_audience="domain_expert",
+            output_format="annotated_bibliography",
+            cost_tolerance="extensive",
+            time_budget="overnight",
+            must_answer_questions=("Q1", "Q2"),
+            degraded_profile=True,
+            pending_profile={"depth": "deep_dive"},
+            profile_followup_round=2,
+        )
+    )
+    assert checkpoint.schema_version == 2
+    assert checkpoint.profile_ref == ref
+    assert checkpoint.must_answer_questions == ("Q1", "Q2")
+    assert checkpoint.pending_profile == {"depth": "deep_dive"}
+
+    with pytest.raises(ValueError, match="research_depth_invalid"):
+        ResearchCheckpoint(**_base_values(research_depth="invented"))
+    with pytest.raises(ValueError, match="must_answer_questions_invalid"):
+        ResearchCheckpoint(**_base_values(must_answer_questions=("x" * 257,)))
+    with pytest.raises(ValueError, match="pending_profile_invalid"):
+        ResearchCheckpoint(**_base_values(pending_profile={"host_path": "/tmp/secret"}))
+    with pytest.raises(ValueError, match="profile_followup_round_invalid"):
+        ResearchCheckpoint(**_base_values(profile_followup_round=4))
 
 
 def test_fixture_plan_rejects_unknown_routes() -> None:

@@ -77,11 +77,37 @@ RESEARCH_STATE_SCHEMA_VERSION = 2
 # ContentRef rather than inside the checkpoint.
 MAX_CHECKPOINT_STATE_BYTES = 65_536
 MAX_WORK_UNIT_BLOCK_BYTES = 40_960
+MAX_PROFILE_PENDING_BYTES = 4_096
+MAX_PROFILE_QUESTIONS = 8
+MAX_PROFILE_QUESTION_CHARS = 256
+MAX_PROFILE_SHORT_FIELD_CHARS = 64
+MAX_PROFILE_FOLLOWUP_ROUND = 3
 
 RESEARCH_ID_RE = re.compile(r"^r_[A-Za-z0-9_-]{43}$")
 REQUEST_DIGEST_RE = re.compile(r"^d_[A-Za-z0-9_-]{43}$")
 CONTENT_HASH_RE = re.compile(r"^h_[A-Za-z0-9_-]{43}$")
 SANDBOX_PATH_RE = re.compile(r"^workspace/deep-research/r_[A-Za-z0-9_-]{43}/.+$")
+
+_PROFILE_ENUM_VALUES = {
+    "research_depth": frozenset({"", "quick_overview", "standard", "deep_dive", "exhaustive"}),
+    "target_audience": frozenset({"", "layperson", "practitioner", "domain_expert", "executive"}),
+    "output_format": frozenset({"", "executive_brief", "detailed_report", "annotated_bibliography", "faq"}),
+    "cost_tolerance": frozenset({"", "minimal", "moderate", "extensive"}),
+    "time_budget": frozenset({"", "very_quick", "standard", "thorough", "overnight"}),
+}
+_PENDING_PROFILE_KEYS = frozenset(
+    {
+        "schema_version",
+        "depth",
+        "audience",
+        "format",
+        "cost_tolerance",
+        "time_budget",
+        "must_answer",
+        "scope_boundaries",
+        "custom_notes",
+    }
+)
 
 
 WorkStatus = AttemptStatus
@@ -136,6 +162,16 @@ GATED_FIELDS = frozenset(
         "terminal_failures_by_attempt_id",
         "next_work_ordinal",
         "next_attempt_ordinal_by_work_id",
+        "profile_ref",
+        "research_depth",
+        "target_audience",
+        "output_format",
+        "cost_tolerance",
+        "time_budget",
+        "must_answer_questions",
+        "degraded_profile",
+        "pending_profile",
+        "profile_followup_round",
         "generation",
         "schema_version",
         "research_id",
@@ -168,6 +204,53 @@ class ContentRef:
             raise ValueError("content_ref_schema_version_invalid")
         if not isinstance(self.short_summary, str) or len(self.short_summary) > 512:
             raise ValueError("content_ref_summary_invalid")
+
+
+def _coerce_content_ref(value: ContentRef | Mapping[str, Any] | None, field_name: str) -> ContentRef | None:
+    if value is None:
+        return None
+    if isinstance(value, ContentRef):
+        return value
+    if isinstance(value, Mapping):
+        try:
+            return ContentRef(**dict(value))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{field_name}_invalid") from exc
+    raise ValueError(f"{field_name}_invalid")
+
+
+def _validate_profile_short_field(field_name: str, value: str) -> str:
+    if not isinstance(value, str) or len(value) > MAX_PROFILE_SHORT_FIELD_CHARS:
+        raise ValueError(f"{field_name}_invalid")
+    allowed = _PROFILE_ENUM_VALUES[field_name]
+    if value not in allowed:
+        raise ValueError(f"{field_name}_invalid")
+    return value
+
+
+def _validate_must_answer_questions(values: Iterable[Any]) -> tuple[str, ...]:
+    questions = tuple(values)
+    if len(questions) > MAX_PROFILE_QUESTIONS:
+        raise ValueError("must_answer_questions_invalid")
+    for item in questions:
+        if not isinstance(item, str) or not item.strip() or len(item) > MAX_PROFILE_QUESTION_CHARS:
+            raise ValueError("must_answer_questions_invalid")
+    return questions
+
+
+def _validate_pending_profile(value: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("pending_profile_invalid")
+    unknown = set(value) - _PENDING_PROFILE_KEYS
+    if unknown:
+        raise ValueError("pending_profile_invalid")
+    payload = dict(value)
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=_json_default)
+    if len(encoded.encode("utf-8")) > MAX_PROFILE_PENDING_BYTES:
+        raise ValueError("pending_profile_too_large")
+    return payload
 
 
 def _enum_sequence(values: Iterable[Any], enum_type: type, field_name: str) -> tuple[Any, ...]:
@@ -504,6 +587,16 @@ def apply_research_update(
         "active_attempt_by_work_id": frozenset({WriterRole.CONTROLLER, WriterRole.SUBMIT}),
         "terminal_failures_by_attempt_id": frozenset({WriterRole.SUBMIT}),
         "accepted_submission_refs": frozenset({WriterRole.SUBMIT}),
+        "profile_ref": frozenset({WriterRole.CONTROLLER}),
+        "research_depth": frozenset({WriterRole.CONTROLLER}),
+        "target_audience": frozenset({WriterRole.CONTROLLER}),
+        "output_format": frozenset({WriterRole.CONTROLLER}),
+        "cost_tolerance": frozenset({WriterRole.CONTROLLER}),
+        "time_budget": frozenset({WriterRole.CONTROLLER}),
+        "must_answer_questions": frozenset({WriterRole.CONTROLLER}),
+        "degraded_profile": frozenset({WriterRole.CONTROLLER}),
+        "pending_profile": frozenset({WriterRole.CONTROLLER}),
+        "profile_followup_round": frozenset({WriterRole.CONTROLLER}),
     }
     forbidden = sorted(name for name in incoming if name in allowed_writers and writer not in allowed_writers[name])
     if forbidden:
@@ -533,6 +626,16 @@ class ResearchCheckpoint:
     start_message_id: str = ""
     request_digest: str = ""
     request_text: str = ""
+    profile_ref: ContentRef | None = None
+    research_depth: str = ""
+    target_audience: str = ""
+    output_format: str = ""
+    cost_tolerance: str = ""
+    time_budget: str = ""
+    must_answer_questions: tuple[str, ...] = ()
+    degraded_profile: bool = False
+    pending_profile: dict[str, Any] | None = None
+    profile_followup_round: int = 0
     # control
     phase: LogicalPhase = LogicalPhase.BOOTSTRAP
     phase_status: PhaseStatus = PhaseStatus.WAITING
@@ -591,6 +694,22 @@ class ResearchCheckpoint:
             raise ValueError("request_digest_invalid")
         if self.request_text and len(self.request_text) > MAX_START_REQUEST_CHARS:
             raise ValueError("request_text_invalid")
+        object.__setattr__(self, "profile_ref", _coerce_content_ref(self.profile_ref, "profile_ref"))
+        for field_name in _PROFILE_ENUM_VALUES:
+            object.__setattr__(self, field_name, _validate_profile_short_field(field_name, getattr(self, field_name)))
+        object.__setattr__(
+            self,
+            "must_answer_questions",
+            _validate_must_answer_questions(self.must_answer_questions),
+        )
+        if not isinstance(self.degraded_profile, bool):
+            raise ValueError("degraded_profile_invalid")
+        if (
+            not isinstance(self.profile_followup_round, int)
+            or not 0 <= self.profile_followup_round <= MAX_PROFILE_FOLLOWUP_ROUND
+        ):
+            raise ValueError("profile_followup_round_invalid")
+        object.__setattr__(self, "pending_profile", _validate_pending_profile(self.pending_profile))
         if isinstance(self.fixture_plan, dict):
             object.__setattr__(self, "fixture_plan", FakeFixturePlan(**self.fixture_plan))
         if not isinstance(self.fixture_plan, FakeFixturePlan):
@@ -680,6 +799,16 @@ class ResearchState(TypedDict, total=False):
     start_message_id: str
     request_digest: str
     request_text: str
+    profile_ref: ContentRef
+    research_depth: str
+    target_audience: str
+    output_format: str
+    cost_tolerance: str
+    time_budget: str
+    must_answer_questions: tuple[str, ...]
+    degraded_profile: bool
+    pending_profile: dict[str, Any]
+    profile_followup_round: int
     # control
     phase: str
     phase_status: str
@@ -747,6 +876,33 @@ OWNERSHIP_TABLE: tuple[FieldOwnership, ...] = (
     FieldOwnership("start_message_id", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "controller_init"),
     FieldOwnership("request_digest", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "controller_init"),
     FieldOwnership("request_text", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "controller_init"),
+    FieldOwnership(
+        "profile_ref", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.PLANNER), "last_write_wins"
+    ),
+    FieldOwnership(
+        "research_depth", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.PLANNER), "last_write_wins"
+    ),
+    FieldOwnership(
+        "target_audience", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.PLANNER), "last_write_wins"
+    ),
+    FieldOwnership(
+        "output_format", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.PLANNER), "last_write_wins"
+    ),
+    FieldOwnership(
+        "cost_tolerance", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.PLANNER), "last_write_wins"
+    ),
+    FieldOwnership(
+        "time_budget", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.PLANNER), "last_write_wins"
+    ),
+    FieldOwnership(
+        "must_answer_questions",
+        WriterRole.CONTROLLER,
+        (WriterRole.CONTROLLER, WriterRole.PLANNER),
+        "last_write_wins",
+    ),
+    FieldOwnership("degraded_profile", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
+    FieldOwnership("pending_profile", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
+    FieldOwnership("profile_followup_round", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
     FieldOwnership("phase", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "apply_research_update"),
     FieldOwnership(
         "phase_status", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "apply_research_update"

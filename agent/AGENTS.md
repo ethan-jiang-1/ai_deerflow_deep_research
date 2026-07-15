@@ -43,6 +43,7 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/runtime/work_unit_storage.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/runtime/work_unit_store.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/runtime/bootstrap_bundle.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/runtime/request_bundle.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/domain/context.py` (file; `PRS-003`)
@@ -54,6 +55,7 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/domain/state.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/bundle.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/work_units.py` (file; `PRS-001`)
+  - `agent/src/deerflow_deep_research/domain/profile.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/engine/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/fake_control.py` (file; `PRS-001`)
@@ -77,6 +79,7 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/graph/nodes/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/bootstrap/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/hitl1/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/hitl1/prompts.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/topic_planning/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/wave0/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/wave1/` (directory; `PRS-003`)
@@ -118,38 +121,46 @@ Registry: `openspec/governance/project-structure.toml`
 
 ## Current Status
 
-Changes 00 through 03 are complete and archived. Active change 04 adds the
-shared work-unit kernel beneath the existing Wave0/Wave1 fixture nodes: immutable
-controller-assigned work/attempt contracts, bounded `Send`, deterministic file
-validation, one hash-chained JSONL ledger writer, crash reconciliation, and the
-shared drain/gate view. Every lifecycle result remains
-`implementation_mode=full_fake`; controlled fixture files and accepted fixture
-records are not research findings or a report.
+Changes 00 through 05 are complete. Change 04 added the shared work-unit kernel
+beneath Wave0/Wave1 fixture nodes: immutable controller-assigned work/attempt
+contracts, bounded `Send`, deterministic file validation, one hash-chained JSONL
+ledger writer, crash reconciliation, and the shared drain/gate view. Change 05
+replaced fake bootstrap with a real bootstrap node that atomically establishes
+the minimal `request/` bundle subtree and `request/marker.json`.
+
+Active change 06 replaces fake HITL1 with the first real model-calling node.
+Real HITL1 uses the runtime node-agent bridge to generate a validated structured
+brief, interrupts through the existing `PendingResearchInterrupt` wire schema,
+parses deterministic JSON/free-text profile answers, loops through checkpointed
+`pending_profile` follow-up state on missing fields, and writes the final
+`request/profile.json` through a runtime-owned `RequestBundleStore`. Every
+lifecycle result still reports `implementation_mode=full_fake` because topic
+planning, evidence collection, synthesis, HITL2, and final delivery remain fake.
 
 Checkpointed `ResearchState` remains control authority, the validated submission
 ledger is evidence authority, and sandbox files are content authority. The
-compatible version-2 state extension defaults absent fields for old checkpoints
-and stores only compact refs under 32-work/64-attempt/32-failure/64-accepted-ref,
-40,960-byte work-block, and 65,536-byte whole-state bounds. The manually invoked
-Wave child has `checkpointer=False`, so the whole Wave node is the replay unit and
-reconciles ledger-first crash windows before redispatch.
+compatible version-2 state extension defaults absent HITL1 profile fields for
+old checkpoints and stores only compact refs/short values: `profile_ref`, enum
+strings, `must_answer_questions`, `degraded_profile`, and bounded transient
+`pending_profile` / `profile_followup_round`. The final profile body lives only
+in sandbox content at `request/profile.json`; `RESEARCH_STATE_SCHEMA_VERSION`
+remains `2`.
 
-The first store is available only after runtime proves that the parent sandbox
-and trusted host path share one mounted POSIX workspace supporting bounded lock,
-atomic replace, and durability sync. `status` and `cancel` remain checkpoint-only:
-they do not initialize a parent sandbox or construct/expose the store. Known IM
-and non-interactive contexts still refuse start/resume and retain status/cancel.
+The work-unit/bootstrap/request-bundle stores are available only after runtime
+proves that the parent sandbox and trusted host path share one mounted POSIX
+workspace supporting bounded lock, atomic replace, and durability sync. `status`
+and `cancel` remain checkpoint-only: they do not initialize a parent sandbox or
+construct/expose these stores. Known IM and non-interactive contexts still
+refuse start/resume and retain status/cancel.
 
-Change 05 replaces the change-01 fake bootstrap with a real bootstrap node. It atomically
-establishes the minimal `request/` bundle subtree plus a schema/version marker (bound to the
-checkpoint identity) through a runtime-owned `BootstrapBundleStore` that reuses the change-04
-shared-workspace capability, then runs a pure binding-validation (reusing gate-kernel
-`FailureCode` values) that replaces the fake fixture pass and routes `needs_input` to HITL1, or
-`exhausted` to a terminal on a post-establish divergence. The store is injected via a new
-`NodeCapability.BOOTSTRAP_BUNDLE` and is constructed only when the mixed implementation map
-selects the real bootstrap (`ResearchGraphRecipe.requires_bootstrap_bundle`); the full-fake
-lifecycle still selects the fake bootstrap and writes no marker. Identity derivation and
-start/resume/status/cancel semantics are unchanged.
+Real HITL1 is available only in the mixed recipe with `bootstrap=real` and
+`hitl1=real`; selecting `hitl1=real` without real bootstrap fails before graph
+invocation. The real node declares `NodeCapability.REQUEST_BUNDLE` and does not
+receive bootstrap or work-unit capabilities. The normalized topology adds only
+`hitl1 --needs_followup--> hitl1` and `hitl1 --exhausted--> blocked`; full-fake
+HITL1 remains deterministic and does not construct the node-agent bridge or
+request-bundle writer. `backend/`, `frontend/`, config examples, extensions,
+skills, MCP/ACP, and Agent/SOUL surfaces stay unchanged.
 
 ## Ownership
 
@@ -202,6 +213,7 @@ the change that owns that node. Every package has this stable surface:
   node.py        # real factory
   fake.py        # deterministic zero-API factory
   contracts.py   # private node-local contracts
+  prompts.py     # optional node-local prompt helpers
   subgraph.py    # optional phase-local subgraph
 ```
 
@@ -209,6 +221,9 @@ The package root exports exactly one `NODE_SPEC`. Ordinary node modules do not
 import graph implementation modules, sibling nodes, `agents/`, or `runtime/`.
 Only package-local `subgraph.py` may import registered reusable
 `graph/components/`; all other graph implementation imports remain forbidden.
+Graph-owned HITL `fake.py`/`node.py` modules may import exactly
+`langgraph.types.interrupt`; other node modules may not import LangGraph outside
+`subgraph.py`.
 The registry loads explicitly listed package roots and never discovers topology
 from the filesystem.
 
@@ -219,7 +234,8 @@ Changes 00 and 01 own the current runtime, graph, and contract files:
 ```text
 runtime/{graph_host,runtime_adapter,projection,identity,checkpoint,control,human_input,research}.py
 runtime/{events,cancellation,node_agent_bridge,diagnostics,startup_snapshot}.py
-domain/{context,enums,node_spec,invocation,lifecycle,state,bundle}.py
+runtime/{bootstrap_bundle,request_bundle,work_unit_storage,work_unit_store}.py
+domain/{context,enums,node_spec,invocation,lifecycle,state,bundle,profile}.py
 agents/{factory,middleware,policies,prompts,structured_output}.py
 graph/{builder,registry,infra_probe,topology,implementation_map,routing,topology_snapshot}.py
 graph/nodes/<eleven-logical-phases>/
@@ -234,9 +250,12 @@ is removed. Any future `ResearchState` field addition must declare its writer,
 reader, and reducer. Change 03 added the gate kernel. Change 04 adds
 `domain/work_units.py`, `engine/work_units/`, `graph/components/work_units.py`,
 and runtime-owned `work_unit_storage.py`/`work_unit_store.py`. Wave0 and Wave1
-use this single path with controlled fixture artifacts; later Wave,
-targeted-evidence, and rerun changes must reuse it rather than introduce another
-submit, ledger, retry, or drain authority.
+use this single path with controlled fixture artifacts. Change 06 adds
+`domain/profile.py`, `graph/nodes/hitl1/prompts.py`, and
+`runtime/request_bundle.py`; later topic planning consumes the checkpoint short
+profile fields and `profile_ref` rather than reparsing user text. Later Wave,
+targeted-evidence, and rerun changes must reuse the work-unit component rather
+than introduce another submit, ledger, retry, or drain authority.
 
 ## Development Order
 

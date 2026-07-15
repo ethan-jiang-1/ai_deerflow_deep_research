@@ -20,6 +20,8 @@ from deerflow_deep_research.domain.node_spec import (
     NodeSpec,
     PolicyRef,
 )
+from deerflow_deep_research.domain.profile import RequestBundleStoreProtocol, ResearchProfile
+from deerflow_deep_research.domain.state import ContentRef
 
 _RID = "r_" + "a" * 43
 
@@ -103,3 +105,26 @@ class TestBootstrapBundleCapability:
     def test_non_declaring_spec_is_constructible(self) -> None:
         spec = _spec(capabilities=frozenset())
         assert NodeCapability.BOOTSTRAP_BUNDLE not in spec.capabilities
+
+
+class TestRequestBundleCapability:
+    def test_capability_member_exists(self) -> None:
+        assert NodeCapability.REQUEST_BUNDLE.value == "request_bundle"
+
+    def test_dependency_slot_defaults_to_none(self) -> None:
+        assert _deps().request_bundle is None
+
+    def test_dependency_slot_accepts_a_store(self) -> None:
+        class _Store:
+            async def write_profile(self, profile: ResearchProfile) -> ContentRef:
+                return ContentRef(
+                    sandbox_path=f"workspace/deep-research/{_RID}/request/profile.json",
+                    content_hash="h_" + "A" * 43,
+                )
+
+        deps = replace(_deps(), request_bundle=_Store())
+        assert isinstance(deps.request_bundle, RequestBundleStoreProtocol)
+
+    def test_declaring_spec_is_constructible(self) -> None:
+        spec = _spec(capabilities=frozenset({NodeCapability.REQUEST_BUNDLE}))
+        assert NodeCapability.REQUEST_BUNDLE in spec.capabilities

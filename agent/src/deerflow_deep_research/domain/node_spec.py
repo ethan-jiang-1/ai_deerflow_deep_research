@@ -25,6 +25,7 @@ from deerflow_deep_research.domain.enums import NodePhase
 if TYPE_CHECKING:
     from deerflow_deep_research.domain.bootstrap import BootstrapBundleStoreProtocol
     from deerflow_deep_research.domain.invocation import WorkUnitControllerDependencies
+    from deerflow_deep_research.domain.profile import RequestBundleStoreProtocol
 
 _LOGICAL_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 _POLICY_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{1,63}$")
@@ -48,6 +49,7 @@ class NodeExecutionCapabilities(Protocol):
 class NodeCapability(StrEnum):
     WORK_UNIT_CONTROLLER = "work_unit_controller"
     BOOTSTRAP_BUNDLE = "bootstrap_bundle"
+    REQUEST_BUNDLE = "request_bundle"
 
 
 @dataclass(frozen=True)
@@ -57,6 +59,7 @@ class NodeBuildDependencies:
     capabilities: NodeExecutionCapabilities
     work_units: WorkUnitControllerDependencies | None = None
     bootstrap_bundle: BootstrapBundleStoreProtocol | None = None
+    request_bundle: RequestBundleStoreProtocol | None = None
 
 
 NodeFactory = Callable[[NodeBuildDependencies], NodeCallable]

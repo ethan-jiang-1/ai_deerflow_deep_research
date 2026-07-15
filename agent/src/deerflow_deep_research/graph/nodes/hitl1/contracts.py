@@ -8,7 +8,7 @@ class Hitl1Request(FrozenContract):
 
 
 class Hitl1Result(FrozenContract):
-    route: Literal["accepted", "cancel"]
+    route: Literal["accepted", "cancel", "needs_followup", "exhausted"]
 
 
 CONTRACTS = (Hitl1Request, Hitl1Result)

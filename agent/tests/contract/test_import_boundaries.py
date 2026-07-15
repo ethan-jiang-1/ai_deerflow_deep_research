@@ -167,14 +167,34 @@ def test_ordinary_node_module_cannot_import_graph_components(project_root: Path)
     _assert_error(project_root, "import.boundary")
 
 
-def test_hitl_fake_may_import_only_public_interrupt(project_root: Path) -> None:
+def test_hitl_fake_or_real_node_may_import_only_public_interrupt(project_root: Path) -> None:
+    _write(
+        project_root,
+        "agent/src/deerflow_deep_research/graph/nodes/hitl1/__init__.py",
+        'NODE_SPEC = object()\n__all__ = ["NODE_SPEC"]\n',
+    )
+    _write(project_root, "agent/src/deerflow_deep_research/graph/nodes/hitl1/contracts.py")
+    _write(
+        project_root,
+        "agent/src/deerflow_deep_research/graph/nodes/hitl1/fake.py",
+        "from langgraph.types import interrupt\n",
+    )
+    _write(
+        project_root,
+        "agent/src/deerflow_deep_research/graph/nodes/hitl1/node.py",
+        "from langgraph.types import interrupt\n",
+    )
+    result = _run_checker(project_root)
+    assert result.returncode == 0, result.stderr
+
+
+def test_non_hitl_fake_cannot_import_interrupt(project_root: Path) -> None:
     _write(
         project_root,
         "agent/src/deerflow_deep_research/graph/nodes/alpha/fake.py",
         "from langgraph.types import interrupt\n",
     )
-    result = _run_checker(project_root)
-    assert result.returncode == 0, result.stderr
+    _assert_error(project_root, "import.boundary")
 
 
 def test_production_app_import_fails(project_root: Path) -> None:

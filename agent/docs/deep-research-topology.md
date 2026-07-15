@@ -36,6 +36,8 @@ final_delivery --pass--> completed
 final_delivery --repair--> final_delivery
 hitl1 --accepted--> topic_planning
 hitl1 --cancel--> cancelled
+hitl1 --exhausted--> blocked
+hitl1 --needs_followup--> hitl1
 hitl2 --cancel--> cancelled
 hitl2 --proceed--> readiness
 hitl2 --repair--> targeted_evidence

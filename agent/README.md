@@ -5,10 +5,11 @@ for DeerFlow 2.1. Its controller is a nested Python `StateGraph`; bounded agent
 loops execute inside graph nodes. DeerFlow remains the host runtime and does not
 import this package.
 
-Changes 00 through 03 are complete and archived. The active change 04 adds the
-shared work-unit kernel beneath Wave0 and Wave1 while keeping every lifecycle
-result labelled `implementation_mode=full_fake`: no node calls a model, network,
-or sandbox research tool, and fixture submissions are not findings or a report.
+Changes 00 through 05 are complete. Change 06 adds real HITL1 on top of the real
+bootstrap bundle while keeping every lifecycle result labelled
+`implementation_mode=full_fake`: topic planning, research waves, synthesis,
+HITL2, readiness, and final delivery are still deterministic fakes and produce
+no findings or report.
 
 ## Work-Unit Kernel
 
@@ -42,6 +43,26 @@ owned `result.json` and declared `outputs/`, and submit-owned ledger lock/stagin
 JSONL files. Later Wave, targeted-evidence, and rerun implementations must reuse
 this component, validator, store, ledger, retry, and drain path rather than add a
 second delegated-completion authority.
+
+## Real Bootstrap And HITL1
+
+Real bootstrap establishes `workspace/deep-research/<research_id>/request/marker.json`
+through a runtime-owned `BootstrapBundleStore`. Real HITL1 is available only in
+the mixed implementation map with `bootstrap=real` and `hitl1=real`; it calls the
+runtime node-agent bridge with a zero-tool, one-model-call policy to draft a
+structured brief, then uses the existing graph interrupt/resume protocol for
+human profile input.
+
+The final validated profile is written as canonical JSON to
+`request/profile.json` through `RequestBundleStore` and referenced from
+`ResearchState.profile_ref`. Checkpoints store only short profile fields,
+`must_answer_questions`, `degraded_profile`, and bounded follow-up progress
+(`pending_profile`, `profile_followup_round`) without bumping schema version 2.
+Incomplete HITL1 answers route explicitly through `hitl1 --needs_followup--> hitl1`;
+brief-generation failure routes through `hitl1 --exhausted--> blocked`.
+
+No `backend/`, `frontend/`, root config, extension, skill, Agent/SOUL, MCP, ACP,
+or lead-agent middleware surface is modified by the real HITL1 change.
 
 ## Requirements
 

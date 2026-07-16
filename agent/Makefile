@@ -1,4 +1,4 @@
-.PHONY: install lock-check format lint test test-unit test-contract test-viability test-durability test-blocking-io test-postgres demo demo-scripted demo-real demo-tui
+.PHONY: install lock-check format lint test test-unit test-contract test-viability test-durability test-blocking-io test-postgres demo demo-scripted demo-real demo-tui demo-tui-real
 
 DEMO_ARGS ?=
 
@@ -22,6 +22,9 @@ demo-real:
 # production DeerFlow Terminal Workbench or generic human-input integration.
 demo-tui:
 	uv run --extra operations --extra demo-tui python scripts/demo_tui.py
+
+demo-tui-real:
+	uv run --extra operations --extra demo-tui python scripts/demo_tui.py --real
 
 lock-check:
 	uv lock --check

@@ -26,6 +26,9 @@ from deerflow_deep_research.tool import run_deep_research
 Stage = Literal["question", "hitl1", "hitl2", "terminal"]
 
 
+_TUI_REAL_MODE = False
+
+
 class DeepResearchDemoTUI(App[None]):
     """A thin presentation shell; lifecycle authority stays in the real graph."""
 
@@ -45,9 +48,23 @@ class DeepResearchDemoTUI(App[None]):
         super().__init__()
         self.stage: Stage = "question"
         self.adapter = DemoAdapter()
+        self._build_host()
+
+    def _build_host(self) -> None:
+        from deerflow_deep_research.graph.builder import build_research_graph
+        from deerflow_deep_research.graph.topology import LOGICAL_NODES
+
+        if _TUI_REAL_MODE:
+            modes: dict[str, str] = {name: "fake" for name in LOGICAL_NODES}
+            modes.update({"hitl2": "real", "rerun": "real", "readiness": "real", "final_delivery": "real"})
+            impl_modes: dict[str, str] | None = modes
+        else:
+            impl_modes = None
         self.host = build_control_graph_host(
             fingerprint_verifier=lambda _app_config: None,
-            research_recipe=ResearchGraphRecipe.create(
+            research_recipe=ResearchGraphRecipe(
+                builder=build_research_graph(implementation_modes=impl_modes),
+                requires_work_units=True,
                 work_unit_store_factory=self.adapter.create_work_unit_store,
             ),
         )
@@ -59,9 +76,10 @@ class DeepResearchDemoTUI(App[None]):
         self.resume_invocations = 0
 
     def compose(self) -> ComposeResult:
+        mode_text = "real: hitl2, rerun, readiness, final_delivery" if _TUI_REAL_MODE else "full_fake"
         yield Static(
             Text(
-                "Deep Research lifecycle demo · ZERO API · implementation_mode=full_fake\n"
+                f"Deep Research lifecycle demo · ZERO API · {mode_text}\n"
                 "Standalone visualization only — no findings or report are produced",
                 style="bold cyan",
             ),
@@ -256,6 +274,12 @@ class DeepResearchDemoTUI(App[None]):
 
 
 def main() -> None:
+    import argparse
+    global _TUI_REAL_MODE
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--real", action="store_true", help="Run non-agent nodes in real mode.")
+    args = parser.parse_args()
+    _TUI_REAL_MODE = args.real
     DeepResearchDemoTUI().run()
 
 

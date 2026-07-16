@@ -1,4 +1,4 @@
-.PHONY: install lock-check format lint test test-unit test-contract test-viability test-durability test-blocking-io test-postgres demo demo-scripted demo-tui
+.PHONY: install lock-check format lint test test-unit test-contract test-viability test-durability test-blocking-io test-postgres demo demo-scripted demo-real demo-tui
 
 DEMO_ARGS ?=
 
@@ -13,6 +13,10 @@ demo:
 # Non-interactive equivalent used by CI and quick smoke checks.
 demo-scripted:
 	uv run --extra operations python scripts/demo.py --scripted $(DEMO_ARGS)
+
+# Real non-agent nodes (hitl2, rerun, readiness, final_delivery) + scripted HITL.
+demo-real:
+	uv run --extra operations python scripts/demo.py --scripted --real
 
 # Standalone visual shell over the same zero-API lifecycle. This is not the
 # production DeerFlow Terminal Workbench or generic human-input integration.

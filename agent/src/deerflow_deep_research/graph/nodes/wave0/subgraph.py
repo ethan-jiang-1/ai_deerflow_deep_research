@@ -33,6 +33,34 @@ WAVE0_FIXTURE_INTENTS = tuple(
 )
 
 
+def materialize_wave0_intents(
+    topic_registry: Mapping[str, Any] | tuple[Mapping[str, Any], ...] | None,
+) -> tuple[WorkIntent, ...]:
+    """Build one real source-intake ``WorkIntent`` per topic in the planner registry.
+
+    @impl WAN-001
+    """
+    intents: list[WorkIntent] = []
+    for entry in topic_registry or ():
+        if not isinstance(entry, Mapping):
+            continue
+        topic_id = entry.get("topic_id")
+        if not isinstance(topic_id, str) or not topic_id.strip():
+            continue
+        intents.append(
+            WorkIntent(
+                worker_role="wave0_intake",
+                scope=(topic_id,),
+                result_contract="wave0.source-intake",
+                result_schema_version=1,
+                required_outputs=(),
+            )
+        )
+    if not intents:
+        raise ValueError("topic_registry_empty")
+    return tuple(intents)
+
+
 async def run_wave0_work_units(
     state: Mapping[str, Any],
     *,
@@ -51,4 +79,4 @@ async def run_wave0_work_units(
     )
 
 
-__all__ = ["WAVE0_FIXTURE_INTENTS", "run_wave0_work_units"]
+__all__ = ["WAVE0_FIXTURE_INTENTS", "materialize_wave0_intents", "run_wave0_work_units"]

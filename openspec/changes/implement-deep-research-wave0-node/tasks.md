@@ -7,15 +7,15 @@
 
 ## 2. Source canonicalization and submit-validation checks
 
-- [ ] 2.1 Add red tests that submit validation for `wave0.source-intake` canonicalizes each source URL via `canonicalize_source_url`, rejects non-canonical input, snippet-as-cache, cross-attempt/out-of-containment writes, and hash mismatch against fetched bytes, and deduplicates sources that canonicalize to the same URL per topic. @impl WAN-003
-- [ ] 2.2 Implement the wave0 source-intake validator (pure) wired into the registry until 2.1 is green. @impl WAN-003
+- [x] 2.1 Add red tests that submit validation for `wave0.source-intake` canonicalizes each source URL via `canonicalize_source_url`, rejects non-canonical input, snippet-as-cache, cross-attempt/out-of-containment writes, and hash mismatch against fetched bytes, and deduplicates sources that canonicalize to the same URL per topic. @impl WAN-003
+- [x] 2.2 Implement the wave0 source-intake validator (pure) wired into the registry until 2.1 is green. @impl WAN-003
 
 ## 3. Topic-to-work materialization and worker prompt
 
-- [ ] 3.1 Add red tests for `materialize_wave0_intents(topic_registry)` producing one `WorkIntent` per topic (scope binding topic id + must-answer questions, required outputs declaring source-intake artifacts) and rejecting an empty registry. @impl WAN-001
-- [ ] 3.2 Implement the intent materializer under the wave0 package until 3.1 is green. @impl WAN-001
-- [ ] 3.3 Add red tests for `build_wave0_worker_prompt(work_spec, topic)` producing a bounded `NodeExecutionRequest` whose objective carries the topic scope and whose instructions keep fetched content as untrusted data; verify the trusted policy prompt is never overridden by source text. @impl WAN-002
-- [ ] 3.4 Implement `graph/nodes/wave0/prompts.py` until 3.3 is green. @impl WAN-002
+- [x] 3.1 Add red tests for `materialize_wave0_intents(topic_registry)` producing one `WorkIntent` per topic (scope binding topic id + must-answer questions, required outputs declaring source-intake artifacts) and rejecting an empty registry. @impl WAN-001
+- [x] 3.2 Implement the intent materializer under the wave0 package until 3.1 is green. @impl WAN-001
+- [x] 3.3 Add red tests for `build_wave0_worker_prompt(work_spec, topic)` producing a bounded `NodeExecutionRequest` whose objective carries the topic scope and whose instructions keep fetched content as untrusted data; verify the trusted policy prompt is never overridden by source text. @impl WAN-002
+- [x] 3.4 Implement `graph/nodes/wave0/prompts.py` until 3.3 is green. @impl WAN-002
 
 ## 4. Real Wave0 node, subgraph, and worker
 

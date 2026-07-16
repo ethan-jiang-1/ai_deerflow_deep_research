@@ -111,29 +111,15 @@ def _answer(prompt: str, *, scripted: bool, default: str) -> str:
     return value or default
 
 
-async def run_demo(*, question: str, scripted: bool, real: bool = False) -> None:
-    if real:
-        from deerflow_deep_research.graph.topology import LOGICAL_NODES
-
-        modes: dict[str, str] = {name: "fake" for name in LOGICAL_NODES}
-        modes.update({"hitl2": "real", "rerun": "real", "readiness": "real", "final_delivery": "real"})
-        implementation_modes: dict[str, str] | None = modes
-        print("DeerFlow Deep Research — real: hitl2, rerun, readiness, final_delivery")
-    else:
-        implementation_modes = None
-        print("DeerFlow Deep Research — full-fake mode (add --real for real non-agent nodes)")
-
+async def run_demo(*, question: str, scripted: bool) -> None:
+    print("DeerFlow Deep Research — Change 01 terminal demo")
+    print("ZERO API / implementation_mode=full_fake / no findings or report will be produced")
     adapter = DemoAdapter()
-    from deerflow_deep_research.graph.builder import build_research_graph
-
-    recipe = ResearchGraphRecipe(
-        builder=build_research_graph(implementation_modes=implementation_modes),
-        requires_work_units=True,
-        work_unit_store_factory=adapter.create_work_unit_store,
-    )
     host = build_control_graph_host(
         fingerprint_verifier=lambda _app_config: None,
-        research_recipe=recipe,
+        research_recipe=ResearchGraphRecipe.create(
+            work_unit_store_factory=adapter.create_work_unit_store,
+        ),
     )
     start_user = HumanMessage(content=question, id="demo-human-start")
     start_call = _tool_call("start", "demo-call-start")
@@ -233,13 +219,8 @@ def main() -> None:
         action="store_true",
         help="Use deterministic HITL answers instead of prompting on stdin.",
     )
-    parser.add_argument(
-        "--real",
-        action="store_true",
-        help="Run non-agent nodes (hitl2, rerun, readiness, final_delivery) in real mode.",
-    )
     args = parser.parse_args()
-    asyncio.run(run_demo(question=args.question, scripted=args.scripted, real=args.real))
+    asyncio.run(run_demo(question=args.question, scripted=args.scripted))
 
 
 if __name__ == "__main__":

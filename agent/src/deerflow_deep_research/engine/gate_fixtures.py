@@ -196,7 +196,7 @@ def build_wave1_real_gate_def() -> GateDefinition:
     return GateDefinition(
         phase="wave1",
         rules=(_work_unit_completion_rule(),),
-        default_budget=3,
+        default_budget=5,
         route_map=_wave_route_map(),
     )
 
@@ -213,7 +213,7 @@ def build_wave0_real_gate_def() -> GateDefinition:
     return GateDefinition(
         phase="wave0",
         rules=(_work_unit_completion_rule(),),
-        default_budget=3,
+        default_budget=5,
         route_map=_wave_route_map(),
     )
 

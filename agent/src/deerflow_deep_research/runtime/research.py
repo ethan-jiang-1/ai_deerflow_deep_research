@@ -19,7 +19,7 @@ from typing import Any
 
 from langgraph.types import Command
 
-from deerflow_deep_research.agents.policies import ExecutionBudget, ExecutionPolicy
+from deerflow_deep_research.agents.policies import ExecutionBudget, ExecutionPolicy, ToolPolicySpec
 from deerflow_deep_research.domain.invocation import GraphInvocationContext, WorkUnitControllerDependencies
 from deerflow_deep_research.domain.lifecycle import (
     DeepResearchControlResult,
@@ -240,16 +240,20 @@ def _wave0_worker_policy(graph_context: Any) -> ExecutionPolicy:
         read_roots=(graph_context.workspace_root, graph_context.uploads_root),
         write_roots=(graph_context.workspace_root,),
         attempt_root=graph_context.workspace_root,
+        tool_specs=tuple(
+            ToolPolicySpec(tool_name=name, effect="read", native_cancellable=True)
+            for name in WAVE0_WORKER_TOOL_NAMES
+        ),
         budget=ExecutionBudget(
-            max_model_calls=6,
-            max_total_tool_calls=30,
-            max_tool_calls_per_response=6,
-            max_parallel_tool_calls=2,
-            total_token_budget=48_000,
-            per_call_output_token_cap=8_192,
-            per_tool_result_bytes=131_072,
-            structured_result_bytes=16_384,
-            wall_time_seconds=240.0,
+            max_model_calls=50,
+            max_total_tool_calls=200,
+            max_tool_calls_per_response=12,
+            max_parallel_tool_calls=12,
+            total_token_budget=2_000_000,
+            per_call_output_token_cap=64_000,
+            per_tool_result_bytes=512_000,
+            structured_result_bytes=64_000,
+            wall_time_seconds=900.0,
         ),
     )
 
@@ -280,16 +284,20 @@ def _wave1_worker_policy(graph_context: Any) -> ExecutionPolicy:
         read_roots=(graph_context.workspace_root, graph_context.uploads_root),
         write_roots=(graph_context.workspace_root,),
         attempt_root=graph_context.workspace_root,
+        tool_specs=tuple(
+            ToolPolicySpec(tool_name=name, effect="read", native_cancellable=True)
+            for name in WAVE1_WORKER_TOOL_NAMES
+        ),
         budget=ExecutionBudget(
-            max_model_calls=3,
-            max_total_tool_calls=20,
-            max_tool_calls_per_response=5,
-            max_parallel_tool_calls=2,
-            total_token_budget=32_768,
-            per_call_output_token_cap=8_192,
-            per_tool_result_bytes=131_072,
-            structured_result_bytes=16_384,
-            wall_time_seconds=180.0,
+            max_model_calls=50,
+            max_total_tool_calls=200,
+            max_tool_calls_per_response=12,
+            max_parallel_tool_calls=12,
+            total_token_budget=2_000_000,
+            per_call_output_token_cap=64_000,
+            per_tool_result_bytes=512_000,
+            structured_result_bytes=64_000,
+            wall_time_seconds=900.0,
         ),
     )
 

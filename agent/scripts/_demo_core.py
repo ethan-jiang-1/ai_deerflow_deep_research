@@ -175,10 +175,11 @@ class DemoAdapter:
         # returns our sandbox (required by verify_runtime_work_unit_storage).
         _prime_demo_sandbox(sandbox)
 
+        _suffix = secrets.token_hex(4)
         self._envelope = TrustedRuntimeEnvelope(
             effective_user_id="demo-user",
-            outer_thread_id="demo-thread",
-            outer_run_id="demo-run",
+            outer_thread_id=f"demo-thread-{_suffix}",
+            outer_run_id=f"demo-run-{_suffix}",
             app_config=DemoAppConfig(),
             workspace_host_path=workspace,
             uploads_host_path=uploads,

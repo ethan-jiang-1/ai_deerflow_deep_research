@@ -769,6 +769,57 @@ class WorkSpecRef(_FrozenModel):
     spec_hash: str = Field(pattern=CONTENT_HASH_RE.pattern)
 
 
+class WorkerSource(_FrozenModel):
+    """One source a Wave0 worker proposes, referencing its fetched content."""
+
+    source_id: str = Field(pattern=SOURCE_ID_RE.pattern)
+    canonical_url: str = Field(min_length=1, max_length=2048)
+    title: str = Field(min_length=1, max_length=MAX_SOURCE_TITLE_CHARS)
+    content_ref: str
+    content_hash: str
+    byte_count: int = Field(ge=1)
+    fetch_status: Literal["fetched", "degraded"]
+
+    @field_validator("canonical_url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        if canonicalize_source_url(value) != value:
+            raise ValueError("canonical_url_not_canonical")
+        return value
+
+    @field_validator("content_ref")
+    @classmethod
+    def validate_content_ref(cls, value: str) -> str:
+        return _validate_bundle_ref(value, field_name="content_ref")
+
+
+WAVE0_WORKER_OUTPUT_SCHEMA_VERSION = 1
+
+
+class Wave0WorkerOutput(_FrozenModel):
+    """The bounded structured output a Wave0 worker returns from ``run_agent``."""
+
+    schema_version: Literal[1] = WAVE0_WORKER_OUTPUT_SCHEMA_VERSION
+    sources: Annotated[tuple[WorkerSource, ...], Field(min_length=1, max_length=MAX_SOURCE_REFS)]
+    baseline_facts: Annotated[tuple[str, ...], Field(default=(), max_length=MAX_BASELINE_FACTS)] = ()
+    limitations: str = Field(default="", max_length=MAX_SOURCE_LIMITATIONS_CHARS)
+
+    @field_validator("baseline_facts")
+    @classmethod
+    def validate_baseline_facts(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        for item in values:
+            if not isinstance(item, str) or not item.strip() or len(item) > MAX_BASELINE_FACT_CHARS:
+                raise ValueError("baseline_fact_invalid")
+        return values
+
+    @model_validator(mode="after")
+    def validate_independent_sources(self) -> Wave0WorkerOutput:
+        urls = [source.canonical_url for source in self.sources]
+        if len(set(urls)) != len(urls):
+            raise ValueError("sources_not_independent")
+        return self
+
+
 class AttemptRef(_FrozenModel):
     created_at: datetime
     started_at: datetime | None = None
@@ -1114,8 +1165,11 @@ __all__ = [
     "AttemptTerminalUpdate",
     "CandidateResult",
     "FixtureResultDocument",
+    "WAVE0_WORKER_OUTPUT_SCHEMA_VERSION",
     "Wave0SourceIntakeResult",
     "Wave0SourceMeta",
+    "Wave0WorkerOutput",
+    "WorkerSource",
     "OutputRef",
     "PlannedRead",
     "SourceRef",

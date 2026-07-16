@@ -12,10 +12,14 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from deerflow_deep_research.domain.work_units import Attempt, WorkSpec, compute_work_spec_hash
-from deerflow_deep_research.graph.nodes.wave0.prompts import (
+from deerflow_deep_research.domain.work_units import (
+    Attempt,
     Wave0WorkerOutput,
     WorkerSource,
+    WorkSpec,
+    compute_work_spec_hash,
+)
+from deerflow_deep_research.graph.nodes.wave0.prompts import (
     build_wave0_result_document,
     build_wave0_worker_prompt,
     parse_wave0_worker_output,

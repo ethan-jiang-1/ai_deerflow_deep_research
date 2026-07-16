@@ -1,68 +1,26 @@
 """Source-intake worker prompt and structured-output helpers for real Wave0.
 
+The structured-output contracts (``WorkerSource``/``Wave0WorkerOutput``) live in
+``domain.work_units``; this node-local module only builds the prompt and merges
+the worker output with work-spec identity.
+
 @impl WAN-002
 """
 
 from __future__ import annotations
 
 import json
-from typing import Literal
 
-from pydantic import Field, field_validator
-
-from deerflow_deep_research.domain.bundle import canonicalize_source_url
 from deerflow_deep_research.domain.context import NodeExecutionRequest
-from deerflow_deep_research.domain.lifecycle import FrozenContract
 from deerflow_deep_research.domain.work_units import (
-    MAX_BASELINE_FACTS,
-    MAX_BASELINE_FACT_CHARS,
-    MAX_SOURCE_LIMITATIONS_CHARS,
     MAX_SOURCE_REFS,
     MAX_SOURCE_TITLE_CHARS,
-    SOURCE_ID_RE,
     Wave0SourceIntakeResult,
     Wave0SourceMeta,
+    Wave0WorkerOutput,
     WorkSpec,
     Attempt,
 )
-
-WAVE0_WORKER_OUTPUT_SCHEMA_VERSION = 1
-
-
-class WorkerSource(FrozenContract):
-    """One source a Wave0 worker proposes, referencing its fetched content."""
-
-    source_id: str = Field(pattern=SOURCE_ID_RE.pattern)
-    canonical_url: str = Field(min_length=1, max_length=2048)
-    title: str = Field(min_length=1, max_length=MAX_SOURCE_TITLE_CHARS)
-    content_ref: str
-    content_hash: str
-    byte_count: int = Field(ge=1)
-    fetch_status: Literal["fetched", "degraded"]
-
-    @field_validator("canonical_url")
-    @classmethod
-    def _canonical(cls, value: str) -> str:
-        if canonicalize_source_url(value) != value:
-            raise ValueError("canonical_url_not_canonical")
-        return value
-
-
-class Wave0WorkerOutput(FrozenContract):
-    """The bounded structured output a Wave0 worker returns from ``run_agent``."""
-
-    schema_version: Literal[1] = WAVE0_WORKER_OUTPUT_SCHEMA_VERSION
-    sources: tuple[WorkerSource, ...] = Field(min_length=1, max_length=MAX_SOURCE_REFS)
-    baseline_facts: tuple[str, ...] = Field(default=(), max_length=MAX_BASELINE_FACTS)
-    limitations: str = Field(default="", max_length=MAX_SOURCE_LIMITATIONS_CHARS)
-
-    @field_validator("baseline_facts")
-    @classmethod
-    def _bound_facts(cls, values: tuple[str, ...]) -> tuple[str, ...]:
-        for item in values:
-            if not isinstance(item, str) or not item.strip() or len(item) > MAX_BASELINE_FACT_CHARS:
-                raise ValueError("baseline_fact_invalid")
-        return values
 
 
 def _topic_from_scope(spec: WorkSpec, topic_registry: tuple[dict, ...] | list[dict] | None) -> dict:
@@ -74,7 +32,9 @@ def _topic_from_scope(spec: WorkSpec, topic_registry: tuple[dict, ...] | list[di
     return {"topic_id": topic_id, "title": topic_id, "scope": "", "must_answer_bindings": ()}
 
 
-def build_wave0_worker_prompt(spec: WorkSpec, topic_registry: tuple[dict, ...] | None) -> NodeExecutionRequest:
+def build_wave0_worker_prompt(
+    spec: WorkSpec, topic_registry: tuple[dict, ...] | list[dict] | None
+) -> NodeExecutionRequest:
     """Build the bounded source-intake worker request for one topic work spec."""
     topic = _topic_from_scope(spec, topic_registry)
     bindings = topic.get("must_answer_bindings") or ()
@@ -100,7 +60,7 @@ def build_wave0_worker_prompt(spec: WorkSpec, topic_registry: tuple[dict, ...] |
     )
     expected = {
         "instruction": "Return exactly one JSON object and no markdown, prose, or code fences.",
-        "schema_version": WAVE0_WORKER_OUTPUT_SCHEMA_VERSION,
+        "schema_version": 1,
         "required_keys": ["schema_version", "sources"],
         "source_required_keys": [
             "source_id",
@@ -172,9 +132,6 @@ def build_wave0_result_document(
 
 
 __all__ = [
-    "WAVE0_WORKER_OUTPUT_SCHEMA_VERSION",
-    "Wave0WorkerOutput",
-    "WorkerSource",
     "build_wave0_result_document",
     "build_wave0_worker_prompt",
     "parse_wave0_worker_output",

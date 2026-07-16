@@ -19,15 +19,15 @@
 
 ## 4. Real Wave0 node, subgraph, and worker
 
-- [ ] 4.1 Add red tests for the real `wave0/node.py` factory: it reads `topic_registry`, drives the shared work-unit component with real intents and a real worker, and returns `node_update` + parent work-block update + `WorkUnitGateView`; empty registry fails closed. @impl WAN-001
-- [ ] 4.2 Implement the real factory (replace `UNAVAILABLE_REAL_FACTORY`); extend `wave0/subgraph.py` to accept real intents + a real worker callable; keep `fake.py` unchanged. Until 4.1 is green. @impl WAN-001
-- [ ] 4.3 Add red tests for the real worker callable: it calls `capabilities.run_agent()` once per attempt under the worker policy, writes its result via the attempt artifact writer, writes only under its `attempt_root`, and routes fetched content through the untrusted-data path. Use fake capabilities returning a `NodeExecutionResult`, not `FakeToolCallingModel` directly. @impl WAN-002
-- [ ] 4.4 Implement the real worker until 4.3 is green. @impl WAN-002
+- [x] 4.1 Add red tests for the real `wave0/node.py` factory: it reads `topic_registry`, drives the shared work-unit component with real intents and a real worker, and returns `node_update` + parent work-block update + `WorkUnitGateView`; empty registry fails closed. @impl WAN-001
+- [x] 4.2 Implement the real factory (replace `UNAVAILABLE_REAL_FACTORY`); extend `wave0/subgraph.py` to accept real intents + a real worker callable; keep `fake.py` unchanged. Until 4.1 is green. @impl WAN-001
+- [x] 4.3 Add red tests for the real worker callable: it calls `capabilities.run_agent()` once per attempt under the worker policy, writes its result via the attempt artifact writer, writes only under its `attempt_root`, and routes fetched content through the untrusted-data path. Use fake capabilities returning a `NodeExecutionResult`, not `FakeToolCallingModel` directly. @impl WAN-002
+- [x] 4.4 Implement the real worker until 4.3 is green. @impl WAN-002
 
 ## 5. Worker bridge policy and recipe wiring
 
-- [ ] 5.1 Add red tests in `tests/unit/test_research_runtime_capabilities.py` that `ResearchGraphRecipe` detects `wave0=real`, rejects it unless `topic_planning=real` (which requires `hitl1=real` + `bootstrap=real`), constructs a real `RuntimeNodeAgentBridge` for the wave0 worker with a non-empty `allowed_tool_names` web set and attempt-scoped read/write roots, and does not attach request-bundle/bootstrap for wave0. @impl WAN-002, WAN-005, NOA-001, NOA-002
-- [ ] 5.2 Wire `runtime/research.py` with a real wave0 worker `ExecutionPolicy` (web tool names, per-tool `ToolPolicySpec`, attempt-scoped roots) using `_default_tools_resolver`, and the `wave0=real` recipe dependency guard. Until 5.1 is green. @impl WAN-002, WAN-005, NOA-001, NOA-002
+- [x] 5.1 Add red tests in `tests/unit/test_research_runtime_capabilities.py` that `ResearchGraphRecipe` detects `wave0=real`, rejects it unless `topic_planning=real` (which requires `hitl1=real` + `bootstrap=real`), constructs a real `RuntimeNodeAgentBridge` for the wave0 worker with a non-empty `allowed_tool_names` web set and attempt-scoped read/write roots, and does not attach request-bundle/bootstrap for wave0. @impl WAN-002, WAN-005, NOA-001, NOA-002
+- [x] 5.2 Wire `runtime/research.py` with a real wave0 worker `ExecutionPolicy` (web tool names, per-tool `ToolPolicySpec`, attempt-scoped roots) using `_default_tools_resolver`, and the `wave0=real` recipe dependency guard. Until 5.1 is green. @impl WAN-002, WAN-005, NOA-001, NOA-002
 
 ## 6. Real Wave0 gate with source floor and degraded capture
 

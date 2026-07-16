@@ -115,6 +115,7 @@ class ResearchGraphRecipe:
     requires_bootstrap_bundle: bool = False
     requires_request_bundle: bool = False
     requires_node_agent_bridge: bool = False
+    requires_wave0_worker_bridge: bool = False
     work_unit_store_factory: Any = None
     request_bundle_store_factory: Any = None
     node_agent_bridge_factory: Any = None
@@ -132,16 +133,20 @@ class ResearchGraphRecipe:
         hitl1_real = modes.get("hitl1") == "real"
         bootstrap_real = modes.get("bootstrap") == "real"
         topic_planning_real = modes.get("topic_planning") == "real"
+        wave0_real = modes.get("wave0") == "real"
         if hitl1_real and not bootstrap_real:
             raise ValueError("hitl1_real_requires_bootstrap_real")
         if topic_planning_real and not hitl1_real:
             raise ValueError("topic_planning_real_requires_hitl1_real")
+        if wave0_real and not topic_planning_real:
+            raise ValueError("wave0_real_requires_topic_planning_real")
         return cls(
             builder=build_research_graph(implementation_modes=implementation_modes),
             requires_work_units=True,
             requires_bootstrap_bundle=bootstrap_real,
             requires_request_bundle=hitl1_real,
             requires_node_agent_bridge=hitl1_real or topic_planning_real,
+            requires_wave0_worker_bridge=wave0_real,
             work_unit_store_factory=work_unit_store_factory,
             request_bundle_store_factory=request_bundle_store_factory,
             node_agent_bridge_factory=node_agent_bridge_factory,
@@ -190,6 +195,54 @@ def _build_hitl1_capabilities(envelope: TrustedRuntimeEnvelope, graph_context: A
         policy=policy,
         tools_resolver=lambda _envelope, _policy: (),
     )
+
+
+# Web search/fetch tool names a Wave0 source-intake worker may use. Concrete
+# provisioning is operator configuration; the bridge resolver intersects this set
+# with the tools configured for the deep-research agent. (WAN-002 / WAN-005)
+WAVE0_WORKER_TOOL_NAMES = frozenset(
+    {"tavily_search", "tavily_extract", "duckduckgo_search", "jina_ai", "firecrawl_scrape"}
+)
+
+
+def _wave0_worker_policy(graph_context: Any) -> ExecutionPolicy:
+    """Bounded multi-tool policy for a Wave0 source-intake worker.
+
+    @impl WAN-002
+    @impl NOA-001
+    @impl NOA-002
+    """
+    return ExecutionPolicy(
+        policy_name="wave0-source-intake",
+        allowed_tool_names=WAVE0_WORKER_TOOL_NAMES,
+        read_roots=(graph_context.workspace_root, graph_context.uploads_root),
+        write_roots=(graph_context.workspace_root,),
+        attempt_root=graph_context.workspace_root,
+        budget=ExecutionBudget(
+            max_model_calls=3,
+            max_total_tool_calls=12,
+            max_tool_calls_per_response=4,
+            max_parallel_tool_calls=2,
+            total_token_budget=24_576,
+            per_call_output_token_cap=4_096,
+            per_tool_result_bytes=131_072,
+            structured_result_bytes=8_192,
+            wall_time_seconds=120.0,
+        ),
+    )
+
+
+def _build_wave0_capabilities(envelope: TrustedRuntimeEnvelope, graph_context: Any, factory: Any) -> Any:
+    """Construct the Wave0 worker node-agent bridge with real web tools.
+
+    Unlike the HITL1/topic-planning bridge, this uses the default tools resolver
+    so the worker receives configured web search/fetch tools filtered by the
+    policy. Per-attempt isolation of controller artifacts is enforced by the
+    attempt-scoped artifact writer; fetched content is untrusted data.
+    """
+    policy = _wave0_worker_policy(graph_context)
+    bridge_factory = factory or RuntimeNodeAgentBridge
+    return bridge_factory(envelope=envelope, policy=policy)
 
 
 def _durability(envelope: TrustedRuntimeEnvelope) -> Durability:
@@ -300,7 +353,13 @@ class ResearchActionHandler:
             if include_work_units and self._recipe.requires_node_agent_bridge
             else None
         )
+        wave0_capabilities = (
+            _build_wave0_capabilities(envelope, graph_context, self._recipe.node_agent_bridge_factory)
+            if include_work_units and self._recipe.requires_wave0_worker_bridge
+            else None
+        )
         base_resolver = RuntimeNodeDependencyResolver(graph_context, capabilities)
+        worker_resolver = RuntimeNodeDependencyResolver(graph_context, wave0_capabilities)
         work_units = None
         bootstrap_bundle = None
         request_bundle = None
@@ -309,7 +368,7 @@ class ResearchActionHandler:
             store = await store_factory(envelope, research_id=research_id)
             work_units = WorkUnitControllerDependencies(
                 store=store,
-                resolver=RuntimeWorkUnitDependencyResolver(graph_context, base_resolver, store),
+                resolver=RuntimeWorkUnitDependencyResolver(graph_context, worker_resolver, store),
             )
             if self._recipe.requires_bootstrap_bundle:
                 bootstrap_bundle = await BootstrapBundleStore.create(envelope, research_id=research_id)

@@ -74,6 +74,10 @@ def test_explicit_registry_loads_package_root_only_specs() -> None:
             # Change 07 implements real topic planning; it declares no capability.
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
             assert spec.capabilities == frozenset()
+        elif name == "wave0":
+            # Change 08 implements real Wave0; it declares the work-unit controller capability.
+            assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
+            assert spec.capabilities == frozenset({NodeCapability.WORK_UNIT_CONTROLLER})
         else:
             assert spec.real_factory is UNAVAILABLE_REAL_FACTORY
         assert spec.logical_name == name

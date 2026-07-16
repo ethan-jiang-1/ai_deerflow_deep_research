@@ -37,6 +37,12 @@ _RID = "r_" + "A" * 43
 _FULL_FAKE = {name: "fake" for name in LOGICAL_NODES}
 _MIXED_HITL1 = _FULL_FAKE | {"bootstrap": "real", "hitl1": "real"}
 _MIXED_TOPIC = _FULL_FAKE | {"bootstrap": "real", "hitl1": "real", "topic_planning": "real"}
+_MIXED_WAVE0 = _FULL_FAKE | {
+    "bootstrap": "real",
+    "hitl1": "real",
+    "topic_planning": "real",
+    "wave0": "real",
+}
 
 
 class FakeAppConfig:
@@ -124,6 +130,29 @@ def test_recipe_detects_real_topic_planning_and_requires_real_hitl1() -> None:
         ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"topic_planning": "real"})
     with pytest.raises(ValueError, match="topic_planning_real_requires_hitl1_real"):
         ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"bootstrap": "real", "topic_planning": "real"})
+
+
+def test_recipe_detects_real_wave0_and_requires_real_topic_planning() -> None:
+    recipe = ResearchGraphRecipe.create(implementation_modes=_MIXED_WAVE0)
+    assert recipe.requires_node_agent_bridge is True  # hitl1/topic bridge
+    assert recipe.requires_wave0_worker_bridge is True
+
+    with pytest.raises(ValueError, match="wave0_real_requires_topic_planning_real"):
+        ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"wave0": "real"})
+    with pytest.raises(ValueError, match="wave0_real_requires_topic_planning_real"):
+        ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"bootstrap": "real", "wave0": "real"})
+
+
+def test_wave0_worker_bridge_has_web_tool_policy() -> None:
+    from deerflow_deep_research.runtime.projection import project_research_scope
+    from deerflow_deep_research.runtime.research import WAVE0_WORKER_TOOL_NAMES, _build_wave0_capabilities
+
+    graph_context = project_research_scope(_envelope(), research_scope_id=_RID)
+    bridge = _build_wave0_capabilities(_envelope(), graph_context, None)
+    assert isinstance(bridge, RuntimeNodeAgentBridge)
+    assert bridge.policy.allowed_tool_names == WAVE0_WORKER_TOOL_NAMES
+    assert bridge.policy.budget.max_total_tool_calls == 12
+    assert bridge.policy.policy_name == "wave0-source-intake"
 
 
 async def test_real_topic_planning_context_constructs_zero_tool_bridge(

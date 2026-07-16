@@ -581,13 +581,20 @@ async def run_fixture_work_unit_component(
     intents: tuple[WorkIntent, ...],
     clock: Callable[[], datetime],
     fault_hook: Callable[[str], None] | None = None,
+    worker: Worker | None = None,
 ) -> WorkUnitComponentResult:
-    """Run the controlled non-research fixture through the production submit path."""
+    """Run a controlled work-unit phase through the production submit path.
+
+    By default the fixture artifact-writing worker is used. Real phases (e.g.
+    Wave0 source intake) pass their own ``worker`` callable that calls the
+    runtime node-agent bridge; the shared reconcile/replay/retry/submit
+    scaffolding is reused unchanged.
+    """
 
     initial_records = await reconcile_parent_ledger_authority(parent_state, controller)
     records_by_work_id = {record.work_id: record for record in initial_records}
 
-    async def worker(spec: WorkSpec, attempt: Attempt) -> CandidateResult:
+    async def fixture_worker(spec: WorkSpec, attempt: Attempt) -> CandidateResult:
         resolved = await controller.resolver.resolve_worker(
             logical_name=logical_name,
             work_spec=spec,
@@ -706,6 +713,7 @@ async def run_fixture_work_unit_component(
     materialized_specs = replay_specs or retry_specs
     selected_attempts = replay_attempts or retry_attempts
     selected_intents = () if materialized_specs else intents
+    effective_worker = worker if worker is not None else fixture_worker
     return await run_work_unit_component(
         parent_state,
         config=WorkUnitComponentConfig(
@@ -720,7 +728,7 @@ async def run_fixture_work_unit_component(
             materialized_specs=materialized_specs,
             replay_attempts_by_work_id=selected_attempts,
         ),
-        worker=worker,
+        worker=effective_worker,
         submit=validate_and_submit,
         reconcile=reconcile,
     )

@@ -125,14 +125,14 @@ def test_incomplete_or_unknown_map_is_rejected() -> None:
 
 def test_explicit_mixed_override_preserves_identical_graph_shape() -> None:
     specs = load_research_node_specs()
-    test_wave0 = replace(specs["wave0"], real_factory=_fake_factory)
-    modes = {name: "fake" for name in LOGICAL_NODES} | {"wave0": "real"}
-    mixed = build_research_graph(implementation_modes=modes, spec_overrides={"wave0": test_wave0}).compile()
+    test_wave1 = replace(specs["wave1"], real_factory=_fake_factory)
+    modes = {name: "fake" for name in LOGICAL_NODES} | {"wave1": "real"}
+    mixed = build_research_graph(implementation_modes=modes, spec_overrides={"wave1": test_wave1}).compile()
     fake = build_research_graph().compile()
     assert {(edge.source, edge.target) for edge in mixed.get_graph().edges} == {
         (edge.source, edge.target) for edge in fake.get_graph().edges
     }
-    with pytest.raises(ImplementationMapError, match="implementation_unavailable.*wave0"):
+    with pytest.raises(ImplementationMapError, match="implementation_unavailable.*wave1"):
         build_research_graph(implementation_modes=modes)
 
 

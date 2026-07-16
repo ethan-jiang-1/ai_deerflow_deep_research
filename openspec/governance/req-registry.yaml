@@ -206,6 +206,11 @@ EVH-002: evaluation-hardening — Quality metrics compute citation precision, mu
 EVH-003: evaluation-hardening — Fault injection tests cover crash, timeout, cancel, and duplicate resume at key graph points with verified recovery or terminal outcome
 EVH-004: evaluation-hardening — Adversarial source tests verify prompt-injected content cannot gain control or forge submissions
 EVH-005: evaluation-hardening — Release gate combines deterministic hard CI checks with optional real-LLM canary tests; DPT parity audit documents achieved vs outstanding invariants
+EVH-006: evaluation-hardening — Every recorded real-mode integration incident maps to a deterministic regression at the lowest responsible test seam with stable diagnostics
+EVH-007: evaluation-hardening — Typed reusable scenarios declare risk, required authenticity, inputs, expected workflow outcomes, artifacts, invariants, metrics, and traceability
+EVH-008: evaluation-hardening — Every real node and high-risk real-prefix workflow has zero-API conformance coverage through real graph/runtime policy paths with only external model and tool adapters replaced
+EVH-009: evaluation-hardening — Stable test selection separates network-free deterministic PR gates, credentialed live canaries, and full-real release acceptance without silent skips or overlap
+EVH-010: evaluation-hardening — Requirement-to-test coverage is mechanically checked and every live or E2E regression descends to the smallest reproducible deterministic scenario when feasible
 
 TEL-001: targeted-evidence-loop — Deterministic gap router converts synthesis gaps to bounded targeted WorkSpecs per gap with scoped search dimensions
 TEL-002: targeted-evidence-loop — Targeted worker performs focused web search per gap under attempt-scoped policy and produces structured evidence with backing refs

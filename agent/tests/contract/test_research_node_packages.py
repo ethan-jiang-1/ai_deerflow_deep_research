@@ -101,6 +101,10 @@ def test_explicit_registry_loads_package_root_only_specs() -> None:
             # Change 15 implements real readiness (non-gated, self-routing).
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
             assert spec.capabilities == frozenset()
+        elif name == "final_delivery":
+            # Change 16 implements real final delivery (writer + gate + terminal lifecycle).
+            assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
+            assert spec.capabilities == frozenset()
         else:
             assert spec.real_factory is UNAVAILABLE_REAL_FACTORY
         assert spec.logical_name == name

@@ -276,8 +276,19 @@ def build_fixture_gate_defs() -> dict[str, GateDefinition]:
     }
 
 
+def build_final_delivery_real_gate_def() -> GateDefinition:
+    """Real final delivery gate: report artifacts + evidence presence."""
+    return GateDefinition(
+        phase="final_delivery",
+        rules=(_make_fixture_rule("final_delivery", frozenset({PhaseVerdict.PASS, PhaseVerdict.REPAIR}), {}),),
+        default_budget=3,
+        route_map={PhaseVerdict.PASS: "pass", PhaseVerdict.REPAIR: "repair"},
+    )
+
+
 __all__ = [
     "FixtureSequenceRule",
+    "build_final_delivery_real_gate_def",
     "build_fixture_gate_defs",
     "build_wave0_real_gate_def",
     "build_wave1_real_gate_def",

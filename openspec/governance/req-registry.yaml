@@ -48,6 +48,7 @@ prefixes:
   WSN: wave2-synthesis-node
   REN: rerun-node
   REA: readiness-node
+  FID: final-delivery-node
 
 # ──────────────────────────────────────────────
 # Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
@@ -182,6 +183,13 @@ REA-004: readiness-node — The node writes its own route based on hard-rule res
 REA-005: readiness-node — The node collects all hard-rule failures and critic verdicts before determining the route; no single failure short-circuits the collection
 REA-006: readiness-node — Readiness critic runs under read-only bounded policy with structured output schema; invalid or malformed critic output fails closed
 REA-007: readiness-node — Real readiness integrates into mixed graph requiring full real chain through hitl2 with unchanged topology; full-fake readiness path preserved
+
+# final-delivery-node
+FID-001: final-delivery-node — Writer agent produces report.md and claim-citation-map from the readiness report plan as a bounded read-only agent loop without web tools
+FID-002: final-delivery-node — Final integrity gate verifies report artifacts exist and accepted evidence is present; report_refs empty routes to self-repair, evidence missing routes to evidence_blocked
+FID-003: final-delivery-node — Report conclusions are bounded by the readiness report plan; mandatory uncertainties are preserved; claim strength cannot exceed critic verdicts
+FID-004: final-delivery-node — Completed lifecycle is idempotent after gate pass; start/resume/status/cancel after completion return stable terminal state
+FID-005: final-delivery-node — Real final delivery integrates into mixed graph requiring real readiness with unchanged topology; full-fake path preserved
 
 TEL-001: targeted-evidence-loop — Deterministic gap router converts synthesis gaps to bounded targeted WorkSpecs per gap with scoped search dimensions
 TEL-002: targeted-evidence-loop — Targeted worker performs focused web search per gap under attempt-scoped policy and produces structured evidence with backing refs

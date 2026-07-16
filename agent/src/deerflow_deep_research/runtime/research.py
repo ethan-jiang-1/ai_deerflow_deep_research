@@ -157,6 +157,9 @@ class ResearchGraphRecipe:
         readiness_real = modes.get("readiness") == "real"
         if readiness_real and not hitl2_real:
             raise ValueError("readiness_real_requires_hitl2_real")
+        final_real = modes.get("final_delivery") == "real"
+        if final_real and not readiness_real:
+            raise ValueError("final_delivery_real_requires_readiness_real")
         return cls(
             builder=build_research_graph(implementation_modes=implementation_modes),
             requires_work_units=True,

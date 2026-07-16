@@ -12,6 +12,7 @@ from typing import Any
 
 from deerflow_deep_research.domain.gate import GateDefinition
 from deerflow_deep_research.engine.gate_fixtures import (
+    build_final_delivery_real_gate_def,
     build_fixture_gate_defs,
     build_wave0_real_gate_def,
     build_wave1_real_gate_def,
@@ -53,9 +54,15 @@ def real_wave2_gate_def() -> GateDefinition:
     return build_wave2_real_gate_def()
 
 
+def real_final_delivery_gate_def() -> GateDefinition:
+    """Return the real final delivery ``GateDefinition``."""
+    return build_final_delivery_real_gate_def()
+
+
 __all__ = [
     "default_gate_defs",
     "evaluate_gate_for_node",
+    "real_final_delivery_gate_def",
     "real_wave0_gate_def",
     "real_wave1_gate_def",
     "real_wave2_gate_def",

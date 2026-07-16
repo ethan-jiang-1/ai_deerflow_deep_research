@@ -150,6 +150,8 @@ def build_research_graph(
         _gate_defs["wave2_synthesis"] = real_wave2_gate_def()
     if modes.get("readiness") == "real":
         _gate_defs.pop("readiness", None)
+    if modes.get("final_delivery") == "real":
+        _gate_defs["final_delivery"] = real_final_delivery_gate_def()
 
     builder = StateGraph(ResearchState, context_schema=GraphInvocationContext)
     for logical_name in LOGICAL_NODES:

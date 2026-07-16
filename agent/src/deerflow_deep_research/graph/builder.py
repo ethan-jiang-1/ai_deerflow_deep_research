@@ -32,6 +32,7 @@ from deerflow_deep_research.graph.nodes.gate_adapter import (
     default_gate_defs,
     evaluate_gate_for_node,
     real_wave0_gate_def,
+    real_wave1_gate_def,
 )
 from deerflow_deep_research.graph.registry import load_research_node_specs
 from deerflow_deep_research.graph.topology import LOGICAL_NODES
@@ -141,9 +142,9 @@ def build_research_graph(
 
     _gate_defs: Mapping[str, GateDefinition] = dict(gate_defs if gate_defs is not None else default_gate_defs())
     if modes.get("wave0") == "real":
-        # Real Wave0 uses the completion-only gate; the fixture sequence rule is
-        # dropped because the real node consumes the topic registry, not fixture_plan.
         _gate_defs["wave0"] = real_wave0_gate_def()
+    if modes.get("wave1") == "real":
+        _gate_defs["wave1"] = real_wave1_gate_def()
 
     builder = StateGraph(ResearchState, context_schema=GraphInvocationContext)
     for logical_name in LOGICAL_NODES:

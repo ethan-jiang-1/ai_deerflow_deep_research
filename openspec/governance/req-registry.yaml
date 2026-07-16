@@ -41,6 +41,7 @@ prefixes:
   RUI: runtime-integration
   TOP: topic-planning-node
   WAN: wave0-node
+  WON: wave1-node
   WOU: work-unit-kernel
 
 # ──────────────────────────────────────────────
@@ -140,6 +141,14 @@ WAN-002: wave0-node — A bounded web worker agent performs per-topic source int
 WAN-003: wave0-node — A real wave0.source-intake result contract is registered in the generalized validation registry and deterministic submit validation canonicalizes URLs, verifies fetch/cache refs, checks path/hash/source identity, and counts only accepted SubmissionRecords as coverage
 WAN-004: wave0-node — A real source-floor gate replaces the fixture rule, enforces per-topic independent-source coverage at submit time with honest degraded capture, and preserves the completion/drain rule and the repair/pass/exhausted routes
 WAN-005: wave0-node — Real Wave0 integrates into the mixed graph only off the real topic chain with unchanged topology while preserving the full-fake fixture path and the backend/frontend boundary
+
+# wave1-node
+WON-001: wave1-node — Wave1 planner materializes per-topic evidence WorkSpecs from profile constraints and Wave0 background coverage through the shared work-unit controller
+WON-002: wave1-node — A bounded web worker performs deep evidence extraction per topic with structured claims, support/counter refs, open questions, and explicit is_new_vs_wave0 marking
+WON-003: wave1-node — Submit validation enforces a per-topic new-source floor by rejecting Wave0-duplicate URLs and invokes SourceDiagnostic and ClaimVerifier critics on accepted evidence
+WON-004: wave1-node — Wave1 gate enforces hard provenance, semantic coverage, critic verdict presence, and open-question resolution with bounded repair and terminal blocked routing
+WON-005: wave1-node — Real Wave1 integrates into the mixed graph only off the full real chain (bootstrap, hitl1, topic_planning, wave0, targeted_evidence) with unchanged topology
+WON-006: wave1-node — Open questions enter resolved, targeted-search, deferred, or requires-internal-data closed states with deterministic reducer and no silent loss
 
 # work-unit-kernel
 WOU-001: work-unit-kernel — Immutable work, attempt, candidate, and submission contracts preserve controller-assigned identity and spec integrity

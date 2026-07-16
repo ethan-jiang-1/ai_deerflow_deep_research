@@ -43,6 +43,14 @@ _MIXED_WAVE0 = _FULL_FAKE | {
     "topic_planning": "real",
     "wave0": "real",
 }
+_MIXED_WAVE1 = _FULL_FAKE | {
+    "bootstrap": "real",
+    "hitl1": "real",
+    "topic_planning": "real",
+    "wave0": "real",
+    "targeted_evidence": "real",
+    "wave1": "real",
+}
 
 
 class FakeAppConfig:
@@ -214,6 +222,14 @@ async def test_full_fake_recipe_keeps_unavailable_capabilities_and_no_request_wr
     assert ctx.request_bundle is None
     with pytest.raises(RuntimeError, match="full_fake_agent_capability_unavailable"):
         await deps.capabilities.run_agent(context=deps.agent_context, request=object())
+
+
+def test_recipe_detects_real_wave1_and_requires_real_wave0_and_targeted_evidence() -> None:
+    recipe = ResearchGraphRecipe.create(implementation_modes=_MIXED_WAVE1)
+    assert recipe.requires_wave1_worker_bridge is True
+
+    with pytest.raises(ValueError, match="wave1_real_requires_wave0_and_targeted_evidence_real"):
+        ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"wave1": "real"})
 
 
 def test_full_fake_recipe_does_not_require_wave0_worker_bridge() -> None:

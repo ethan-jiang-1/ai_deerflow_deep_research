@@ -125,14 +125,14 @@ def test_incomplete_or_unknown_map_is_rejected() -> None:
 
 def test_explicit_mixed_override_preserves_identical_graph_shape() -> None:
     specs = load_research_node_specs()
-    test_wave1 = replace(specs["wave1"], real_factory=_fake_factory)
-    modes = {name: "fake" for name in LOGICAL_NODES} | {"wave1": "real"}
-    mixed = build_research_graph(implementation_modes=modes, spec_overrides={"wave1": test_wave1}).compile()
+    test_node = replace(specs["hitl2"], real_factory=_fake_factory)
+    modes = {name: "fake" for name in LOGICAL_NODES} | {"hitl2": "real"}
+    mixed = build_research_graph(implementation_modes=modes, spec_overrides={"hitl2": test_node}).compile()
     fake = build_research_graph().compile()
     assert {(edge.source, edge.target) for edge in mixed.get_graph().edges} == {
         (edge.source, edge.target) for edge in fake.get_graph().edges
     }
-    with pytest.raises(ImplementationMapError, match="implementation_unavailable.*wave1"):
+    with pytest.raises(ImplementationMapError, match="implementation_unavailable.*hitl2"):
         build_research_graph(implementation_modes=modes)
 
 
@@ -186,6 +186,49 @@ def test_mixed_real_wave0_chain_resolves_and_compiles() -> None:
             assert resolved[name] is specs[name].fake_factory, f"{name} should use fake factory"
     # Graph compiles without error — topology shape preserved.
     build_research_graph(implementation_modes=modes).compile()
+
+
+def test_mixed_real_wave1_chain_resolves_and_compiles() -> None:
+    """Mixed mode with the six-real chain selects all six real factories and compiles.
+
+    @impl WON-005
+    """
+    specs = load_research_node_specs()
+    modes = {name: "fake" for name in LOGICAL_NODES} | {
+        "bootstrap": "real",
+        "hitl1": "real",
+        "topic_planning": "real",
+        "wave0": "real",
+        "targeted_evidence": "real",
+        "wave1": "real",
+    }
+    resolved = resolve_implementations(specs, modes)
+    for name in ("bootstrap", "hitl1", "topic_planning", "wave0", "targeted_evidence", "wave1"):
+        assert resolved[name] is specs[name].real_factory, f"{name} should use real factory"
+    for name in LOGICAL_NODES:
+        if name not in {"bootstrap", "hitl1", "topic_planning", "wave0", "targeted_evidence", "wave1"}:
+            assert resolved[name] is specs[name].fake_factory, f"{name} should use fake factory"
+    build_research_graph(implementation_modes=modes).compile()
+
+
+def test_mixed_real_wave1_chain_preserves_topology_shape() -> None:
+    """Graph shape is identical for full-fake and mixed wave1-chain maps.
+
+    @impl WON-005
+    """
+    fake_graph = build_research_graph().compile()
+    mixed_modes = {name: "fake" for name in LOGICAL_NODES} | {
+        "bootstrap": "real",
+        "hitl1": "real",
+        "topic_planning": "real",
+        "wave0": "real",
+        "targeted_evidence": "real",
+        "wave1": "real",
+    }
+    mixed_graph = build_research_graph(implementation_modes=mixed_modes).compile()
+    assert {(e.source, e.target) for e in mixed_graph.get_graph().edges} == {
+        (e.source, e.target) for e in fake_graph.get_graph().edges
+    }
 
 
 def test_mixed_real_wave0_chain_preserves_topology_shape() -> None:

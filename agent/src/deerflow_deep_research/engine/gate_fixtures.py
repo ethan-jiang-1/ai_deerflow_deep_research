@@ -176,6 +176,19 @@ def _final_delivery_fixture_map() -> dict[str, FailureCode]:
 # ---- Public registry -------------------------------------------------------
 
 
+def build_wave1_real_gate_def() -> GateDefinition:
+    """Real Wave1 gate: shared completion/drain rule only (no fixture sequence).
+
+    @impl WON-004
+    """
+    return GateDefinition(
+        phase="wave1",
+        rules=(_work_unit_completion_rule(),),
+        default_budget=3,
+        route_map=_wave_route_map(),
+    )
+
+
 def build_wave0_real_gate_def() -> GateDefinition:
     """Real Wave0 gate: shared completion/drain rule only (no fixture sequence).
 
@@ -255,4 +268,5 @@ __all__ = [
     "FixtureSequenceRule",
     "build_fixture_gate_defs",
     "build_wave0_real_gate_def",
+    "build_wave1_real_gate_def",
 ]

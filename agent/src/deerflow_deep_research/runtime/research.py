@@ -116,6 +116,7 @@ class ResearchGraphRecipe:
     requires_request_bundle: bool = False
     requires_node_agent_bridge: bool = False
     requires_wave0_worker_bridge: bool = False
+    requires_wave1_worker_bridge: bool = False
     work_unit_store_factory: Any = None
     request_bundle_store_factory: Any = None
     node_agent_bridge_factory: Any = None
@@ -134,12 +135,16 @@ class ResearchGraphRecipe:
         bootstrap_real = modes.get("bootstrap") == "real"
         topic_planning_real = modes.get("topic_planning") == "real"
         wave0_real = modes.get("wave0") == "real"
+        wave1_real = modes.get("wave1") == "real"
+        targeted_evidence_real = modes.get("targeted_evidence") == "real"
         if hitl1_real and not bootstrap_real:
             raise ValueError("hitl1_real_requires_bootstrap_real")
         if topic_planning_real and not hitl1_real:
             raise ValueError("topic_planning_real_requires_hitl1_real")
         if wave0_real and not topic_planning_real:
             raise ValueError("wave0_real_requires_topic_planning_real")
+        if wave1_real and not (wave0_real and targeted_evidence_real):
+            raise ValueError("wave1_real_requires_wave0_and_targeted_evidence_real")
         return cls(
             builder=build_research_graph(implementation_modes=implementation_modes),
             requires_work_units=True,
@@ -147,6 +152,7 @@ class ResearchGraphRecipe:
             requires_request_bundle=hitl1_real,
             requires_node_agent_bridge=hitl1_real or topic_planning_real,
             requires_wave0_worker_bridge=wave0_real,
+            requires_wave1_worker_bridge=wave1_real,
             work_unit_store_factory=work_unit_store_factory,
             request_bundle_store_factory=request_bundle_store_factory,
             node_agent_bridge_factory=node_agent_bridge_factory,
@@ -241,6 +247,39 @@ def _build_wave0_capabilities(envelope: TrustedRuntimeEnvelope, graph_context: A
     attempt-scoped artifact writer; fetched content is untrusted data.
     """
     policy = _wave0_worker_policy(graph_context)
+    bridge_factory = factory or RuntimeNodeAgentBridge
+    return bridge_factory(envelope=envelope, policy=policy)
+
+
+WAVE1_WORKER_TOOL_NAMES = frozenset(
+    {"tavily_search", "tavily_extract", "duckduckgo_search", "jina_ai", "firecrawl_scrape"}
+)
+
+
+def _wave1_worker_policy(graph_context: Any) -> ExecutionPolicy:
+    """Bounded multi-tool policy for a Wave1 evidence extraction worker."""
+    return ExecutionPolicy(
+        policy_name="wave1-evidence-extraction",
+        allowed_tool_names=WAVE1_WORKER_TOOL_NAMES,
+        read_roots=(graph_context.workspace_root, graph_context.uploads_root),
+        write_roots=(graph_context.workspace_root,),
+        attempt_root=graph_context.workspace_root,
+        budget=ExecutionBudget(
+            max_model_calls=3,
+            max_total_tool_calls=20,
+            max_tool_calls_per_response=5,
+            max_parallel_tool_calls=2,
+            total_token_budget=32_768,
+            per_call_output_token_cap=8_192,
+            per_tool_result_bytes=131_072,
+            structured_result_bytes=16_384,
+            wall_time_seconds=180.0,
+        ),
+    )
+
+
+def _build_wave1_capabilities(envelope: TrustedRuntimeEnvelope, graph_context: Any, factory: Any) -> Any:
+    policy = _wave1_worker_policy(graph_context)
     bridge_factory = factory or RuntimeNodeAgentBridge
     return bridge_factory(envelope=envelope, policy=policy)
 
@@ -358,8 +397,14 @@ class ResearchActionHandler:
             if include_work_units and self._recipe.requires_wave0_worker_bridge
             else None
         )
+        wave1_capabilities = (
+            _build_wave1_capabilities(envelope, graph_context, self._recipe.node_agent_bridge_factory)
+            if include_work_units and self._recipe.requires_wave1_worker_bridge
+            else wave0_capabilities  # fall back to wave0 capabilities (same tool set)
+        )
         base_resolver = RuntimeNodeDependencyResolver(graph_context, capabilities)
-        worker_resolver = RuntimeNodeDependencyResolver(graph_context, wave0_capabilities)
+        worker_caps = wave1_capabilities or wave0_capabilities
+        worker_resolver = RuntimeNodeDependencyResolver(graph_context, worker_caps)
         work_units = None
         bootstrap_bundle = None
         request_bundle = None

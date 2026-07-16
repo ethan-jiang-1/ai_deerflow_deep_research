@@ -59,6 +59,8 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/domain/topics.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/critics.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/domain/untrusted.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/domain/wave1.py` (file; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/wave1/prompts.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/engine/` (directory; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/__init__.py` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/engine/fake_control.py` (file; `PRS-001`)

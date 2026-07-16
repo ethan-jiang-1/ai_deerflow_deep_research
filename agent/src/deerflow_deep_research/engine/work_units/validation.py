@@ -11,6 +11,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from deerflow_deep_research.domain.bundle import output_path, result_path, work_spec_path
+from deerflow_deep_research.domain.wave1 import Wave1WorkerOutput
 from deerflow_deep_research.domain.work_units import (
     SUBMISSION_VALIDATION_PRECEDENCE,
     ArtifactRead,
@@ -58,6 +59,7 @@ def get_result_contract_handler(contract: str, schema_version: int) -> ResultCon
 
 register_result_contract(ResultContractHandler("fixture.work-unit", 1, FixtureResultDocument))
 register_result_contract(ResultContractHandler("wave0.source-intake", 1, Wave0SourceIntakeResult))
+register_result_contract(ResultContractHandler("wave1.source-intake", 1, Wave1WorkerOutput))
 
 
 def _validate_result_doc_envelope(

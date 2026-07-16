@@ -176,6 +176,18 @@ def _final_delivery_fixture_map() -> dict[str, FailureCode]:
 # ---- Public registry -------------------------------------------------------
 
 
+def build_wave2_real_gate_def() -> GateDefinition:
+    """Real Wave2 gate: pure pass-through rule."""
+    from deerflow_deep_research.domain.gate import PhaseVerdict
+
+    return GateDefinition(
+        phase="wave2_synthesis",
+        rules=(_make_fixture_rule("wave2_synthesis", frozenset({PhaseVerdict.PASS, PhaseVerdict.REPAIR}), {}),),
+        default_budget=1,
+        route_map={PhaseVerdict.PASS: "pass", PhaseVerdict.REPAIR: "evidence_needed"},
+    )
+
+
 def build_wave1_real_gate_def() -> GateDefinition:
     """Real Wave1 gate: shared completion/drain rule only (no fixture sequence).
 
@@ -269,4 +281,5 @@ __all__ = [
     "build_fixture_gate_defs",
     "build_wave0_real_gate_def",
     "build_wave1_real_gate_def",
+    "build_wave2_real_gate_def",
 ]

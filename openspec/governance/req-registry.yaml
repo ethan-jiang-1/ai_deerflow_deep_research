@@ -43,6 +43,7 @@ prefixes:
   WAN: wave0-node
   WON: wave1-node
   WOU: work-unit-kernel
+  WSN: wave2-synthesis-node
 
 # ──────────────────────────────────────────────
 # Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
@@ -149,6 +150,12 @@ WON-003: wave1-node — Submit validation enforces a per-topic new-source floor 
 WON-004: wave1-node — Wave1 gate enforces hard provenance, semantic coverage, critic verdict presence, and open-question resolution with bounded repair and terminal blocked routing
 WON-005: wave1-node — Real Wave1 integrates into the mixed graph only off the full real chain (bootstrap, hitl1, topic_planning, wave0, targeted_evidence) with unchanged topology
 WON-006: wave1-node — Open questions enter resolved, targeted-search, deferred, or requires-internal-data closed states with deterministic reducer and no silent loss
+
+# wave2-synthesis-node
+WSN-001: wave2-synthesis-node — Synthesis agent reads only accepted evidence via read-only policy and produces structured findings-index, cross-topic relations, contradictions, and candidate gaps without web tools
+WSN-002: wave2-synthesis-node — Deterministic materializer writes synthesis artifacts to sandbox with structured finding schema and cross-topic ledger
+WSN-003: wave2-synthesis-node — Hard gate validates finding references, structure, and accepted backing; semantic gate checks causal strength, contradiction coverage, and must-answer completeness
+WSN-004: wave2-synthesis-node — Real synthesis integrates into mixed graph requiring full real chain through wave1 and preserves full-fake path with unchanged topology
 
 # work-unit-kernel
 WOU-001: work-unit-kernel — Immutable work, attempt, candidate, and submission contracts preserve controller-assigned identity and spec integrity

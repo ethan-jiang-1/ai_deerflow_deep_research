@@ -33,6 +33,7 @@ from deerflow_deep_research.graph.nodes.gate_adapter import (
     evaluate_gate_for_node,
     real_wave0_gate_def,
     real_wave1_gate_def,
+    real_wave2_gate_def,
 )
 from deerflow_deep_research.graph.registry import load_research_node_specs
 from deerflow_deep_research.graph.topology import LOGICAL_NODES
@@ -145,6 +146,8 @@ def build_research_graph(
         _gate_defs["wave0"] = real_wave0_gate_def()
     if modes.get("wave1") == "real":
         _gate_defs["wave1"] = real_wave1_gate_def()
+    if modes.get("wave2_synthesis") == "real":
+        _gate_defs["wave2_synthesis"] = real_wave2_gate_def()
 
     builder = StateGraph(ResearchState, context_schema=GraphInvocationContext)
     for logical_name in LOGICAL_NODES:

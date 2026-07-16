@@ -15,6 +15,7 @@ from deerflow_deep_research.engine.gate_fixtures import (
     build_fixture_gate_defs,
     build_wave0_real_gate_def,
     build_wave1_real_gate_def,
+    build_wave2_real_gate_def,
 )
 from deerflow_deep_research.engine.gate_kernel import (
     evaluate_gate,
@@ -47,9 +48,15 @@ def real_wave1_gate_def() -> GateDefinition:
     return build_wave1_real_gate_def()
 
 
+def real_wave2_gate_def() -> GateDefinition:
+    """Return the real Wave2 ``GateDefinition`` (pass-through)."""
+    return build_wave2_real_gate_def()
+
+
 __all__ = [
     "default_gate_defs",
     "evaluate_gate_for_node",
     "real_wave0_gate_def",
     "real_wave1_gate_def",
+    "real_wave2_gate_def",
 ]

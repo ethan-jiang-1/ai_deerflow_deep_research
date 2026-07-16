@@ -136,6 +136,7 @@ class ResearchGraphRecipe:
         topic_planning_real = modes.get("topic_planning") == "real"
         wave0_real = modes.get("wave0") == "real"
         wave1_real = modes.get("wave1") == "real"
+        wave2_real = modes.get("wave2_synthesis") == "real"
         targeted_evidence_real = modes.get("targeted_evidence") == "real"
         if hitl1_real and not bootstrap_real:
             raise ValueError("hitl1_real_requires_bootstrap_real")
@@ -145,6 +146,8 @@ class ResearchGraphRecipe:
             raise ValueError("wave0_real_requires_topic_planning_real")
         if wave1_real and not (wave0_real and targeted_evidence_real):
             raise ValueError("wave1_real_requires_wave0_and_targeted_evidence_real")
+        if wave2_real and not wave1_real:
+            raise ValueError("wave2_real_requires_wave1_real")
         return cls(
             builder=build_research_graph(implementation_modes=implementation_modes),
             requires_work_units=True,

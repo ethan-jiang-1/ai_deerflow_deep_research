@@ -212,10 +212,7 @@ def test_mixed_real_wave1_chain_resolves_and_compiles() -> None:
 
 
 def test_mixed_real_wave1_chain_preserves_topology_shape() -> None:
-    """Graph shape is identical for full-fake and mixed wave1-chain maps.
-
-    @impl WON-005
-    """
+    """Graph shape is identical for full-fake and mixed wave1-chain maps."""
     fake_graph = build_research_graph().compile()
     mixed_modes = {name: "fake" for name in LOGICAL_NODES} | {
         "bootstrap": "real",
@@ -229,6 +226,25 @@ def test_mixed_real_wave1_chain_preserves_topology_shape() -> None:
     assert {(e.source, e.target) for e in mixed_graph.get_graph().edges} == {
         (e.source, e.target) for e in fake_graph.get_graph().edges
     }
+
+
+def test_mixed_real_wave2_chain_resolves_and_compiles() -> None:
+    """Mixed mode with seven-real chain (through wave2) selects all real factories."""
+    specs = load_research_node_specs()
+    modes = {name: "fake" for name in LOGICAL_NODES} | {
+        "bootstrap": "real",
+        "hitl1": "real",
+        "topic_planning": "real",
+        "wave0": "real",
+        "targeted_evidence": "real",
+        "wave1": "real",
+        "wave2_synthesis": "real",
+    }
+    resolved = resolve_implementations(specs, modes)
+    expected = {"bootstrap", "hitl1", "topic_planning", "wave0", "targeted_evidence", "wave1", "wave2_synthesis"}
+    for name in expected:
+        assert resolved[name] is specs[name].real_factory
+    build_research_graph(implementation_modes=modes).compile()
 
 
 def test_mixed_real_wave0_chain_preserves_topology_shape() -> None:

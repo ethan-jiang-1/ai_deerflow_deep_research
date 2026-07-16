@@ -19,11 +19,10 @@
 
 | Plan | 简述 |
 |------|------|
-| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00–18 路线图（00–14 ✅ 已归档，15 起待做） |
+| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00–18 路线图（00–15 ✅ 已归档，16 起待做） |
 | [deep-research-spec-gates-and-coverage.md](deep-research-spec-gates-and-coverage.md) | 治理：spec 门禁与 requirement-test 覆盖目录（提案，未立 change） |
 | [deep-research-structured-output-linting.md](deep-research-structured-output-linting.md) | 治理：agent YAML/JSON 结构化输出 lint（提案，Phase 2 已随 04 解锁） |
-| [deep-research-15-readiness-node.md](deep-research-15-readiness-node.md) | answerability、citation closure 与 readiness gate（← 下一个） |
-| [deep-research-16-final-delivery-node.md](deep-research-16-final-delivery-node.md) | final writer、integrity gate 与 workspace-to-outputs artifact publish |
+| [deep-research-16-final-delivery-node.md](deep-research-16-final-delivery-node.md) | final writer、integrity gate 与 workspace-to-outputs artifact publish（← 下一个） |
 | [deep-research-17-runtime-operations.md](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress 与 operator recovery |
 | [deep-research-18-evaluation-hardening.md](deep-research-18-evaluation-hardening.md) | 全链路质量评估、故障注入与 production hardening |
 
@@ -48,6 +47,7 @@
 | deep-research-12-targeted-evidence-loop.md | 12 | 2026-07-16 |
 | deep-research-13-hitl2-node.md | 13 | 2026-07-16 |
 | deep-research-14-rerun-node.md | 14 | 2026-07-16 |
+| deep-research-15-readiness-node.md | 15 | 2026-07-16 |
 | deep-research-tui-hitl-terminal-workbench.md | CLS-001 | 2026-07-13 |
 
 ---

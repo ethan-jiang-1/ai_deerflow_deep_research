@@ -370,6 +370,11 @@ kind = "directory"
 owner = "PRS-003"
 
 [[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/hitl2/prompts.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
 path = "agent/src/deerflow_deep_research/graph/nodes/rerun"
 kind = "directory"
 owner = "PRS-003"

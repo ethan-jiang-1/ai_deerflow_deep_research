@@ -34,6 +34,7 @@ prefixes:
   EVC: evidence-critic-nodes
   GAK: gate-kernel
   HIN: hitl1-node
+  HIT: hitl2-node
   NOA: node-agent-runtime
   PRS: project-structure
   RED: research-demo-tui
@@ -68,6 +69,10 @@ DEC-002: deployment-configuration — Structured configuration materialization i
 DEC-003: deployment-configuration — The public entry skill is materialized and enabled from committed source
 DEC-004: deployment-configuration — The dedicated Deep Research Agent is provisioned in the effective user's scope without legacy shared paths
 DEC-005: deployment-configuration — Diagnostics separate runtime, entry, worker-count, provider durability, reload, and restart readiness without exposing secrets
+
+HIT-001: hitl2-node — Deterministic brief builder generates decision brief from accepted findings and quality state with confirmed conclusions, uncertainties, gaps, and cost options
+HIT-002: hitl2-node — LangGraph interrupt presents brief to user, checkpoints pending_user and brief hash before interrupt, and parses closed-set user decisions with research id/generation binding
+HIT-003: hitl2-node — Real HITL2 integrates into mixed graph requiring full real chain through targeted_evidence with unchanged topology and full-fake path preserved
 
 # node-agent-runtime
 NOA-001: node-agent-runtime — A runtime-owned bridge gives phase agents the parent sandbox and trusted ephemeral context without leaking authority or adding a checkpointer

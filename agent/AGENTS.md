@@ -96,6 +96,7 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/graph/nodes/targeted_evidence/materializer.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/targeted_evidence/subgraph.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/hitl2/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/hitl2/prompts.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/rerun/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/readiness/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/final_delivery/` (directory; `PRS-003`)

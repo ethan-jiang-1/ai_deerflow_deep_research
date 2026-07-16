@@ -125,15 +125,33 @@ def test_incomplete_or_unknown_map_is_rejected() -> None:
 
 def test_explicit_mixed_override_preserves_identical_graph_shape() -> None:
     specs = load_research_node_specs()
-    test_node = replace(specs["hitl2"], real_factory=_fake_factory)
-    modes = {name: "fake" for name in LOGICAL_NODES} | {"hitl2": "real"}
-    mixed = build_research_graph(implementation_modes=modes, spec_overrides={"hitl2": test_node}).compile()
+    test_node = replace(specs["readiness"], real_factory=_fake_factory)
+    modes = {name: "fake" for name in LOGICAL_NODES} | {"readiness": "real"}
+    mixed = build_research_graph(implementation_modes=modes, spec_overrides={"readiness": test_node}).compile()
     fake = build_research_graph().compile()
     assert {(edge.source, edge.target) for edge in mixed.get_graph().edges} == {
         (edge.source, edge.target) for edge in fake.get_graph().edges
     }
-    with pytest.raises(ImplementationMapError, match="implementation_unavailable.*hitl2"):
-        build_research_graph(implementation_modes=modes)
+
+
+def test_mixed_real_hitl2_chain_resolves_and_compiles() -> None:
+    """Mixed mode with hitl2 real chain selects real factories and compiles."""
+    specs = load_research_node_specs()
+    real_names = {
+        "bootstrap",
+        "hitl1",
+        "topic_planning",
+        "wave0",
+        "targeted_evidence",
+        "wave1",
+        "wave2_synthesis",
+        "hitl2",
+    }
+    modes = {name: ("real" if name in real_names else "fake") for name in LOGICAL_NODES}
+    resolved = resolve_implementations(specs, modes)
+    for name in real_names:
+        assert resolved[name] is specs[name].real_factory
+    build_research_graph(implementation_modes=modes).compile()
 
 
 def test_mixed_real_bootstrap_resolves_and_preserves_shape() -> None:

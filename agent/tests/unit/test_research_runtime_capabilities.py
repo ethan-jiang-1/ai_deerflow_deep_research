@@ -232,6 +232,24 @@ def test_recipe_detects_real_wave1_and_requires_real_wave0_and_targeted_evidence
         ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"wave1": "real"})
 
 
+def test_recipe_detects_real_hitl2_and_requires_wave2_synthesis_real() -> None:
+    modes = _FULL_FAKE | {
+        "bootstrap": "real",
+        "hitl1": "real",
+        "topic_planning": "real",
+        "wave0": "real",
+        "targeted_evidence": "real",
+        "wave1": "real",
+        "wave2_synthesis": "real",
+        "hitl2": "real",
+    }
+    recipe = ResearchGraphRecipe.create(implementation_modes=modes)
+    assert recipe.requires_node_agent_bridge is True
+
+    with pytest.raises(ValueError, match="hitl2_real_requires_wave2_synthesis_real"):
+        ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"hitl2": "real"})
+
+
 def test_full_fake_recipe_does_not_require_wave0_worker_bridge() -> None:
     """Full-fake recipe SHALL NOT construct a RuntimeNodeAgentBridge for Wave0.
 

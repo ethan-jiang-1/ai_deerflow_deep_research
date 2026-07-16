@@ -97,6 +97,10 @@ def test_explicit_registry_loads_package_root_only_specs() -> None:
             # Change 14 implements real rerun (scoped invalidation + back edges).
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
             assert spec.capabilities == frozenset()
+        elif name == "readiness":
+            # Change 15 implements real readiness (non-gated, self-routing).
+            assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
+            assert spec.capabilities == frozenset()
         else:
             assert spec.real_factory is UNAVAILABLE_REAL_FACTORY
         assert spec.logical_name == name

@@ -694,6 +694,11 @@ class ResearchCheckpoint:
     synthesis_ref: ContentRef | None = None
     decision_brief_ref: ContentRef | None = None
     report_refs: tuple[ContentRef, ...] = ()
+    # readiness
+    readiness_hard_failures: tuple[dict[str, Any], ...] = ()
+    readiness_critic_summary: dict[str, Any] = field(default_factory=dict)
+    readiness_blocked_count: int = 0
+    readiness_report_plan: ContentRef | None = None
     # content refs (sandbox-backed large content)
     content_refs: tuple[ContentRef, ...] = ()
     # fake-control slot (change-01 deterministic resume; removed with the fake graph)
@@ -875,6 +880,11 @@ class ResearchState(TypedDict, total=False):
     synthesis_ref: ContentRef
     decision_brief_ref: ContentRef
     report_refs: Annotated[tuple[ContentRef, ...], merge_content_refs]
+    # readiness
+    readiness_hard_failures: tuple[dict[str, Any], ...]
+    readiness_critic_summary: dict[str, Any]
+    readiness_blocked_count: int
+    readiness_report_plan: ContentRef
     # content refs
     content_refs: Annotated[tuple[ContentRef, ...], merge_content_refs]
     # fake-control slot
@@ -1031,6 +1041,10 @@ OWNERSHIP_TABLE: tuple[FieldOwnership, ...] = (
     FieldOwnership("synthesis_ref", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
     FieldOwnership("decision_brief_ref", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "last_write_wins"),
     FieldOwnership("report_refs", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "merge_content_refs"),
+    FieldOwnership("readiness_hard_failures", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
+    FieldOwnership("readiness_critic_summary", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
+    FieldOwnership("readiness_blocked_count", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
+    FieldOwnership("readiness_report_plan", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
     FieldOwnership("content_refs", WriterRole.WORKER, (WriterRole.CONTROLLER, WriterRole.GATE), "merge_content_refs"),
     FieldOwnership("fixture_plan", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "controller_init"),
     # @impl GAK-003 — gate writes route for gated phases

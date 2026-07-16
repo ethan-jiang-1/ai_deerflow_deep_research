@@ -47,6 +47,7 @@ prefixes:
   TEL: targeted-evidence-loop
   WSN: wave2-synthesis-node
   REN: rerun-node
+  REA: readiness-node
 
 # ──────────────────────────────────────────────
 # Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
@@ -172,6 +173,15 @@ REN-004: rerun-node — Scoped WorkSpecs are materialized via the existing work-
 REN-005: rerun-node — Back edges are a closed set determined by rerun scope: full and topic scope route to topic_planning; finding scope with stale sources routes to wave0; finding scope with deep-evidence-only routes to wave1; generation ceiling exhaustion routes to exhausted
 REN-006: rerun-node — New generation must re-pass all affected wave gates and HITL2; gate attempt and repair budget state is reset for affected phases; old HITL2 proceed decision is not inherited
 REN-007: rerun-node — Real rerun integrates into mixed graph requiring real hitl2 with unchanged topology; full-fake rerun preserves existing behavior; real back edges expand allowed route values without breaking existing edges
+
+# readiness-node
+REA-001: readiness-node — The node runs deterministic hard checks on pre-existing state and determines its own route; structural failures route to exhausted with BLOCKED
+REA-002: readiness-node — Semantic readiness critic runs as a bounded read-only agent loop assessing answerability per must-answer question with structured typed verdicts
+REA-003: readiness-node — Deterministic report plan materializer produces an immutable projection of writable conclusions, mandatory uncertainties, and prohibited claim upgrades with checkpointed ContentRef
+REA-004: readiness-node — The node writes its own route based on hard-rule results and critic verdicts: pass to final_delivery, repair_targeted to targeted_evidence, exhausted to blocked
+REA-005: readiness-node — The node collects all hard-rule failures and critic verdicts before determining the route; no single failure short-circuits the collection
+REA-006: readiness-node — Readiness critic runs under read-only bounded policy with structured output schema; invalid or malformed critic output fails closed
+REA-007: readiness-node — Real readiness integrates into mixed graph requiring full real chain through hitl2 with unchanged topology; full-fake readiness path preserved
 
 TEL-001: targeted-evidence-loop — Deterministic gap router converts synthesis gaps to bounded targeted WorkSpecs per gap with scoped search dimensions
 TEL-002: targeted-evidence-loop — Targeted worker performs focused web search per gap under attempt-scoped policy and produces structured evidence with backing refs

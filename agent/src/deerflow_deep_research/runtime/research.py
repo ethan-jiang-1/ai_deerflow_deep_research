@@ -154,6 +154,9 @@ class ResearchGraphRecipe:
         rerun_real = modes.get("rerun") == "real"
         if rerun_real and not hitl2_real:
             raise ValueError("rerun_real_requires_hitl2_real")
+        readiness_real = modes.get("readiness") == "real"
+        if readiness_real and not hitl2_real:
+            raise ValueError("readiness_real_requires_hitl2_real")
         return cls(
             builder=build_research_graph(implementation_modes=implementation_modes),
             requires_work_units=True,

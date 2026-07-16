@@ -159,7 +159,7 @@ def test_wave0_worker_bridge_has_web_tool_policy() -> None:
     bridge = _build_wave0_capabilities(_envelope(), graph_context, None)
     assert isinstance(bridge, RuntimeNodeAgentBridge)
     assert bridge.policy.allowed_tool_names == WAVE0_WORKER_TOOL_NAMES
-    assert bridge.policy.budget.max_total_tool_calls == 12
+    assert bridge.policy.budget.max_total_tool_calls == 30
     assert bridge.policy.policy_name == "wave0-source-intake"
 
 

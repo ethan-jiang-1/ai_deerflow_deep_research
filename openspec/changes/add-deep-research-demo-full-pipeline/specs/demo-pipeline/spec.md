@@ -58,15 +58,15 @@ Demo scripts SHALL display pipeline phase progress by reading the `execution_tra
 
 ### Requirement: CLI real demo is an independent script with credential validation
 
-The agent project SHALL provide `agent/scripts/demo_real.py` as an independent CLI entry point for real-mode research. It SHALL import from `_demo_core`, validate that `ANTHROPIC_API_KEY` is set before building the recipe, display phase progress from the `execution_trace` field in each `DeepResearchControlResult`, and support `--question` and `--scripted` arguments. In `--scripted` mode it SHALL pass `non_interactive_policy={"auto_profile": True, "auto_proceed": True}` via the `_runtime` helper's `context` parameter. (`DPL-004`)
+The agent project SHALL provide `agent/scripts/demo_real.py` as an independent CLI entry point for real-mode research. It SHALL import from `_demo_core`, validate that at least one known API key (`DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`) is set before building the recipe, display phase progress from the `execution_trace` field in each `DeepResearchControlResult`, and support `--question` and `--scripted` arguments. In `--scripted` mode it SHALL pass `non_interactive_policy={"auto_profile": True, "auto_proceed": True}` via the `_runtime` helper's `context` parameter. The `DemoAppConfig` SHALL auto-detect which API key is available and build the corresponding `ModelConfig` (DeepSeek → `PatchedChatDeepSeek`, Anthropic → `ChatAnthropic`, OpenAI → `ChatOpenAI`). (`DPL-004`)
 
 #### Scenario: Real demo rejects missing credentials
-- **WHEN** `demo_real.py` is launched without `ANTHROPIC_API_KEY` in the environment
-- **THEN** it prints a clear error message listing required environment variables and exits with non-zero status before building the graph
+- **WHEN** `demo_real.py` is launched without any of `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY` in the environment
+- **THEN** it prints a clear error message listing all three environment variables and exits with non-zero status before building the graph
 
 #### Scenario: Real demo starts with valid credentials
-- **WHEN** `demo_real.py` is launched with `ANTHROPIC_API_KEY` set
-- **THEN** it builds the all-real recipe, constructs the graph host, and begins the lifecycle with `action="start"`
+- **WHEN** `demo_real.py` is launched with `DEEPSEEK_API_KEY` (or `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`) set
+- **THEN** it auto-detects the available credential, builds the corresponding model config, constructs the all-real recipe, and begins the lifecycle with `action="start"`
 
 #### Scenario: Scripted real demo passes non-interactive policy
 - **WHEN** `demo_real.py --scripted` is launched
@@ -74,7 +74,7 @@ The agent project SHALL provide `agent/scripts/demo_real.py` as an independent C
 
 ### Requirement: Makefile provides targets for all demo variants
 
-The `agent/Makefile` SHALL provide: `demo` (unchanged, fake CLI), `demo-scripted` (unchanged, fake CLI non-interactive), `demo-real` (new, real CLI), `demo-real-scripted` (new, real CLI non-interactive), and `demo-tui` (changed to real-only TUI). The `DEMO_ARGS` variable SHALL be passed to all targets. No files under `backend/` or `frontend/` SHALL be modified. (`DPL-005`)
+The `agent/Makefile` SHALL provide: `demo` (unchanged, fake CLI), `demo-scripted` (unchanged, fake CLI non-interactive), `demo-real` (new, real CLI), `demo-real-scripted` (new, real CLI non-interactive), and `demo-tui` (changed to real-only TUI). The `demo-real*` and `demo-tui` targets SHALL pass `--env-file .env` to `uv run` so credentials in `agent/.env` are loaded automatically. The `DEMO_ARGS` variable SHALL be passed to all targets. No files under `backend/` or `frontend/` SHALL be modified. (`DPL-005`)
 
 #### Scenario: make demo runs fake pipeline
 - **WHEN** `make demo` is invoked

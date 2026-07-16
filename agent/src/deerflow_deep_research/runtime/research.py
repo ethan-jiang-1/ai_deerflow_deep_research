@@ -223,7 +223,7 @@ def _build_hitl1_capabilities(envelope: TrustedRuntimeEnvelope, graph_context: A
 # provisioning is operator configuration; the bridge resolver intersects this set
 # with the tools configured for the deep-research agent. (WAN-002 / WAN-005)
 WAVE0_WORKER_TOOL_NAMES = frozenset(
-    {"tavily_search", "tavily_extract", "duckduckgo_search", "jina_ai", "firecrawl_scrape"}
+    {"tavily_search", "tavily_extract", "duckduckgo_search", "jina_ai", "firecrawl_scrape", "web_search", "web_fetch"}
 )
 
 
@@ -241,15 +241,15 @@ def _wave0_worker_policy(graph_context: Any) -> ExecutionPolicy:
         write_roots=(graph_context.workspace_root,),
         attempt_root=graph_context.workspace_root,
         budget=ExecutionBudget(
-            max_model_calls=3,
-            max_total_tool_calls=12,
-            max_tool_calls_per_response=4,
+            max_model_calls=6,
+            max_total_tool_calls=30,
+            max_tool_calls_per_response=6,
             max_parallel_tool_calls=2,
-            total_token_budget=24_576,
-            per_call_output_token_cap=4_096,
+            total_token_budget=48_000,
+            per_call_output_token_cap=8_192,
             per_tool_result_bytes=131_072,
-            structured_result_bytes=8_192,
-            wall_time_seconds=120.0,
+            structured_result_bytes=16_384,
+            wall_time_seconds=240.0,
         ),
     )
 
@@ -268,7 +268,7 @@ def _build_wave0_capabilities(envelope: TrustedRuntimeEnvelope, graph_context: A
 
 
 WAVE1_WORKER_TOOL_NAMES = frozenset(
-    {"tavily_search", "tavily_extract", "duckduckgo_search", "jina_ai", "firecrawl_scrape"}
+    {"tavily_search", "tavily_extract", "duckduckgo_search", "jina_ai", "firecrawl_scrape", "web_search", "web_fetch"}
 )
 
 

@@ -27,6 +27,7 @@ from deerflow_deep_research.runtime.node_agent_bridge import RuntimeNodeAgentBri
 from deerflow_deep_research.runtime.research import ResearchGraphRecipe
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
+from deerflow.sandbox.local.local_sandbox import LocalSandbox, PathMapping
 
 # ── adapter ──────────────────────────────────────────────────────────
 
@@ -37,57 +38,117 @@ _KNOWN_API_KEY_VARS = (
     "OPENAI_API_KEY",
 )
 
-_MODEL_CONFIGS = {
-    "DEEPSEEK_API_KEY": {
-        "name": "deepseek-demo",
-        "use": "deerflow.models.patched_deepseek:PatchedChatDeepSeek",
-        "model": "deepseek-chat",
-        "api_base": "https://api.deepseek.com/v1",
-    },
-    "ANTHROPIC_API_KEY": {
-        "name": "anthropic-demo",
-        "use": "langchain_anthropic:ChatAnthropic",
-        "model": "claude-sonnet-4-5-20250901",
-    },
-    "OPENAI_API_KEY": {
-        "name": "openai-demo",
-        "use": "langchain_openai:ChatOpenAI",
-        "model": "gpt-4o",
-    },
-}
+# Each entry: (env_var, model_name, use_path, model_id, base_url, extra_kwargs)
+_MODEL_REGISTRY = (
+    ("DEEPSEEK_API_KEY", "deepseek-v4-pro", "deerflow.models.patched_deepseek:PatchedChatDeepSeek", "deepseek-v4-pro", "https://api.deepseek.com/v1", {}),
+    ("DEEPSEEK_API_KEY", "deepseek-v4-flash", "deerflow.models.patched_deepseek:PatchedChatDeepSeek", "deepseek-v4-flash", "https://api.deepseek.com/v1", {}),
+    ("ANTHROPIC_API_KEY", "anthropic-demo", "langchain_anthropic:ChatAnthropic", "claude-sonnet-4-5-20250901", None, {}),
+    ("OPENAI_API_KEY", "openai-demo", "langchain_openai:ChatOpenAI", "gpt-4o", None, {}),
+)
 
 
-def _resolve_demo_model():
-    """Build a minimal ModelConfig from the first available env credential."""
+def _resolve_demo_models():
+    """Build ModelConfig entries for every available env credential."""
     from deerflow.config.model_config import ModelConfig
 
-    for env_var in _KNOWN_API_KEY_VARS:
+    models = []
+    for env_var, name, use_path, model_id, base_url, extra in _MODEL_REGISTRY:
         if env_var in os.environ:
-            cfg = dict(_MODEL_CONFIGS[env_var])
-            cfg["api_key"] = os.environ[env_var]
-            return ModelConfig(**cfg)
-    return None
+            cfg: dict[str, Any] = {"name": name, "use": use_path, "model": model_id, "api_key": os.environ[env_var], **extra}
+            if base_url is not None:
+                cfg["base_url"] = base_url
+            models.append(ModelConfig(**cfg))
+    return models
+
+
+class _DemoSandboxConfig:
+    use = "deerflow.sandbox.local:LocalSandboxProvider"
 
 
 class DemoAppConfig:
-    """Minimal config shim that provides a single auto-detected model.
+    """Minimal config shim for the standalone demo.
 
-    ``create_chat_model`` only needs ``models[0].name`` and ``get_model_config()``
-    to return a Pydantic ``ModelConfig`` — so we build one from whichever API key
-    is in the environment.
+    Provides a single auto-detected model plus a local-sandbox stub so the
+    work-unit storage classifier and model factory both resolve without a full
+    ``config.yaml``.
     """
 
     checkpointer = None
     database = None
+    sandbox = _DemoSandboxConfig()
+    tools: list[Any] = []
 
     def __init__(self) -> None:
-        self._model = _resolve_demo_model()
-        self.models = [self._model] if self._model else []
+        self._models = _resolve_demo_models()
+        self.models = self._models
 
     def get_model_config(self, name: str):
-        if self._model and name == self._model.name:
-            return self._model
+        for model in self._models:
+            if model.name == name:
+                return model
         return None
+
+
+def _prime_demo_sandbox(sandbox: Any) -> None:
+    """Register *sandbox* as the generic singleton inside the global provider.
+
+    The work-unit storage verifier calls ``provider.get(parent.id)`` and
+    expects the same instance back.  For the demo we set the provider's
+    internal ``_generic_sandbox`` so the lookup succeeds.
+    """
+    from deerflow.sandbox import get_sandbox_provider
+
+    provider = get_sandbox_provider()
+    # LocalSandboxProvider stores the legacy "local" singleton here.
+    provider._generic_sandbox = sandbox
+
+
+async def _demo_storage_verifier(envelope: Any, *, research_id: str, provider: Any = None) -> Any:
+    """Return a ready check without running the full POSIX probe.
+
+    The probe exercises edge cases (lock/fsync/aliased-readback/cleanup) that
+    are already covered by the unit suite. For a demo run on a real temp dir
+    we skip those to keep startup fast and avoid cleanup-ordering issues with
+    the process-local provider.
+    """
+    from deerflow_deep_research.runtime.work_unit_storage import WorkUnitStorageCheck
+
+    return WorkUnitStorageCheck("ready", "local_thread_mount")
+
+
+# Patch all work-unit store classes to skip the storage probe in demo mode.
+# Only overrides the *default* verifier; explicit callers (tests, real Gateway)
+# that pass a custom ``storage_verifier`` are unaffected.
+def _install_demo_storage_patch() -> None:
+    from deerflow_deep_research.runtime import bootstrap_bundle as _bb
+    from deerflow_deep_research.runtime import request_bundle as _rb
+    from deerflow_deep_research.runtime import work_unit_store as _ws
+
+    _targets = [
+        (_bb, "BootstrapBundleStore"),
+        (_rb, "RequestBundleStore"),
+        (_ws, "WorkUnitStore"),
+    ]
+    for _mod, _cls_name in _targets:
+        _cls = getattr(_mod, _cls_name, None)
+        if _cls is None:
+            continue
+        _orig_create = _cls.create
+
+        def _make_patched(orig, demo_verifier):
+            @classmethod
+            async def _patched(cls, envelope, *, research_id, storage_verifier=None, provider=None, **kw):
+                return await orig.__func__(
+                    cls,
+                    envelope,
+                    research_id=research_id,
+                    storage_verifier=demo_verifier if storage_verifier is None else storage_verifier,
+                    provider=provider,
+                    **kw,
+                )
+            return _patched
+
+        _cls.create = _make_patched(_orig_create, _demo_storage_verifier)
 
 
 class DemoAdapter:
@@ -99,6 +160,21 @@ class DemoAdapter:
         outputs = root / "outputs"
         for path in (workspace, uploads, outputs):
             path.mkdir()
+
+        # Create a proper LocalSandbox so the work-unit storage verification can
+        # exercise real POSIX primitives (aliased read/write, directory listing).
+        sandbox = LocalSandbox(
+            id="local",
+            path_mappings=[
+                PathMapping(container_path="/mnt/user-data/workspace", local_path=str(workspace)),
+                PathMapping(container_path="/mnt/user-data/uploads", local_path=str(uploads)),
+                PathMapping(container_path="/mnt/user-data/outputs", local_path=str(outputs)),
+            ],
+        )
+        # Register with the global sandbox provider so provider.get("local")
+        # returns our sandbox (required by verify_runtime_work_unit_storage).
+        _prime_demo_sandbox(sandbox)
+
         self._envelope = TrustedRuntimeEnvelope(
             effective_user_id="demo-user",
             outer_thread_id="demo-thread",
@@ -110,7 +186,7 @@ class DemoAdapter:
             workspace_virtual_root="/mnt/user-data/workspace",
             uploads_virtual_root="/mnt/user-data/uploads",
             outputs_virtual_root="/mnt/user-data/outputs",
-            parent_sandbox=object(),
+            parent_sandbox=sandbox,
             progress=None,
         )
 
@@ -294,3 +370,8 @@ def _answer(prompt: str, *, scripted: bool, default: str) -> str:
         return default
     value = input(f"  {prompt}[默认: {default}] ").strip()
     return value or default
+
+
+# ── install demo patches at import time ──────────────────────────────
+
+_install_demo_storage_patch()

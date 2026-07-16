@@ -177,6 +177,7 @@ async def run_deep_research(
         tool_call_id=str(getattr(runtime, "tool_call_id", "")),
         messages=messages,
         start_message=start_message,
+        non_interactive_policy=non_interactive_policy,
     )
     try:
         return await host.run_action(action=action, envelope=envelope, action_input=action_input)

@@ -55,7 +55,15 @@ def _default_model_resolver(envelope: TrustedRuntimeEnvelope) -> Any:
 def _default_tools_resolver(envelope: TrustedRuntimeEnvelope, policy: ExecutionPolicy) -> Sequence[Any]:
     from deerflow.tools.tools import get_available_tools
 
-    loaded = get_available_tools(include_mcp=False, app_config=envelope.app_config)
+    # When the envelope carries a minimal demo config with no tools, fall
+    # back to the global config.yaml so operators can configure web search
+    # tools without threading them through the demo shim.
+    app_config = envelope.app_config
+    if not getattr(app_config, "tools", None):
+        from deerflow.config import get_app_config
+
+        app_config = get_app_config()
+    loaded = get_available_tools(include_mcp=False, app_config=app_config)
     return [tool for tool in loaded if tool.name in policy.allowed_tool_names]
 
 

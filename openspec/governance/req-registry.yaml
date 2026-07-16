@@ -50,6 +50,7 @@ prefixes:
   REA: readiness-node
   FID: final-delivery-node
   RUO: runtime-operations
+  EVH: evaluation-hardening
 
 # ──────────────────────────────────────────────
 # Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
@@ -197,6 +198,13 @@ RUO-001: runtime-operations — Non-interactive start/resume is permitted with n
 RUO-002: runtime-operations — HITL1 auto-generates default profile values when auto_profile is True, setting degraded_profile and writing audit note; HITL2 auto-proceeds when auto_proceed is True
 RUO-003: runtime-operations — Orphan in-flight work attempts from a prior graph incarnation are detected on recovery and transitioned to failed
 RUO-004: runtime-operations — Non-interactive policy and orphan detection do not alter graph topology or full-fake behavior
+
+# evaluation-hardening
+EVH-001: evaluation-hardening — Replay-based eval corpus framework supports quick factual, claim verification, and insufficient evidence scenarios with deterministic assertions
+EVH-002: evaluation-hardening — Quality metrics compute citation precision, must-answer coverage, and source diversity from accepted submissions and checkpoint state
+EVH-003: evaluation-hardening — Fault injection tests cover crash, timeout, cancel, and duplicate resume at key graph points with verified recovery or terminal outcome
+EVH-004: evaluation-hardening — Adversarial source tests verify prompt-injected content cannot gain control or forge submissions
+EVH-005: evaluation-hardening — Release gate combines deterministic hard CI checks with optional real-LLM canary tests; DPT parity audit documents achieved vs outstanding invariants
 
 TEL-001: targeted-evidence-loop — Deterministic gap router converts synthesis gaps to bounded targeted WorkSpecs per gap with scoped search dimensions
 TEL-002: targeted-evidence-loop — Targeted worker performs focused web search per gap under attempt-scoped policy and produces structured evidence with backing refs

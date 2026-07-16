@@ -25,6 +25,11 @@
 | [deep-research-16-final-delivery-node.md](deep-research-16-final-delivery-node.md) | final writer、integrity gate 与 workspace-to-outputs artifact publish（← 下一个） |
 | [deep-research-17-runtime-operations.md](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress 与 operator recovery |
 | [deep-research-18-evaluation-hardening.md](deep-research-18-evaluation-hardening.md) | 全链路质量评估、故障注入与 production hardening |
+| [deep-research-demo-full-pipeline.md](deep-research-demo-full-pipeline.md) | Demo CLI fake + CLI real + TUI real 三合一设计 |
+| [test-assets-postmortem-real-mode-integration.md](test-assets-postmortem-real-mode-integration.md) | 复盘：real-mode 集成暴露 11 个 bug，根因分析与教训 |
+| [test-assets-layered-strategy.md](test-assets-layered-strategy.md) | 测试资产补充 roadmap：4 层测试策略、4 个 change 路线图 |
+| [test-assets-bug-to-test-mapping.md](test-assets-bug-to-test-mapping.md) | Bug→Test 映射表：每个 bug 对应具体测试用例，7 个文件 21 个测试 |
+| [test-assets-demo-design-coverage.md](test-assets-demo-design-coverage.md) | Demo 5 个设计决策的测试覆盖分析：已有 vs 缺失 |
 
 **Next available plan ID: CLS-003**（移入 `_closed_plans/` 时分配）
 

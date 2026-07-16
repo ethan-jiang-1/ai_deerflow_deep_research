@@ -138,14 +138,21 @@ async def run_deep_research(
     )
     context = getattr(runtime, "context", None)
     context = context if isinstance(context, dict) else {}
-    if action in {"start", "resume"} and (
-        context.get("non_interactive") is True or context.get("disable_clarification") is True
-    ):
+    non_interactive = context.get("non_interactive") is True or context.get("disable_clarification") is True
+    non_interactive_policy = context.get("non_interactive_policy")
+    if action in {"start", "resume"} and non_interactive and not isinstance(non_interactive_policy, dict):
         return denial_result(
             action=lifecycle_action,
             code=ResultCode.INTERACTIVE_REQUIRED,
             research_id=resolved_research_id,
         )
+    if action in {"start", "resume"} and non_interactive and isinstance(non_interactive_policy, dict):
+        if not (non_interactive_policy.get("auto_profile") and non_interactive_policy.get("auto_proceed")):
+            return denial_result(
+                action=lifecycle_action,
+                code=ResultCode.INTERACTIVE_REQUIRED,
+                research_id=resolved_research_id,
+            )
     if action in {"start", "resume"} and (context.get("channel_user_id") or context.get("channel_name")):
         return denial_result(
             action=lifecycle_action,

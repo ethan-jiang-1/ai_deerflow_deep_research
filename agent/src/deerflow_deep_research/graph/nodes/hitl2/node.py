@@ -70,6 +70,15 @@ def build_real(dependencies: NodeBuildDependencies):
             phase="hitl2",
             generation=generation,
         )
+        # Non-interactive auto-proceed: skip interrupt
+        non_interactive = state.get("non_interactive_policy")
+        if isinstance(non_interactive, dict) and non_interactive.get("auto_proceed") is True:
+            return node_update(
+                "hitl2", route="proceed",
+                consumed_request_ids=(*state.get("consumed_request_ids", ()), request_id),
+                consumed_message_ids=(*state.get("consumed_message_ids", ()), "auto-proceed"),
+            )
+
         raw = interrupt(descriptor.model_dump(mode="json"))
         if isinstance(raw, dict) and raw.get("kind") == "internal_cancel":
             InternalCancelDecision.model_validate(raw)

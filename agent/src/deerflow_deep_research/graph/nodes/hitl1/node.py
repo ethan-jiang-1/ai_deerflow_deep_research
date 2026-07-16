@@ -146,6 +146,16 @@ def build_real(dependencies: NodeBuildDependencies):
         if request_store is None:
             raise ValueError("request_bundle_capability_missing")
 
+        # Non-interactive auto-profile: skip interrupt, use defaults
+        non_interactive = state.get("non_interactive_policy")
+        if isinstance(non_interactive, dict) and non_interactive.get("auto_profile") is True:
+            profile = finalize_profile(PartialResearchProfile(), degraded=True)
+            profile_ref = await request_store.write_profile(profile)
+            return node_update(
+                "hitl1", route="accepted",
+                **profile_state_fields(profile, profile_ref),
+            )
+
         pending = _pending_progress(state)
         request_id, ordinal = _request_id(state)
         if pending is None:

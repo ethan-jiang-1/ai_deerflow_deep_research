@@ -106,6 +106,7 @@ class ResearchActionInput:
     messages: tuple[Any, ...]
     start_message: SelectedStartMessage | None = None
     fixture_plan: FakeFixturePlan | None = None
+    non_interactive_policy: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -491,6 +492,8 @@ class StartResearchHandler(ResearchActionHandler):
         values["waiting_for"] = initial.waiting_for
         values["terminal_status"] = initial.terminal_status.value if initial.terminal_status is not None else None
         values["terminal_reason"] = initial.terminal_reason.value if initial.terminal_reason is not None else None
+        if action_input.non_interactive_policy is not None:
+            values["non_interactive_policy"] = action_input.non_interactive_policy
         await graph.ainvoke(values, config=config, context=await self._context(envelope, action_input.research_id))
         return _project_action_result(
             action_input=action_input,

@@ -49,6 +49,7 @@ prefixes:
   REN: rerun-node
   REA: readiness-node
   FID: final-delivery-node
+  RUO: runtime-operations
 
 # ──────────────────────────────────────────────
 # Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
@@ -190,6 +191,12 @@ FID-002: final-delivery-node — Final integrity gate verifies report artifacts 
 FID-003: final-delivery-node — Report conclusions are bounded by the readiness report plan; mandatory uncertainties are preserved; claim strength cannot exceed critic verdicts
 FID-004: final-delivery-node — Completed lifecycle is idempotent after gate pass; start/resume/status/cancel after completion return stable terminal state
 FID-005: final-delivery-node — Real final delivery integrates into mixed graph requiring real readiness with unchanged topology; full-fake path preserved
+
+# runtime-operations
+RUO-001: runtime-operations — Non-interactive start/resume is permitted with non_interactive_policy containing auto_profile and auto_proceed; without policy, non-interactive is denied as before
+RUO-002: runtime-operations — HITL1 auto-generates default profile values when auto_profile is True, setting degraded_profile and writing audit note; HITL2 auto-proceeds when auto_proceed is True
+RUO-003: runtime-operations — Orphan in-flight work attempts from a prior graph incarnation are detected on recovery and transitioned to failed
+RUO-004: runtime-operations — Non-interactive policy and orphan detection do not alter graph topology or full-fake behavior
 
 TEL-001: targeted-evidence-loop — Deterministic gap router converts synthesis gaps to bounded targeted WorkSpecs per gap with scoped search dimensions
 TEL-002: targeted-evidence-loop — Targeted worker performs focused web search per gap under attempt-scoped policy and produces structured evidence with backing refs

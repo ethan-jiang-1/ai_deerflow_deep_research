@@ -699,6 +699,8 @@ class ResearchCheckpoint:
     readiness_critic_summary: dict[str, Any] = field(default_factory=dict)
     readiness_blocked_count: int = 0
     readiness_report_plan: ContentRef | None = None
+    # runtime
+    non_interactive_policy: dict[str, Any] | None = None
     # content refs (sandbox-backed large content)
     content_refs: tuple[ContentRef, ...] = ()
     # fake-control slot (change-01 deterministic resume; removed with the fake graph)
@@ -885,6 +887,8 @@ class ResearchState(TypedDict, total=False):
     readiness_critic_summary: dict[str, Any]
     readiness_blocked_count: int
     readiness_report_plan: ContentRef
+    # runtime
+    non_interactive_policy: dict[str, Any] | None
     # content refs
     content_refs: Annotated[tuple[ContentRef, ...], merge_content_refs]
     # fake-control slot
@@ -1045,6 +1049,7 @@ OWNERSHIP_TABLE: tuple[FieldOwnership, ...] = (
     FieldOwnership("readiness_critic_summary", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
     FieldOwnership("readiness_blocked_count", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
     FieldOwnership("readiness_report_plan", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
+    FieldOwnership("non_interactive_policy", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
     FieldOwnership("content_refs", WriterRole.WORKER, (WriterRole.CONTROLLER, WriterRole.GATE), "merge_content_refs"),
     FieldOwnership("fixture_plan", WriterRole.CONTROLLER, (WriterRole.CONTROLLER,), "controller_init"),
     # @impl GAK-003 — gate writes route for gated phases

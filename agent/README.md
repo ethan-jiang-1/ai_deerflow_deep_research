@@ -5,17 +5,13 @@ for DeerFlow 2.1. Its controller is a nested Python `StateGraph`; bounded agent
 loops execute inside graph nodes. DeerFlow remains the host runtime and does not
 import this package.
 
-Changes 00 through 08 are complete. Change 06 added real HITL1 on top of the real
-bootstrap bundle. Change 07 adds real topic planning on top of real HITL1: a
-bounded planner turns the checkpointed profile into a stable topic registry and
-must-answer coverage map (planner-owned checkpoint state). Change 08 replaces the
-fixture Wave0 with the first real *worker* node: a bounded web source-intake
-worker agent runs per topic under a real attempt-scoped tool policy with
-untrusted-data discipline, a real `wave0.source-intake` v1 result contract is
-registered in the generalized validation registry, and a real source-floor gate
-replaces the fixture sequence rule. The lifecycle result STILL reports
-`implementation_mode=full_fake` because Wave1, synthesis, HITL2, readiness, and
-final delivery are still deterministic fakes and produce no findings or report.
+Changes 00 through 15 are complete — all 11 graph nodes (bootstrap through
+final_delivery) have both real and fake implementations. The demo pipeline
+supports three entry points:
+
+- `make demo` — fake CLI, zero API, shows all phases
+- `make demo-real` — real CLI, full LLM + web search pipeline
+- `make demo-tui` — real TUI, visual phase progress
 
 ## Work-Unit Kernel
 
@@ -129,16 +125,26 @@ make test
 make test-viability
 make test-durability
 make test-blocking-io
-make demo             # interactive zero-API lifecycle walkthrough
-make demo-scripted    # deterministic non-interactive walkthrough
-make demo-tui         # standalone Textual visualization of the same lifecycle
+make demo               # interactive zero-API fake lifecycle (show all 11 phases)
+make demo-scripted      # deterministic non-interactive fake (CI)
+make demo-real          # interactive real pipeline (requires ANTHROPIC_API_KEY)
+make demo-real-scripted # deterministic non-interactive real (CI, requires creds)
+make demo-tui           # standalone Textual real-mode visualization
 ```
 
-`make demo-tui` is an agent-owned visual demo, not the production DeerFlow
-Terminal Workbench, Web UI, Gateway, or generic human-input integration. It
-requires no root `config.yaml`, model credentials, network, or service process;
-it drives the same process-local full-fake lifecycle used by `make demo` and
-never produces research findings or a report.
+`make demo` and `make demo-scripted` are zero-dependency: no Gateway, config,
+model credentials, or network needed. They show every pipeline phase from bootstrap
+to final_delivery with human-readable Chinese labels driven by the graph's own
+`execution_trace`.
+
+`make demo-real` and `make demo-real-scripted` require `ANTHROPIC_API_KEY` (and
+optionally web search tool credentials). They exercise the full real pipeline
+through all 11 nodes.
+
+`make demo-tui` is a real-mode Textual visualization. It requires
+`ANTHROPIC_API_KEY` and the `demo-tui` extra. This is an agent-owned visual demo,
+not the production DeerFlow Terminal Workbench, Web UI, Gateway, or generic
+human-input integration.
 
 `make test-viability` is a hard prerequisite for structure/runtime work after
 change 00 group 2. It verifies reflected async `ToolRuntime` injection and

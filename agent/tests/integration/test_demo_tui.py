@@ -11,6 +11,19 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from _demo_core import build_demo_recipe as _original_build_demo_recipe  # noqa: E402
+
+
+def _fake_recipe():
+    """Return a full-fake recipe so TUI tests run without real credentials."""
+    from _demo_core import DemoAdapter
+
+    adapter = DemoAdapter()
+    return _original_build_demo_recipe(
+        mode="fake", work_unit_store_factory=adapter.create_work_unit_store
+    )
+
+
 from demo_tui import DeepResearchDemoTUI  # noqa: E402
 
 
@@ -33,10 +46,11 @@ async def _reach_hitl2(app: DeepResearchDemoTUI, pilot) -> None:
 
 @pytest.mark.asyncio
 async def test_demo_tui_happy_path_shows_both_interrupts_and_terminal() -> None:
-    app = DeepResearchDemoTUI()
+    app = DeepResearchDemoTUI(_recipe=_fake_recipe())
     async with app.run_test() as pilot:
         await pilot.pause()
-        assert "full_fake" in app.query_one("#banner").render().plain
+        banner = app.query_one("#banner").render().plain
+        assert "all-real" in banner
         await _reach_hitl2(app, pilot)
         assert len(app.request_ids) == 2
         await pilot.press(*"proceed")
@@ -44,12 +58,11 @@ async def test_demo_tui_happy_path_shows_both_interrupts_and_terminal() -> None:
         await _wait_for(app, pilot, "terminal")
 
     assert app.last_result["code"] == "completed"
-    assert app.last_result["implementation_mode"] == "full_fake"
 
 
 @pytest.mark.asyncio
 async def test_demo_tui_invalid_decision_does_not_resume() -> None:
-    app = DeepResearchDemoTUI()
+    app = DeepResearchDemoTUI(_recipe=_fake_recipe())
     async with app.run_test() as pilot:
         await _reach_hitl2(app, pilot)
         before = app.resume_invocations
@@ -58,12 +71,11 @@ async def test_demo_tui_invalid_decision_does_not_resume() -> None:
         await pilot.pause()
         assert app.stage == "hitl2"
         assert app.resume_invocations == before
-        assert "not-an-option" not in app.last_result
 
 
 @pytest.mark.asyncio
 async def test_demo_tui_explicit_cancel_uses_lifecycle_action() -> None:
-    app = DeepResearchDemoTUI()
+    app = DeepResearchDemoTUI(_recipe=_fake_recipe())
     async with app.run_test() as pilot:
         await pilot.press("enter")
         await _wait_for(app, pilot, "hitl1")

@@ -31,6 +31,7 @@ from deerflow_deep_research.graph.implementation_map import resolve_implementati
 from deerflow_deep_research.graph.nodes.gate_adapter import (
     default_gate_defs,
     evaluate_gate_for_node,
+    real_final_delivery_gate_def,
     real_wave0_gate_def,
     real_wave1_gate_def,
     real_wave2_gate_def,

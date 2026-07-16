@@ -5,8 +5,8 @@ DEMO_ARGS ?=
 install:
 	uv sync --extra operations
 
-# Standalone Change 01 lifecycle demo. It needs no Gateway, config.yaml,
-# model credentials, network access, or TUI installation.
+# Standalone fake lifecycle demo. Zero API, no Gateway, config.yaml,
+# model credentials, network access, or TUI installation needed.
 demo:
 	uv run --extra operations python scripts/demo.py $(DEMO_ARGS)
 
@@ -14,10 +14,20 @@ demo:
 demo-scripted:
 	uv run --extra operations python scripts/demo.py --scripted $(DEMO_ARGS)
 
-# Standalone visual shell over the same zero-API lifecycle. This is not the
-# production DeerFlow Terminal Workbench or generic human-input integration.
+# Real-mode CLI — full 11-phase pipeline with actual LLM + web search.
+# Requires ANTHROPIC_API_KEY (and optionally web search tool credentials).
+demo-real:
+	uv run --env-file .env --extra operations python scripts/demo_real.py $(DEMO_ARGS)
+
+# Non-interactive real-mode for CI (requires credentials).
+demo-real-scripted:
+	uv run --env-file .env --extra operations python scripts/demo_real.py --scripted $(DEMO_ARGS)
+
+# Standalone real-mode TUI. Requires model API key in .env + TUI dependencies.
+# This is not the production DeerFlow Terminal Workbench or generic
+# human-input integration.
 demo-tui:
-	uv run --extra operations --extra demo-tui python scripts/demo_tui.py
+	uv run --env-file .env --extra operations --extra demo-tui python scripts/demo_tui.py
 
 lock-check:
 	uv lock --check

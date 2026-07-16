@@ -344,6 +344,7 @@ def _result_from_snapshot(
         generation=checkpoint.generation,
         request_id=pending.request.request_id if pending is not None else None,
         terminal_reason=checkpoint.terminal_reason,
+        execution_trace=checkpoint.execution_trace,
     )
     return result, pending
 

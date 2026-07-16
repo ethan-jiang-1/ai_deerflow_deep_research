@@ -22,11 +22,16 @@ def test_scripted_demo_traverses_both_interrupts_and_terminal_fixture() -> None:
     )
 
     output = result.stdout
-    assert "=== START RESULT ===" in output
-    assert "=== HITL1 REQUEST ===" in output
-    assert "=== HITL2 REQUEST ===" in output
-    assert "=== TERMINAL RESULT ===" in output
-    assert output.count('"implementation_mode": "full_fake"') == 3
-    assert '"code": "completed"' in output
+    # Phase progress markers
+    assert "→" in output
+    assert "⏸" in output
+    # Chinese phase labels
+    assert "初始化" in output
+    assert "研究配置" in output
+    assert "主题规划" in output
+    assert "决策" in output
+    assert "报告生成" in output
+    # Terminal completion
+    assert "status: completed" in output
     assert "fixture, not completed research" in output
     assert "Blocked deserialization" not in result.stderr

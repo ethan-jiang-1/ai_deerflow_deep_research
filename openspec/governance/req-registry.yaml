@@ -51,6 +51,7 @@ prefixes:
   FID: final-delivery-node
   RUO: runtime-operations
   EVH: evaluation-hardening
+  DPL: demo-pipeline
 
 # ──────────────────────────────────────────────
 # Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
@@ -220,3 +221,8 @@ WOU-005: work-unit-kernel — Submission replay reconciles ledger and checkpoint
 WOU-006: work-unit-kernel — Per-research cross-process serialization guarantees at most one accepted winner without partial ledger publication
 WOU-007: work-unit-kernel — Retry, expiry, cancellation, failure, and crash recovery preserve one-way attempt lifecycle semantics
 WOU-008: work-unit-kernel — A generic drain check permits phase gating only when pending and in-flight work are empty
+DPL-001: demo-pipeline — A shared demo core module provides DemoAdapter, synthetic tool-call helpers, phase metadata, and importable infrastructure for all demo scripts
+DPL-002: demo-pipeline — Phase progress display reads execution_trace from DeepResearchControlResult and renders completed phases with → and suspended phases with ⏸
+DPL-003: demo-pipeline — build_demo_recipe supports fake (zero-API) and real (ALL_REAL_MODES + RuntimeNodeAgentBridge) modes through ResearchGraphRecipe.create()
+DPL-004: demo-pipeline — An independent CLI real demo validates ANTHROPIC_API_KEY, builds the all-real recipe, and supports scripted non-interactive mode
+DPL-005: demo-pipeline — Makefile provides demo, demo-scripted, demo-real, demo-real-scripted, and demo-tui targets with DEMO_ARGS passthrough

@@ -276,7 +276,7 @@ def text_only_content(content: Any, *, max_chars: int = MAX_START_REQUEST_CHARS)
 
 class DeepResearchControlResult(FrozenContract):
     schema_version: Literal[1] = 1
-    implementation_mode: Literal["full_fake"] = "full_fake"
+    implementation_mode: str = "full_fake"
     action: LifecycleAction
     code: ResultCode | InfrastructureResultCode
     durability: Durability
@@ -287,6 +287,7 @@ class DeepResearchControlResult(FrozenContract):
     request_id: str | None = Field(default=None, min_length=1, max_length=128)
     terminal_reason: TerminalReason | None = None
     infrastructure_reason: WorkUnitStorageReason | None = None
+    execution_trace: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def validate_lifecycle_shape(self) -> DeepResearchControlResult:

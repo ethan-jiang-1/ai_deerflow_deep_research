@@ -8,11 +8,11 @@ install:
 # Standalone Change 01 lifecycle demo. It needs no Gateway, config.yaml,
 # model credentials, network access, or TUI installation.
 demo:
-	uv run --extra operations python scripts/demo.py $(DEMO_ARGS)
+	uv run --extra operations python scripts/demo_fake.py $(DEMO_ARGS)
 
 # Non-interactive equivalent used by CI and quick smoke checks.
 demo-scripted:
-	uv run --extra operations python scripts/demo.py --scripted $(DEMO_ARGS)
+	uv run --extra operations python scripts/demo_fake.py --scripted $(DEMO_ARGS)
 
 # Standalone visual shell over the same zero-API lifecycle. This is not the
 # production DeerFlow Terminal Workbench or generic human-input integration.

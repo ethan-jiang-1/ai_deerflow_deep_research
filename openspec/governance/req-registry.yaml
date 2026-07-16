@@ -43,6 +43,7 @@ prefixes:
   WAN: wave0-node
   WON: wave1-node
   WOU: work-unit-kernel
+  TEL: targeted-evidence-loop
   WSN: wave2-synthesis-node
 
 # ──────────────────────────────────────────────
@@ -156,6 +157,11 @@ WSN-001: wave2-synthesis-node — Synthesis agent reads only accepted evidence v
 WSN-002: wave2-synthesis-node — Deterministic materializer writes synthesis artifacts to sandbox with structured finding schema and cross-topic ledger
 WSN-003: wave2-synthesis-node — Hard gate validates finding references, structure, and accepted backing; semantic gate checks causal strength, contradiction coverage, and must-answer completeness
 WSN-004: wave2-synthesis-node — Real synthesis integrates into mixed graph requiring full real chain through wave1 and preserves full-fake path with unchanged topology
+
+TEL-001: targeted-evidence-loop — Deterministic gap router converts synthesis gaps to bounded targeted WorkSpecs per gap with scoped search dimensions
+TEL-002: targeted-evidence-loop — Targeted worker performs focused web search per gap under attempt-scoped policy and produces structured evidence with backing refs
+TEL-003: targeted-evidence-loop — Post-submit critic invocation validates new evidence and updates finding backing; convergence gate checks gap closure, round budgets, and fatigue
+TEL-004: targeted-evidence-loop — Real targeted evidence loop integrates into mixed graph requiring full real chain through wave2_synthesis with unchanged topology
 
 # work-unit-kernel
 WOU-001: work-unit-kernel — Immutable work, attempt, candidate, and submission contracts preserve controller-assigned identity and spec integrity

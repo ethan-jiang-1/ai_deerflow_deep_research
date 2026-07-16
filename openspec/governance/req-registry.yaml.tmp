@@ -1,0 +1,7 @@
+# targeted-evidence-loop
+TEL-001: targeted-evidence-loop — Deterministic gap router converts synthesis gaps to bounded targeted WorkSpecs per gap with scoped search dimensions
+TEL-002: targeted-evidence-loop — Targeted worker performs focused web search per gap under attempt-scoped policy and produces structured evidence with backing refs
+TEL-003: targeted-evidence-loop — Post-submit critic invocation validates new evidence and updates finding backing; convergence gate checks gap closure, round budgets, and fatigue
+TEL-004: targeted-evidence-loop — Real targeted evidence loop integrates into mixed graph requiring full real chain through wave2_synthesis with unchanged topology
+
+# work-unit-kernel

@@ -1,9 +1,7 @@
-"""Critic runners and dispatcher for the targeted_evidence node.
-
-Each critic runner builds a prompt, calls ``capabilities.run_agent()`` once,
-parses the structured output, and returns the typed Pydantic result.
+"""Critic runners, dispatcher, and gap router for the targeted_evidence node.
 
 @impl EVC-001, EVC-002, EVC-003
+@impl TEL-001, TEL-002
 """
 
 from __future__ import annotations
@@ -16,6 +14,8 @@ from deerflow_deep_research.domain.critics import (
     ClaimVerifierResult,
     SourceDiagnosticResult,
 )
+from deerflow_deep_research.engine.fake_control import node_update
+from deerflow_deep_research.graph.components.work_units import run_fixture_work_unit_component
 
 from .prompts import build_claim_verifier_prompt, build_source_diagnostic_prompt
 
@@ -40,7 +40,6 @@ async def run_source_diagnostic(
     source_contents: tuple[str, ...],
     workspace_root: str,
 ) -> SourceDiagnosticResult:
-    """Run the SourceDiagnostic critic and return its typed result."""
     request = build_source_diagnostic_prompt(source_refs, source_contents)
     result = await capabilities.run_agent(context=capabilities, request=request)  # type: ignore[union-attr]
     payload = _parse_json(result.summary, "source_diagnostic")
@@ -55,7 +54,6 @@ async def run_claim_verifier(
     evidence_refs: tuple[str, ...],
     workspace_root: str,
 ) -> ClaimVerifierResult:
-    """Run the ClaimVerifier critic and return its typed result."""
     request = build_claim_verifier_prompt(claims, evidence_refs)
     result = await capabilities.run_agent(context=capabilities, request=request)  # type: ignore[union-attr]
     payload = _parse_json(result.summary, "claim_verifier")
@@ -69,7 +67,6 @@ async def dispatch_critic(
     research_id: str,
     workspace_root: str,
 ) -> list[Mapping[str, Any]]:
-    """Route each work item to the appropriate critic runner."""
     results: list[Mapping[str, Any]] = []
     for item in work_items:
         item_type = item.get("type")
@@ -90,3 +87,53 @@ async def dispatch_critic(
         else:
             raise ValueError(f"unknown_critic_work_type: {item_type}")
     return results
+
+
+async def run_gap_workers(state: dict, gap_intents: tuple, dependencies: Any) -> dict:
+    """Run gap workers through the shared work-unit component.
+
+    @impl TEL-001
+    """
+    from datetime import UTC, datetime
+
+    from deerflow_deep_research.domain.node_spec import PolicyRef
+
+    result = await run_fixture_work_unit_component(
+        state,
+        logical_name="targeted_evidence",
+        policy=PolicyRef(name="skeleton-targeted-evidence", version="v1"),
+        controller=dependencies.work_units,
+        intents=gap_intents,
+        clock=lambda: datetime.now(UTC),
+    )
+    return {**node_update("targeted_evidence"), **result.parent_update}
+
+
+def materialize_gap_intents(
+    gaps: tuple[dict, ...] | list[dict] | None,
+) -> tuple:
+    """Build one WorkIntent per search_required gap.
+
+    @impl TEL-001
+    """
+    from deerflow_deep_research.engine.work_units.kernel import WorkIntent
+
+    intents: list = []
+    for gap in gaps or ():
+        if not isinstance(gap, dict):
+            continue
+        if not gap.get("search_required", False):
+            continue
+        gap_id = gap.get("gap_id", "")
+        if not gap_id:
+            continue
+        intents.append(
+            WorkIntent(
+                worker_role="targeted_worker",
+                scope=(gap_id,),
+                result_contract="targeted.source-intake",
+                result_schema_version=1,
+                required_outputs=(),
+            )
+        )
+    return tuple(intents)

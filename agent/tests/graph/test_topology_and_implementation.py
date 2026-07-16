@@ -67,7 +67,7 @@ def test_normalized_topology_has_eleven_reachable_nodes_and_no_internal_workers(
 def test_only_wave0_and_wave1_declare_work_unit_controller_capability() -> None:
     specs = load_research_node_specs()
     declaring = {name for name, spec in specs.items() if NodeCapability.WORK_UNIT_CONTROLLER in spec.capabilities}
-    assert declaring == {"wave0", "wave1"}
+    assert declaring == {"wave0", "wave1", "targeted_evidence"}
 
 
 def test_real_hitl1_declares_only_request_bundle_capability() -> None:

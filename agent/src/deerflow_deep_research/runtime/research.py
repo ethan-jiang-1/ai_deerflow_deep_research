@@ -151,6 +151,9 @@ class ResearchGraphRecipe:
             raise ValueError("wave2_real_requires_wave1_real")
         if hitl2_real and not wave2_real:
             raise ValueError("hitl2_real_requires_wave2_synthesis_real")
+        rerun_real = modes.get("rerun") == "real"
+        if rerun_real and not hitl2_real:
+            raise ValueError("rerun_real_requires_hitl2_real")
         return cls(
             builder=build_research_graph(implementation_modes=implementation_modes),
             requires_work_units=True,

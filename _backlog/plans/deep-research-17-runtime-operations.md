@@ -1,18 +1,19 @@
 # Plan: Deep Research 17 - Runtime Operations
 
-> 类型: 设计 | 更新: 2026-07-12
-> 对应 OpenSpec change: `harden-deep-research-runtime-operations`
-> 依赖: 14 Rerun Node、16 Final Delivery Node
+> 类型: 设计 | 更新: 2026-07-16
+> 对应 OpenSpec change: `harden-deep-research-runtime-operations`（待 proposal）
+> 依赖: 14 Rerun Node（proposal 完成）、16 Final Delivery Node（待 proposal）
 > 替换范围: 横切运行时能力，不替换单一 phase node
 
-## 地基已具备（来自 00 + 01）
+## 地基已具备（来自 00 + 01 + 全链路 08–13）
 
 以下已由 00 和 01 交付，**本 plan 不用重建**：
 
-- **cancel 传播**: 01 的 `runtime/control.py` 已实现 cancel action → lifecycle state transition → graph 清理；`status` 可返回当前 phase/waiting state。
-- **checkpoint recovery**: 01 已验证 memory 同进程恢复和 file-SQLite 跨进程恢复（subprocess restart）。
+- **cancel 传播**: 01 的 `runtime/control.py` 已实现 cancel action → lifecycle state transition → graph 清理；`status` 可返回当前 phase/waiting state。08–13 的全链路运行已验证 cancel 在 wave worker batch、critic agent、synthesis loop 中正确传播。
+- **checkpoint recovery**: 01 已验证 memory 同进程恢复和 file-SQLite 跨进程恢复。03 checkpointer 集成已在 08–13 中经过大量 checkpoint 写入/恢复（每个 wave gate、每次 HITL interrupt 都写 checkpoint）。
 - **provider lifecycle**: 00 已定义 `async_provider.make_checkpointer(app_config)` 和 per-action open/close；memory/sqlite/postgres 三 backend 可用。
-- **lifecycle tool**: 01 的 `start | resume | status | cancel` 已通过 reflected control tool 暴露；identity 由 RuntimeAdapter 提供。
+- **lifecycle tool**: 01 的 `start | resume | status | cancel` 已通过 reflected control tool 暴露；identity 由 RuntimeAdapter 提供。HITL1（06）和 HITL2（13）已验证完整的 interrupt/resume 链路。
+- **新增横切经验**: 08–13 暴露了 recovery edge cases（worker crash 中 ledger 一致性、batch 中单 worker timeout 的 orphan detection、HITL interrupt 前后的 crash replay），为 17 的 scope 提供了真实测试场景。
 
 ## 目标
 

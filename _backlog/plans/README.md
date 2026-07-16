@@ -1,6 +1,6 @@
 # Active Plans — 活跃 plan/分析文档列表
 
-> 最后更新: 2026-07-15 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
+> 最后更新: 2026-07-16 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
 >
 > **plan 没有编号，文件名即标识。完成后文件名不变，位置即状态。**
 
@@ -19,22 +19,36 @@
 
 | Plan | 简述 |
 |------|------|
-| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00–18 路线图（00–05 ✅ 已归档，06 起待做） |
+| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00–18 路线图（00–14 ✅ 已归档，15 起待做） |
 | [deep-research-spec-gates-and-coverage.md](deep-research-spec-gates-and-coverage.md) | 治理：spec 门禁与 requirement-test 覆盖目录（提案，未立 change） |
 | [deep-research-structured-output-linting.md](deep-research-structured-output-linting.md) | 治理：agent YAML/JSON 结构化输出 lint（提案，Phase 2 已随 04 解锁） |
-| [deep-research-08-wave0-node.md](deep-research-08-wave0-node.md) | 真实 Wave0 source-intake phase |
-| [deep-research-09-evidence-critic-nodes.md](deep-research-09-evidence-critic-nodes.md) | 独立 source diagnostic 与 claim verifier nodes |
-| [deep-research-10-wave1-node.md](deep-research-10-wave1-node.md) | 真实 Wave1 evidence-depth phase |
-| [deep-research-11-wave2-synthesis-node.md](deep-research-11-wave2-synthesis-node.md) | 无 web 工具的真实 Wave2 pure-synthesis node |
-| [deep-research-12-targeted-evidence-loop.md](deep-research-12-targeted-evidence-loop.md) | gap planner、targeted workers 与 Wave2 convergence gate |
-| [deep-research-13-hitl2-node.md](deep-research-13-hitl2-node.md) | 真实 HITL2 typed decision node |
-| [deep-research-14-rerun-node.md](deep-research-14-rerun-node.md) | rerun generation、scoped invalidation 与 graph 回边 |
-| [deep-research-15-readiness-node.md](deep-research-15-readiness-node.md) | answerability、citation closure 与 readiness gate |
+| [deep-research-15-readiness-node.md](deep-research-15-readiness-node.md) | answerability、citation closure 与 readiness gate（← 下一个） |
 | [deep-research-16-final-delivery-node.md](deep-research-16-final-delivery-node.md) | final writer、integrity gate 与 workspace-to-outputs artifact publish |
 | [deep-research-17-runtime-operations.md](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress 与 operator recovery |
 | [deep-research-18-evaluation-hardening.md](deep-research-18-evaluation-hardening.md) | 全链路质量评估、故障注入与 production hardening |
 
 **Next available plan ID: CLS-003**（移入 `_closed_plans/` 时分配）
+
+## 已归档（移至 `_done/_closed_plans/`）
+
+| Plan | Change | 归档日期 |
+|------|--------|----------|
+| deep-research-00-runtime-infrastructure.md | 00 | 2026-07-12 |
+| deep-research-01-fake-graph-skeleton.md | 01 | 2026-07-12 |
+| deep-research-02-state-persistence-contracts.md | 02 | 2026-07-13 |
+| deep-research-03-gate-kernel.md | 03 | 2026-07-13 |
+| deep-research-04-work-unit-kernel.md | 04 | 2026-07-14 |
+| deep-research-05-bootstrap-node.md | 05 | 2026-07-15 |
+| deep-research-06-hitl1-node.md | 06 | 2026-07-15 |
+| deep-research-07-topic-planning-node.md | 07 | 2026-07-15 |
+| deep-research-08-wave0-node.md | 08 | 2026-07-16 |
+| deep-research-09-evidence-critic-nodes.md | 09 | 2026-07-16 |
+| deep-research-10-wave1-node.md | 10 | 2026-07-16 |
+| deep-research-11-wave2-synthesis-node.md | 11 | 2026-07-16 |
+| deep-research-12-targeted-evidence-loop.md | 12 | 2026-07-16 |
+| deep-research-13-hitl2-node.md | 13 | 2026-07-16 |
+| deep-research-14-rerun-node.md | 14 | 2026-07-16 |
+| deep-research-tui-hitl-terminal-workbench.md | CLS-001 | 2026-07-13 |
 
 ---
 

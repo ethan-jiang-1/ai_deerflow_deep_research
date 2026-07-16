@@ -1,10 +1,10 @@
 # Plan: Deep Research Structured-Output Linting (Agent YAML/JSON)
 
-> 类型: 治理/流程 | 更新: 2026-07-13
-> 对应 OpenSpec change: 待立(Phase 1:`add-deep-research-structured-file-lint-gate`;Phase 2 随 change 04)
-> 依赖: Phase 1 无;Phase 2 依赖 change 04(work-unit kernel 落地 WorkSpec/SubmissionRecord/ledger schema)
+> 类型: 治理/流程 | 更新: 2026-07-16
+> 对应 OpenSpec change: 待立(Phase 1:`add-deep-research-structured-file-lint-gate`;Phase 2 随 change 04 已解锁)
+> 依赖: Phase 1 无;Phase 2 依赖 change 04(work-unit kernel 落地 WorkSpec/SubmissionRecord/ledger schema ✅ 已归档)
 > 动因: 想给"agent 输出的 YAML/JSON"加 linter——main-agent 侧成熟可做,sub-agent 侧还没东西可 lint
-> 状态: 提案(draft for discussion)
+> 状态: 提案(draft for discussion)——Phase 2 触发条件已满足（04 已落地），sub-agent 侧现在有 wave0/wave1 result、critic verdict、synthesis findings、gap result 等结构化 JSON 可 lint
 
 ## Context / 你问的问题
 

@@ -1,14 +1,16 @@
 # Plan: Deep Research 15 - Readiness Node
 
-> 类型: 设计 | 更新: 2026-07-12
-> 对应 OpenSpec change: `implement-deep-research-readiness-node`
-> 依赖: 09 Evidence Critics、13 HITL2 Node
+> 类型: 设计 | 更新: 2026-07-16
+> 对应 OpenSpec change: `implement-deep-research-readiness-node`（待 proposal）
+> 依赖: 09 Evidence Critics ✅、13 HITL2 Node ✅
 > 替换范围: fake readiness gate/repair router（`agent/src/deerflow_deep_research/graph/nodes/readiness/fake.py`）
 
-## 地基已具备（来自 01）
+## 地基已具备（来自 01 + 08–13 实际实现）
 
 - **node 和路由**: 01 的 readiness node 已在拓扑中，HITL2(proceed) → readiness → final delivery/pass/repair edges 已定义。
-- **gate kernel 复用**: 03 的 GateDefinition/GateResult 直接用于 readiness gate。
+- **gate kernel 复用**: 03 的 GateDefinition/GateResult 直接用于 readiness gate。08–12 的 wave0/wave1/wave2/targeted evidence gate 已验证 collect-all + inspect/advice + fatigue 模式可复用。
+- **evidence critics 已验证**: 09 的 SourceDiagnostic + ClaimVerifier 已在 wave1（10）和 targeted evidence（12）中被调用，产出 typed verdict。Readiness 的 answerability assessment 可以消费这些 verdict，不需要重新 critique。
+- **HITL2 decision 已有 generation binding**: 13 的 `request_id` 机制已编码 generation，readiness 只需校验 `HITL2 decision` 属于当前 generation/brief hash，不需要重新发明 stale detection。
 
 ## 目标
 

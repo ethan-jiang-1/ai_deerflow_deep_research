@@ -46,6 +46,7 @@ prefixes:
   WOU: work-unit-kernel
   TEL: targeted-evidence-loop
   WSN: wave2-synthesis-node
+  REN: rerun-node
 
 # ──────────────────────────────────────────────
 # Requirement IDs（按 capability 分组，组按字母序，组内按数字序）
@@ -162,6 +163,15 @@ WSN-001: wave2-synthesis-node — Synthesis agent reads only accepted evidence v
 WSN-002: wave2-synthesis-node — Deterministic materializer writes synthesis artifacts to sandbox with structured finding schema and cross-topic ledger
 WSN-003: wave2-synthesis-node — Hard gate validates finding references, structure, and accepted backing; semantic gate checks causal strength, contradiction coverage, and must-answer completeness
 WSN-004: wave2-synthesis-node — Real synthesis integrates into mixed graph requiring full real chain through wave1 and preserves full-fake path with unchanged topology
+
+# rerun-node
+REN-001: rerun-node — Rerun scope is deterministically parsed from HITL2 decision payload producing a typed RerunPlan with scope, reason, target topics, target findings, and retained topics, defaulting to full scope when metadata is absent
+REN-002: rerun-node — Generation increment is monotonic with generation decrease rejected by reducer; old submission ledger and raw evidence artifacts remain append-only with no deletion or modification of accepted SubmissionRecords
+REN-003: rerun-node — Derived projections (synthesis ref, decision brief ref, report refs) are invalidated by clearing checkpoint refs without deleting sandbox files; raw evidence and submission ledger entries are never removed
+REN-004: rerun-node — Scoped WorkSpecs are materialized via the existing work-unit controller for topics and findings within the rerun scope; topics outside scope retain accepted evidence without new WorkSpecs
+REN-005: rerun-node — Back edges are a closed set determined by rerun scope: full and topic scope route to topic_planning; finding scope with stale sources routes to wave0; finding scope with deep-evidence-only routes to wave1; generation ceiling exhaustion routes to exhausted
+REN-006: rerun-node — New generation must re-pass all affected wave gates and HITL2; gate attempt and repair budget state is reset for affected phases; old HITL2 proceed decision is not inherited
+REN-007: rerun-node — Real rerun integrates into mixed graph requiring real hitl2 with unchanged topology; full-fake rerun preserves existing behavior; real back edges expand allowed route values without breaking existing edges
 
 TEL-001: targeted-evidence-loop — Deterministic gap router converts synthesis gaps to bounded targeted WorkSpecs per gap with scoped search dimensions
 TEL-002: targeted-evidence-loop — Targeted worker performs focused web search per gap under attempt-scoped policy and produces structured evidence with backing refs

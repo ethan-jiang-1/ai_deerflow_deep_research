@@ -1,7 +1,7 @@
 # Plan: DeerFlow 原生 Deep Research Graph
 
-> 类型: 设计 / 架构映射 | 更新: 2026-07-15
-> 状态: 00–07 ✅ 已归档 · 08 ⬜ ← 当前 · 09–18 ⬜
+> 类型: 设计 / 架构映射 | 更新: 2026-07-16
+> 状态: 00–13 ✅ 已归档 · 14 ⬜ ← 当前 · 15–18 ⬜
 > 参考: [`../_reference/dpt/`](../_reference/dpt/) 全部 9 份架构分析，以及 DPT 原始 workflow、gate、queue、work-unit、trace 实现
 
 ## 结论先行
@@ -718,12 +718,12 @@ Phase 0 对应 00-04 五个 change，期间不实现任何真实研究节点：
 | 05 | ✅ | deep-research-05-bootstrap-node *(已归档)* | 替换 fake bootstrap：原子 bundle 建立 + schema/version marker + 非门控 binding-validation 替换 fixture pass | 02, 03 |
 | 06 | ✅ | deep-research-06-hitl1-node *(已归档)* | 替换 fake HITL1：真实 model-calling 节点生成结构化 brief、deterministic profile 解析、restart-durable follow-up、request/profile.json 存储 | 05 |
 | 07 | ✅ | deep-research-07-topic-planning-node *(已归档)* | 替换 fake topic planner/seed materialization：真实 model-calling planner + 确定性 materializer + planner-owned topic registry | 03, 06 |
-| 08 | ⬜ | [`deep-research-08-wave0-node.md`](deep-research-08-wave0-node.md) | 替换 fake Wave0 intake phase | 04, 07 |
-| 09 | ⬜ | [`deep-research-09-evidence-critic-nodes.md`](deep-research-09-evidence-critic-nodes.md) | source diagnostic + claim verifier agent nodes | 03, 04 |
-| 10 | ⬜ | [`deep-research-10-wave1-node.md`](deep-research-10-wave1-node.md) | 替换 fake Wave1 evidence-depth phase | 08, 09 |
-| 11 | ⬜ | [`deep-research-11-wave2-synthesis-node.md`](deep-research-11-wave2-synthesis-node.md) | 替换 fake pure-synthesis node | 10 |
-| 12 | ⬜ | [`deep-research-12-targeted-evidence-loop.md`](deep-research-12-targeted-evidence-loop.md) | 替换 fake gap planner/targeted-search loop + Wave2 gate | 04, 09, 11 |
-| 13 | ⬜ | [`deep-research-13-hitl2-node.md`](deep-research-13-hitl2-node.md) | 替换 fake HITL2 decision node | 03, 12 |
+| 08 | ✅ | [`deep-research-08-wave0-node.md`](deep-research-08-wave0-node.md) | 替换 fake Wave0 intake phase | 04, 07 |
+| 09 | ✅ | [`deep-research-09-evidence-critic-nodes.md`](deep-research-09-evidence-critic-nodes.md) | source diagnostic + claim verifier agent nodes | 03, 04 |
+| 10 | ✅ | [`deep-research-10-wave1-node.md`](deep-research-10-wave1-node.md) | 替换 fake Wave1 evidence-depth phase | 08, 09 |
+| 11 | ✅ | [`deep-research-11-wave2-synthesis-node.md`](deep-research-11-wave2-synthesis-node.md) | 替换 fake pure-synthesis node | 10 |
+| 12 | ✅ | [`deep-research-12-targeted-evidence-loop.md`](deep-research-12-targeted-evidence-loop.md) | 替换 fake gap planner/targeted-search loop + Wave2 gate | 04, 09, 11 |
+| 13 | ✅ | [`deep-research-13-hitl2-node.md`](deep-research-13-hitl2-node.md) | 替换 fake HITL2 decision node | 03, 12 |
 | 14 | ⬜ | [`deep-research-14-rerun-node.md`](deep-research-14-rerun-node.md) | 替换 fake rerun generation/back edge | 04, 13 |
 | 15 | ⬜ | [`deep-research-15-readiness-node.md`](deep-research-15-readiness-node.md) | 替换 fake readiness gate | 09, 13 |
 | 16 | ⬜ | [`deep-research-16-final-delivery-node.md`](deep-research-16-final-delivery-node.md) | 替换 fake writer/final integrity/publish | 15 |
@@ -925,18 +925,21 @@ change 00 已定死 local editable/Docker source override 和 runtime bridge 直
 
 ## 落地关联
 
-00–07（runtime substrate、fake graph skeleton、typed state、gate kernel、work-unit kernel、
-bootstrap node、HITL1 node、topic planning node）均已完成并归档；launcher、Docker live smoke 与 Postgres profile 已明确转入
-deployment follow-up，不阻塞 graph 路线。下一步从 08 wave0 node 起，严格按 08→18 的依赖
+00–13（runtime substrate、fake graph skeleton、typed state、gate kernel、work-unit kernel、
+bootstrap node、HITL1 node、topic planning node、wave0 node、evidence critics、wave1 node、
+wave2 synthesis node、targeted evidence loop、HITL2 node）均已完成并归档；launcher、Docker live smoke 与 Postgres profile 已明确转入
+deployment follow-up，不阻塞 graph 路线。下一步从 14 rerun node 起，严格按 14→18 的依赖
 关系逐项推进，不提前合并真实 nodes，也不把延期的 deployment 工作塞入未完成的 change。
 
 当前稳定原则是：**graph 控制确定性流程与小型控制 state，agent loop 控制开放式研究判断，sandbox/ledger 控制大内容与证据权威。**
 
 ---
 
-## 实现难度参考（00 和 01 归档后更新于 2026-07-12）
+## 实现难度参考（08–13 归档后更新于 2026-07-16）
 
 以 00（Runtime Infrastructure）为基准——00 看似简单实则全是暗坑（identity 边界、provider lifecycle、per-action open/close、package mount 双模式、permission 模型）。01 站在 00 上搭完整拓扑 + 真实 interrupt，复杂度约 80% 的 00。
+
+08–13 实际经验：Wave0（08，被评为"高"）确实复杂——web search/fetch 的 adversarial source handling、URL canonicalization、snippet-vs-cache 区分、worker tool policy 每个都是新 attack surface；但 work-unit kernel（04）的 fan-out/fan-in 模式一遍验证后，Wave1（10）和 targeted evidence（12）就顺滑很多。Evidence critics（09）和 Wave2 synthesis（11）的复杂度主要在设计 verdict/gap schema，不在基础设施。HITL2（13）最简单——fake 已是 real pattern，只需补 brief builder。总体低于预期：03/04 地基铺好后，08–13 没有重新经历 00 那种"从零摸索"的痛苦。
 
 ### 难度分级
 
@@ -957,7 +960,7 @@ deployment follow-up，不阻塞 graph 路线。下一步从 08 wave0 node 起�
 | Plan | 难度 | 说明 |
 |---|---|---|
 | 02 State Contracts | 中低 | Reducer + schema version 需细心，pattern 成熟，无新暗坑 |
-| 13 HITL2 | 中低 | interrupt 已通。核心是 brief builder + 5 种 decision 解析 |
+| 13 HITL2 | 中低 | interrupt 已通。核心是 brief builder + 5 种 decision 解析（✅ 已归档 2026-07-16，实际比预期简单——fake 已是 real pattern）|
 | 17 Runtime Ops | 中低 | 横切加固——cancel/checkpoint 已有，补 non-interactive、progress、diagnostics |
 
 #### 🟠 中 —— 核心新能力，非地基级别
@@ -966,8 +969,8 @@ deployment follow-up，不阻塞 graph 路线。下一步从 08 wave0 node 起�
 |---|---|---|
 | 03 Gate Kernel | 中 | collect-all + inspect/advice + fatigue 通用框架。路由已有，需设计可复用 abstraction |
 | 06 HITL1 | 中 | LLM structured brief + 回答校验 + follow-up interrupt。机制已通，核心在 prompt/schema |
-| 09 Evidence Critics | 中 | 两个新 agent node。难度在 verdict schema 和 author/critic 隔离 |
-| 11 Wave2 Synthesis | 中 | synthesis agent 不许搜。finding index + cross-topic relations 的 structured output |
+| 09 Evidence Critics | 中 | 两个新 agent node。难度在 verdict schema 和 author/critic 隔离（✅ 实际：schema 设计占大头，agent loop 机械复用 NOA）|
+| 11 Wave2 Synthesis | 中 | synthesis agent 不许搜。finding index + cross-topic relations 的 structured output（✅ 实际：materializer 是关键，synthesis agent 是标准 bounded loop）|
 | 14 Rerun | 中 | generation increment + invalidation。注意"旧决策不继承到新 generation" |
 | 15 Readiness | 中 | answerability assessment + citation closure。复用 03 gate，核心在评估逻辑 |
 
@@ -977,15 +980,15 @@ deployment follow-up，不阻塞 graph 路线。下一步从 08 wave0 node 起�
 |---|---|---|
 | 04 Work Unit Kernel | 中高 | **事务心脏**。ledger + checkpoint + crash replay + per-research concurrency。fan-out 已通，但 crash-safe "最多一个 accepted winner" 是 00 级别的基础设施决策 |
 | 07 Topic Planning | 中高 | LLM structured output → deterministic materializer。第一个真正用 LLM 做决策的 node |
-| 12 Targeted Evidence | 中高 | gap → worker → critic → synthesis 收敛循环。round/attempt/token 三重 budget。`pure_synthesis_eligible` 必须代码导出 |
+| 12 Targeted Evidence | 中高 | gap → worker → critic → synthesis 收敛循环。round/attempt/token 三重 budget。`pure_synthesis_eligible` 必须代码导出（✅ 实际：subgraph 模式有效，convergence gate 是标准 03 gate 的 thin wrapper）|
 | 18 Evaluation | 中高 | 5 类 eval corpus + adversarial sources + fault matrix。难度在覆盖面，非单点 |
 
 #### 🔴 高 —— 接近 00 的复杂度
 
 | Plan | 难度 | 说明 |
 |---|---|---|
-| 08 Wave0 | 高 | **第一个真实 evidence 节点**。web search/fetch 的 adversarial source、URL canonicalization、snippet-vs-cache、worker tool policy。每个 edge case 都可能是新 attack surface |
-| 10 Wave1 | 高 | 比 Wave0 更深：claim extraction、counterevidence、open question state machine。**质量保证的第一个真正关口** |
+| 08 Wave0 | 高 | **第一个真实 evidence 节点**。web search/fetch 的 adversarial source、URL canonicalization、snippet-vs-cache、worker tool policy（✅ 实际：符合预期——URL canonicalization 和 degraded capture 是最棘手的部分）|
+| 10 Wave1 | 高 | 比 Wave0 更深：claim extraction、counterevidence、open question state machine。**质量保证的第一个真正关口**（✅ 实际：claim schema + counterevidence 设计复杂度高，但 worker pattern 复用 wave0）|
 | TUI Workbench | 高 → CLS-001 | demo TUI 已分流完成（`b8753be`）；正式集成延期，plan 已关闭归档 |
 
 ### 关键观察

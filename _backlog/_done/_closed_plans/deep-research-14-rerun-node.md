@@ -1,14 +1,16 @@
 # Plan: Deep Research 14 - Rerun Node
 
-> 类型: 设计 | 更新: 2026-07-12
-> 对应 OpenSpec change: `implement-deep-research-rerun-node`
-> 依赖: 04 Work Unit Kernel、13 HITL2 Node
+> 类型: 设计 | 更新: 2026-07-16
+> 对应 OpenSpec change: `implement-deep-research-rerun-node`（已 proposal，待 apply）
+> 依赖: 04 Work Unit Kernel ✅、13 HITL2 Node ✅
 > 替换范围: fake rerun planner、generation increment 和回边（`agent/src/deerflow_deep_research/graph/nodes/rerun/fake.py`）
 
-## 地基已具备（来自 01）
+## 地基已具备（来自 01 + 08–13 实际实现）
 
-- **rerun node 位置**: 01 的 rerun node 已在拓扑中，HITL2 → rerun → topic planning/Wave0 回边已定义。
-- **generation 概念**: 01 的 state 已有 generation 字段占位。
+- **rerun node 位置**: 01 的 rerun node 已在拓扑中，HITL2 → rerun → topic planning/Wave0 回边已定义。HITL2（13）现在是 real，用户 rerun 决策携带实际 findings/scope 上下文，不再是无上下文的 fixture 选择。
+- **generation 概念**: 01 的 state 已有 generation 字段占位。03 gate kernel 已定义 generation 的 writer 所有权（仅 gate 和 rerun node 可写）。HITL2（13）的 `request_id` 已编码 generation，提供 stale-resume 检测。
+- **work-unit kernel 已验证**: 04 的 WorkSpec/fan-out/fan-in/ledger 模式在 wave0（08）、wave1（10）、targeted evidence（12）中经过三轮真实使用，rerun 的 scoped WorkSpec 创建是同一模式的第四次应用。
+- **实际变更**: OpenSpec change `implement-deep-research-rerun-node` 已 proposal 完成（proposal/design/specs/tasks 就绪），待 apply。
 
 ## 目标
 

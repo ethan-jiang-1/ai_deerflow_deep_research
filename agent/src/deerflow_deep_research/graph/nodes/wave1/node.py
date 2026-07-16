@@ -35,12 +35,16 @@ def build_real(dependencies: NodeBuildDependencies):
         for _spec_entry in state.get("work_specs_by_id", {}).values():
             pass  # Wave0 URLs are in the ledger, not checkpoint state
 
+        active_topic_filter = state.get("active_topic_filter") or ()
+        topic_filter: tuple[str, ...] | None = tuple(active_topic_filter) if active_topic_filter else None
+
         result = await run_wave1_work_units_real(
             state,
             controller=dependencies.work_units,
             topic_registry=topic_registry,
             capabilities=dependencies.capabilities,
             wave0_urls=frozenset(wave0_urls),
+            topic_filter=topic_filter,
             clock=lambda: datetime.now(UTC),
         )
         return {

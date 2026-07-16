@@ -51,6 +51,9 @@ readiness --repair_synthesis--> wave2_synthesis
 readiness --repair_targeted--> targeted_evidence
 rerun --exhausted--> blocked
 rerun --next--> topic_planning
+rerun --topic_planning--> topic_planning
+rerun --wave0--> wave0
+rerun --wave1--> wave1
 targeted_evidence --next--> wave2_synthesis
 topic_planning --exhausted--> blocked
 topic_planning --next--> wave0

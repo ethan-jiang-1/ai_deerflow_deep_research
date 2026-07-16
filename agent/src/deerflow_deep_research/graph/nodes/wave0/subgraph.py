@@ -63,17 +63,26 @@ WAVE0_FIXTURE_INTENTS = tuple(
 
 def materialize_wave0_intents(
     topic_registry: Mapping[str, Any] | tuple[Mapping[str, Any], ...] | None,
+    *,
+    topic_filter: tuple[str, ...] | None = None,
 ) -> tuple[WorkIntent, ...]:
     """Build one real source-intake ``WorkIntent`` per topic in the planner registry.
 
+    When *topic_filter* is non-empty, only topics whose ``topic_id`` is in the
+    filter set get a WorkIntent. This supports scoped rerun (TOPIC/FINDING).
+
     @impl WAN-001
+    @impl REN-004
     """
+    filter_set: frozenset[str] | None = frozenset(topic_filter) if topic_filter else None
     intents: list[WorkIntent] = []
     for entry in topic_registry or ():
         if not isinstance(entry, Mapping):
             continue
         topic_id = entry.get("topic_id")
         if not isinstance(topic_id, str) or not topic_id.strip():
+            continue
+        if filter_set is not None and topic_id not in filter_set:
             continue
         intents.append(
             WorkIntent(
@@ -112,6 +121,7 @@ async def run_wave0_work_units_real(
     *,
     controller: WorkUnitControllerDependencies,
     topic_registry: Mapping[str, Any] | tuple[Mapping[str, Any], ...] | None,
+    topic_filter: tuple[str, ...] | None = None,
     clock: Callable[[], datetime],
     fault_hook: Callable[[str], None] | None = None,
 ) -> WorkUnitComponentResult:
@@ -120,7 +130,7 @@ async def run_wave0_work_units_real(
     @impl WAN-001
     @impl WAN-002
     """
-    intents = materialize_wave0_intents(topic_registry)
+    intents = materialize_wave0_intents(topic_registry, topic_filter=topic_filter)
 
     async def worker(spec: WorkSpec, attempt: Attempt) -> CandidateResult:
         resolved = await controller.resolver.resolve_worker(

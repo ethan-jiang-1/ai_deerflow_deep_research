@@ -192,7 +192,17 @@ def build_research_graph(
             "cancel": END,
         },
     )
-    builder.add_conditional_edges("rerun", _route, {"next": "topic_planning", "exhausted": END})
+    builder.add_conditional_edges(
+        "rerun",
+        _route,
+        {
+            "next": "topic_planning",  # fake backward compat (unchanged)
+            "topic_planning": "topic_planning",  # real FULL
+            "wave0": "wave0",  # real TOPIC / FINDING (stale sources)
+            "wave1": "wave1",  # real FINDING (deep evidence only)
+            "exhausted": END,  # both fake and real
+        },
+    )
     builder.add_conditional_edges(
         "readiness",
         _route,

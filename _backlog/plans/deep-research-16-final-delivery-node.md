@@ -1,15 +1,17 @@
 # Plan: Deep Research 16 - Final Delivery Node
 
-> 类型: 设计 | 更新: 2026-07-12
-> 对应 OpenSpec change: `implement-deep-research-final-delivery-node`
-> 依赖: 15 Readiness Node
+> 类型: 设计 | 更新: 2026-07-16
+> 对应 OpenSpec change: `implement-deep-research-final-delivery-node`（待 proposal）
+> 依赖: 15 Readiness Node（待 proposal）
 > 替换范围: fake final writer、integrity gate、artifact publish（`agent/src/deerflow_deep_research/graph/nodes/final_delivery/fake.py`）
 
-## 地基已具备（来自 01）
+## 地基已具备（来自 01 + 08–13 实际实现）
 
 - **node 位置**: 01 的 final delivery node 已是 graph 的 terminal sink，readiness → final → END 路径通。
 - **terminal marker**: 01 的 fake final 返回 `implementation_mode=full_fake` terminal fixture，已走通 completed 后的幂等行为。
 - **lifecycle 合同**: 01 的 control-result envelope 已标准化 action 返回格式。
+- **writer agent 模式已验证**: 09（critics）、11（synthesis）的 read-only agent loop（禁止 web，只读 accepted evidence，写 assigned paths）已在实际中运行。Final writer 是这个模式的直接复用：只读 readiness-approved report plan，写 report.md + claim-citation-map。
+- **integrity gate 可复用 03 gate kernel**: 03 的 hard gate rules（schema/identity/path containment/hash match）已在此前 wave gates 中验证。Final integrity gate 只需加 claim→citation 双向闭合检查。
 
 ## 目标
 

@@ -56,17 +56,26 @@ def _content_hash(data: bytes) -> str:
 
 def materialize_wave1_intents(
     topic_registry: Mapping[str, Any] | tuple[Mapping[str, Any], ...] | None,
+    *,
+    topic_filter: tuple[str, ...] | None = None,
 ) -> tuple[WorkIntent, ...]:
     """Build one real evidence WorkIntent per topic for deep extraction.
 
+    When *topic_filter* is non-empty, only topics whose ``topic_id`` is in the
+    filter set get a WorkIntent. This supports scoped rerun.
+
     @impl WON-001
+    @impl REN-004
     """
+    filter_set: frozenset[str] | None = frozenset(topic_filter) if topic_filter else None
     intents: list[WorkIntent] = []
     for entry in topic_registry or ():
         if not isinstance(entry, Mapping):
             continue
         topic_id = entry.get("topic_id")
         if not isinstance(topic_id, str) or not topic_id.strip():
+            continue
+        if filter_set is not None and topic_id not in filter_set:
             continue
         intents.append(
             WorkIntent(
@@ -160,11 +169,12 @@ async def run_wave1_work_units_real(
     topic_registry: tuple[dict, ...] | list[dict] | None,
     capabilities: object,
     wave0_urls: frozenset[str],
+    topic_filter: tuple[str, ...] | None = None,
     clock: Callable[[], datetime],
     fault_hook: Callable[[str], None] | None = None,
 ) -> WorkUnitComponentResult:
     """Run real Wave1 evidence extraction through the shared work-unit component."""
-    intents = materialize_wave1_intents(topic_registry)
+    intents = materialize_wave1_intents(topic_registry, topic_filter=topic_filter)
     return await run_fixture_work_unit_component(
         state,
         logical_name="wave1",

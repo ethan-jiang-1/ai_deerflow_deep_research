@@ -1,10 +1,10 @@
 # Plan: Deep Research Spec Gates And Requirement-Test Coverage
 
-> 类型: 治理/流程 | 更新: 2026-07-13
+> 类型: 治理/流程 | 更新: 2026-07-16
 > 对应 OpenSpec change: 待立(建议 `add-deep-research-spec-gate-catalog`,独立于 03/04)
 > 依赖: 无(可先于 03/04 落地,且能让 03/04 的 apply 更稳)
 > 动因: change 02 apply/archive 期间暴露——MD(proposal/spec)只描述意图,真正的裁判是 CLI 门禁 + 测试,二者没对齐,导致"瞎猜才能过"
-> 状态: 提案(draft for discussion)
+> 状态: 提案(draft for discussion)——08–13 已落地，spec 数量从 ~10 增长到 17，门禁集合缩水的风险更高
 
 ## Context / 为什么做
 

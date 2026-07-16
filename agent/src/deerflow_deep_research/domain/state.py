@@ -663,6 +663,12 @@ class ResearchCheckpoint:
     gate_attempts_by_phase: dict[str, int] = field(default_factory=dict)
     repair_budget_by_phase: dict[str, int] = field(default_factory=dict)
     terminal_reason: TerminalReason | None = None
+    # rerun
+    hitl2_rerun_payload: dict[str, Any] | None = None
+    rerun_scope: str = ""
+    rerun_reason: str = ""
+    parent_generation: int = -1
+    active_topic_filter: tuple[str, ...] = ()
     # planning
     topic_refs: tuple[str, ...] = ()
     topic_registry: tuple[dict[str, Any], ...] = ()
@@ -706,7 +712,7 @@ class ResearchCheckpoint:
             raise ValueError("research_id_invalid")
         if not isinstance(self.outer_thread_id, str) or not self.outer_thread_id:
             raise ValueError("outer_thread_id_invalid")
-        if not 0 <= self.generation <= MAX_FAKE_RERUN_GENERATIONS:
+        if self.generation < 0:
             raise ValueError("generation_invalid")
         if self.start_message_id and len(self.start_message_id) > 256:
             raise ValueError("start_message_id_invalid")
@@ -838,6 +844,12 @@ class ResearchState(TypedDict, total=False):
     gate_attempts_by_phase: dict[str, int]
     repair_budget_by_phase: dict[str, int]
     terminal_reason: str
+    # rerun
+    hitl2_rerun_payload: dict[str, Any] | None
+    rerun_scope: str
+    rerun_reason: str
+    parent_generation: int
+    active_topic_filter: tuple[str, ...]
     # planning
     topic_refs: tuple[str, ...]
     topic_registry: tuple[dict[str, Any], ...]
@@ -941,6 +953,18 @@ OWNERSHIP_TABLE: tuple[FieldOwnership, ...] = (
     FieldOwnership("repair_budget_by_phase", WriterRole.GATE, (WriterRole.GATE,), "apply_research_update"),
     FieldOwnership(
         "terminal_reason", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "apply_research_update"
+    ),
+    FieldOwnership("hitl2_rerun_payload", WriterRole.GATE, (WriterRole.CONTROLLER,), "last_write_wins"),
+    FieldOwnership("rerun_scope", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
+    FieldOwnership("rerun_reason", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "last_write_wins"),
+    FieldOwnership(
+        "parent_generation", WriterRole.CONTROLLER, (WriterRole.CONTROLLER, WriterRole.GATE), "apply_research_update"
+    ),
+    FieldOwnership(
+        "active_topic_filter",
+        WriterRole.CONTROLLER,
+        (WriterRole.CONTROLLER, WriterRole.PLANNER, WriterRole.GATE),
+        "last_write_wins",
     ),
     FieldOwnership("topic_refs", WriterRole.PLANNER, (WriterRole.CONTROLLER, WriterRole.WORKER), "last_write_wins"),
     FieldOwnership("topic_registry", WriterRole.PLANNER, (WriterRole.CONTROLLER, WriterRole.WORKER), "last_write_wins"),

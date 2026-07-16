@@ -1,16 +1,17 @@
 # Plan: Deep Research 18 - Evaluation And Production Hardening
 
-> 类型: 设计 | 更新: 2026-07-12
-> 对应 OpenSpec change: `evaluate-harden-deep-research-graph`
-> 依赖: 17 Runtime Operations
+> 类型: 设计 | 更新: 2026-07-16
+> 对应 OpenSpec change: `evaluate-harden-deep-research-graph`（待 proposal）
+> 依赖: 17 Runtime Operations（待 proposal）
 > 替换范围: 全链路 release gate，不新增主要 workflow phase
 
-## 地基已具备（来自 00 + 01 + 所有前置 change）
+## 地基已具备（来自 00–13 全链路 + 所有前置 change）
 
-- **完整 graph 可评估**: 01 的 full-fake graph 已提供所有 node/edge，可直接用于故障注入和 recovery 测试。
-- **contract test 基础设施**: 00/01 的 contract 和 integration test 模式可直接复用到 eval corpus。
-- **checkpoint recovery 已验证**: memory + file-SQLite 跨进程恢复可用于 crash/recovery scenario。
+- **完整 graph 可评估**: 01 的 full-fake graph 提供所有 node/edge 用于故障注入；08–13 的 real nodes 提供真实搜索/证据/批评/综合/HITL 行为用于质量评估。两个 implementation 模式下都已有可重复的 E2E 路径。
+- **contract test 基础设施**: 00/01 的 contract 和 integration test 模式已在 08–13 中大量使用。09（critics）和 11（synthesis）的零 API agent test（FakeToolCallingModel/ReplayChatModel）可直接复用到 eval corpus 的 claim verification 和 adversarial source scenarios。
+- **checkpoint recovery 已验证**: memory + file-SQLite 跨进程恢复已在 01、03、06、13 的 interrupt/resume 测试中反复验证。
 - **topology snapshot**: `topology_snapshot.py` CI 检查可保证 node/edge 闭集，防止意外变更。
+- **新增可评估面**: 08–13 的 real nodes 暴露了具体质量维度——citation precision（wave0/wave1 submit validation）、must-answer coverage（topic planning → wave2 synthesis gap planner）、source diversity（wave0 URL canonicalization）、contradiction recall（wave1 counterevidence + evidence critics）。这些都已有 structured output schema，可直接量化。
 
 ## 目标
 

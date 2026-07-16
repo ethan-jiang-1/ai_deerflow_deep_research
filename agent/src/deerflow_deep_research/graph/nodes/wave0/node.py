@@ -23,10 +23,13 @@ def build_real(dependencies: NodeBuildDependencies):
 
     async def run(state: dict[str, Any]):
         topic_registry = state.get("topic_registry") or ()
+        active_topic_filter = state.get("active_topic_filter") or ()
+        topic_filter: tuple[str, ...] | None = tuple(active_topic_filter) if active_topic_filter else None
         result = await run_wave0_work_units_real(
             state,
             controller=dependencies.work_units,
             topic_registry=topic_registry,
+            topic_filter=topic_filter,
             clock=lambda: datetime.now(UTC),
         )
         return {

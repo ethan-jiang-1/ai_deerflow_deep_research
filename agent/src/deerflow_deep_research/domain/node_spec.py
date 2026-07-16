@@ -60,6 +60,7 @@ class NodeBuildDependencies:
     work_units: WorkUnitControllerDependencies | None = None
     bootstrap_bundle: BootstrapBundleStoreProtocol | None = None
     request_bundle: RequestBundleStoreProtocol | None = None
+    max_rerun_generations: int = 2
 
 
 NodeFactory = Callable[[NodeBuildDependencies], NodeCallable]

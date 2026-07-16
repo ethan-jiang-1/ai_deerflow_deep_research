@@ -770,14 +770,17 @@ class WorkSpecRef(_FrozenModel):
 
 
 class WorkerSource(_FrozenModel):
-    """One source a Wave0 worker proposes, referencing its fetched content."""
+    """One source a Wave0 worker proposes (metadata only).
+
+    The worker owns the content artifact: it writes the fetched/cached bytes
+    under its attempt root and derives ``content_ref``/``content_hash``/
+    ``byte_count`` for the ``SourceRef``. The model never carries host paths or
+    hashes.
+    """
 
     source_id: str = Field(pattern=SOURCE_ID_RE.pattern)
     canonical_url: str = Field(min_length=1, max_length=2048)
     title: str = Field(min_length=1, max_length=MAX_SOURCE_TITLE_CHARS)
-    content_ref: str
-    content_hash: str
-    byte_count: int = Field(ge=1)
     fetch_status: Literal["fetched", "degraded"]
 
     @field_validator("canonical_url")
@@ -786,11 +789,6 @@ class WorkerSource(_FrozenModel):
         if canonicalize_source_url(value) != value:
             raise ValueError("canonical_url_not_canonical")
         return value
-
-    @field_validator("content_ref")
-    @classmethod
-    def validate_content_ref(cls, value: str) -> str:
-        return _validate_bundle_ref(value, field_name="content_ref")
 
 
 WAVE0_WORKER_OUTPUT_SCHEMA_VERSION = 1

@@ -18,6 +18,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Overwrite, Send
 
 from deerflow_deep_research.domain.bundle import first_work_spec_path, output_path, result_path, work_spec_path
+from deerflow_deep_research.domain.failure_codes import FailureCode, get_classification
 from deerflow_deep_research.domain.invocation import WorkUnitControllerDependencies
 from deerflow_deep_research.domain.lifecycle import WorkUnitStorageReason
 from deerflow_deep_research.domain.node_spec import PolicyRef
@@ -28,6 +29,7 @@ from deerflow_deep_research.domain.work_units import (
     Attempt,
     AttemptRef,
     AttemptStatus,
+    AttemptTerminalCode,
     AttemptTerminalUpdate,
     CandidateResult,
     FixtureResultDocument,
@@ -36,9 +38,11 @@ from deerflow_deep_research.domain.work_units import (
     WorkSpec,
     WorkSpecRef,
     WorkUnitComponentState,
+    WorkUnitGateFailure,
     WorkUnitGateView,
     canonical_json_bytes,
     compute_candidate_hash,
+    compute_failure_detail_hash,
     validate_component_gate_view,
 )
 from deerflow_deep_research.engine.work_units.kernel import (
@@ -473,12 +477,32 @@ async def run_work_unit_component(
 
     async def run_worker(state: WorkUnitComponentState) -> dict[str, Any]:
         attempt_id, work_id = next(iter(state["in_flight_by_attempt_id"].items()))
-        candidate = await worker(specs[work_id], attempts[attempt_id])
+        try:
+            candidate = await worker(specs[work_id], attempts[attempt_id])
+        except Exception:
+            # A failed worker (invalid output, run_agent failure) becomes a typed
+            # terminal WORKER_FAILED update so the gate can repair/exhaust instead
+            # of crashing the graph. No candidate is produced for this attempt.
+            # Only return terminal_updates_by_attempt_id (not candidates) because
+            # multiple workers can fan-out via Send in the same super-step, and
+            # the merge_candidates reducer rejects competing Overwrite writes.
+            terminal = dict(state.get("terminal_updates_by_attempt_id", {}))
+            terminal[attempt_id] = AttemptTerminalUpdate(
+                attempt_id=attempt_id,
+                status="failed",
+                terminal_at=config.clock(),
+                terminal_code=AttemptTerminalCode.WORKER_FAILED,
+            )
+            return {
+                "terminal_updates_by_attempt_id": terminal,
+            }
         return {"candidates_by_attempt_id": {attempt_id: candidate}}
 
     async def submit_batch(state: WorkUnitComponentState) -> dict[str, Any]:
-        terminal: dict[str, AttemptTerminalUpdate] = {}
+        terminal: dict[str, AttemptTerminalUpdate] = dict(state.get("terminal_updates_by_attempt_id", {}))
         for attempt_id, candidate in sorted(state["candidates_by_attempt_id"].items()):
+            if candidate is None:
+                continue
             work_id = state["in_flight_by_attempt_id"][attempt_id]
             record = await submit(specs[work_id], attempts[attempt_id], candidate)
             records[work_id] = record
@@ -517,25 +541,72 @@ async def run_work_unit_component(
     graph = builder.compile(checkpointer=False)
     child = await graph.ainvoke({}, {"recursion_limit": 128})
 
+    # Worker failures (no candidate produced) are recorded in terminal_updates
+    # by the child subgraph.  We must fold them into terminal_failures and the
+    # gate-view failure summaries so the parent gate can route repair/exhausted.
+    terminal_updates_by_attempt: dict[str, AttemptTerminalUpdate] = child.get("terminal_updates_by_attempt_id", {})
+    _TERMINAL_TO_FAILURE: dict[AttemptTerminalCode, FailureCode] = {
+        AttemptTerminalCode.WORKER_FAILED: FailureCode.WORK_FAILED,
+        AttemptTerminalCode.VALIDATION_FAILED: FailureCode.INVALID_OUTPUT_SCHEMA,
+        AttemptTerminalCode.DEADLINE_EXCEEDED: FailureCode.WORK_TIMED_OUT,
+        AttemptTerminalCode.EXPIRED: FailureCode.WORK_TIMED_OUT,
+    }
+
     attempt_refs: dict[str, dict[str, Any]] = {}
     statuses: dict[str, str] = {}
+    terminal_failures: dict[str, dict[str, Any]] = {}
+    failure_summaries: list[WorkUnitGateFailure] = []
+
     for attempt_id, attempt in attempts.items():
-        record = records[attempt.work_id]
-        sibling_won = record.attempt_id != attempt_id
-        attempt_refs[attempt_id] = {
-            "created_at": attempt.created_at,
-            "started_at": attempt.started_at if sibling_won else (attempt.started_at or attempt.created_at),
-            "expires_at": attempt.expires_at,
-            "terminal_at": record.submitted_at,
-            "terminal_code": "superseded" if sibling_won else "accepted",
-        }
-        statuses[attempt_id] = "cancelled" if sibling_won else "submitted"
+        record = records.get(attempt.work_id)
+        if record is not None:
+            sibling_won = record.attempt_id != attempt_id
+            attempt_refs[attempt_id] = {
+                "created_at": attempt.created_at,
+                "started_at": attempt.started_at if sibling_won else (attempt.started_at or attempt.created_at),
+                "expires_at": attempt.expires_at,
+                "terminal_at": record.submitted_at,
+                "terminal_code": "superseded" if sibling_won else "accepted",
+            }
+            statuses[attempt_id] = "cancelled" if sibling_won else "submitted"
+        else:
+            terminal = terminal_updates_by_attempt.get(attempt_id)
+            if terminal is None:
+                continue
+            attempt_refs[attempt_id] = {
+                "created_at": attempt.created_at,
+                "started_at": attempt.started_at or attempt.created_at,
+                "expires_at": attempt.expires_at,
+                "terminal_at": terminal.terminal_at,
+                "terminal_code": terminal.terminal_code.value,
+            }
+            statuses[attempt_id] = terminal.status.value
+            failure_code = _TERMINAL_TO_FAILURE.get(terminal.terminal_code, FailureCode.WORK_FAILED)
+            detail_hash = compute_failure_detail_hash(terminal_code=terminal.terminal_code)
+            terminal_failures[attempt_id] = {
+                "failure_code": failure_code.value,
+                "detail_hash": detail_hash,
+            }
+            failure_summaries.append(
+                WorkUnitGateFailure(
+                    work_id=attempt.work_id,
+                    attempt_id=attempt_id,
+                    failure_code=failure_code,
+                    classification=get_classification(failure_code),
+                    detail_hash=detail_hash,
+                )
+            )
+
     next_attempt_ordinals = dict(parent_state.get("next_attempt_ordinal_by_work_id", {}))
     for attempt in attempts.values():
         next_attempt_ordinals[attempt.work_id] = max(
             int(next_attempt_ordinals.get(attempt.work_id, 0)),
             attempt.attempt_ordinal + 1,
         )
+    terminal_attempt_by_work_id: dict[str, str] = {
+        work_id: record.attempt_id for work_id, record in sorted(records.items())
+    }
+    terminal_attempt_by_work_id.update({failure.work_id: failure.attempt_id for failure in failure_summaries})
     parent_update = {
         "work_specs_by_id": {
             work_id: WorkSpecRef(worker_role=spec.worker_role, spec_hash=spec.spec_hash).model_dump(mode="json")
@@ -544,7 +615,7 @@ async def run_work_unit_component(
         "attempts_by_id": attempt_refs,
         "work_status_by_id": statuses,
         "active_attempt_by_work_id": {},
-        "terminal_failures_by_attempt_id": {},
+        "terminal_failures_by_attempt_id": terminal_failures,
         "accepted_submission_refs": tuple(record.record_hash for _, record in sorted(records.items())),
         "pending_work_ids": tuple(child["pending_work_ids"]),
         "batch_cursor": child["batch_cursor"],
@@ -554,9 +625,9 @@ async def run_work_unit_component(
     gate_view = WorkUnitGateView(
         drained=not child["pending_work_ids"] and not child["in_flight_by_attempt_id"],
         planned_work_ids=planned,
-        terminal_attempt_by_work_id={work_id: record.attempt_id for work_id, record in sorted(records.items())},
+        terminal_attempt_by_work_id=terminal_attempt_by_work_id,
         accepted_record_by_work_id={work_id: record.record_hash for work_id, record in sorted(records.items())},
-        failure_summaries=(),
+        failure_summaries=tuple(failure_summaries),
     )
     preview_delta = {key: value for key, value in parent_update.items() if key in WORK_UNIT_GATE_PREVIEW_FIELDS}
     parent_projection = preview_work_unit_update(parent_state, preview_delta)

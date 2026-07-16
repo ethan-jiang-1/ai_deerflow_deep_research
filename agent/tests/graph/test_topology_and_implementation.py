@@ -163,3 +163,44 @@ def test_mixed_real_bootstrap_and_hitl1_resolves() -> None:
         if name not in {"bootstrap", "hitl1"}:
             assert resolved[name] is specs[name].fake_factory
     build_research_graph(implementation_modes=modes).compile()
+
+
+def test_mixed_real_wave0_chain_resolves_and_compiles() -> None:
+    """Mixed mode with the four-real chain selects all four real factories and compiles.
+
+    @impl WAN-005
+    @impl PRS-003
+    """
+    specs = load_research_node_specs()
+    modes = {name: "fake" for name in LOGICAL_NODES} | {
+        "bootstrap": "real",
+        "hitl1": "real",
+        "topic_planning": "real",
+        "wave0": "real",
+    }
+    resolved = resolve_implementations(specs, modes)
+    for name in ("bootstrap", "hitl1", "topic_planning", "wave0"):
+        assert resolved[name] is specs[name].real_factory, f"{name} should use real factory"
+    for name in LOGICAL_NODES:
+        if name not in {"bootstrap", "hitl1", "topic_planning", "wave0"}:
+            assert resolved[name] is specs[name].fake_factory, f"{name} should use fake factory"
+    # Graph compiles without error — topology shape preserved.
+    build_research_graph(implementation_modes=modes).compile()
+
+
+def test_mixed_real_wave0_chain_preserves_topology_shape() -> None:
+    """Graph shape is identical for full-fake and mixed wave0-chain maps.
+
+    @impl WAN-005
+    """
+    fake_graph = build_research_graph().compile()
+    mixed_modes = {name: "fake" for name in LOGICAL_NODES} | {
+        "bootstrap": "real",
+        "hitl1": "real",
+        "topic_planning": "real",
+        "wave0": "real",
+    }
+    mixed_graph = build_research_graph(implementation_modes=mixed_modes).compile()
+    assert {(e.source, e.target) for e in mixed_graph.get_graph().edges} == {
+        (e.source, e.target) for e in fake_graph.get_graph().edges
+    }

@@ -91,7 +91,6 @@ class _AttemptArtifactWriter:
             document.worker_role,
             document.spec_hash,
             document.output_paths,
-            document.source_ids,
         )
         expected = (
             self._spec.research_id,
@@ -102,7 +101,6 @@ class _AttemptArtifactWriter:
             self._spec.worker_role,
             self._spec.spec_hash,
             self._spec.required_outputs,
-            (),
         )
         if identity != expected:
             raise ValueError("fixture_identity_mismatch")
@@ -122,6 +120,22 @@ class _AttemptArtifactWriter:
             self._spec,
             self._attempt,
             ("outputs", *relative_path.split("/")),
+            content,
+        )
+
+    async def write_source(self, relative_path: str, content: bytes) -> None:
+        """Write a fetched/cached source artifact under the attempt ``cache/`` root.
+
+        Source content is not a declared output; it is containment-checked
+        per-attempt content written by the worker (the fetch tool's product, or
+        a deterministic representation in tests).
+        """
+        if not isinstance(content, bytes) or not content:
+            raise ValueError("source_content_invalid")
+        await self._store._write_attempt_file(
+            self._spec,
+            self._attempt,
+            ("cache", *relative_path.split("/")),
             content,
         )
 

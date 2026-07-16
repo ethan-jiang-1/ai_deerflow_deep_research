@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from deerflow_deep_research.domain.work_units import (
     Attempt,
+    Wave0SourceMeta,
     Wave0WorkerOutput,
     WorkerSource,
     WorkSpec,
@@ -91,9 +92,6 @@ def _worker_source(**overrides: object) -> dict[str, object]:
         "source_id": "source:1",
         "canonical_url": "https://example.com/path",
         "title": "Example",
-        "content_ref": f"workspace/deep-research/{RESEARCH_ID}/work/{WORK_ID}/{ATTEMPT_ID}/cache/source:1.json",
-        "content_hash": "h_" + "B" * 43,
-        "byte_count": 42,
         "fetch_status": "fetched",
     }
     payload.update(overrides)
@@ -149,7 +147,17 @@ def test_build_wave0_result_document_merges_identity_and_sources() -> None:
     output = parse_wave0_worker_output(
         json.dumps({"schema_version": 1, "sources": [_worker_source()], "baseline_facts": ["fact"], "limitations": ""})
     )
-    doc = build_wave0_result_document(spec, attempt, output)
+    metas = tuple(
+        Wave0SourceMeta(
+            source_id=source.source_id,
+            canonical_url=source.canonical_url,
+            title=source.title,
+            content_ref=f"workspace/deep-research/{RESEARCH_ID}/work/{WORK_ID}/{ATTEMPT_ID}/cache/source-0.json",
+            fetch_status=source.fetch_status,
+        )
+        for source in output.sources
+    )
+    doc = build_wave0_result_document(spec, attempt, metas, output.baseline_facts, output.limitations)
     assert doc.research_id == spec.research_id
     assert doc.work_id == spec.work_id
     assert doc.attempt_id == attempt.attempt_id

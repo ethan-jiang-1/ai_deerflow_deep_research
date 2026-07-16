@@ -5,13 +5,17 @@ for DeerFlow 2.1. Its controller is a nested Python `StateGraph`; bounded agent
 loops execute inside graph nodes. DeerFlow remains the host runtime and does not
 import this package.
 
-Changes 00 through 06 are complete. Change 06 added real HITL1 on top of the real
+Changes 00 through 08 are complete. Change 06 added real HITL1 on top of the real
 bootstrap bundle. Change 07 adds real topic planning on top of real HITL1: a
 bounded planner turns the checkpointed profile into a stable topic registry and
-must-answer coverage map (planner-owned checkpoint state), while keeping every
-lifecycle result labelled `implementation_mode=full_fake`: research waves,
-synthesis, HITL2, readiness, and final delivery are still deterministic fakes and
-produce no findings or report.
+must-answer coverage map (planner-owned checkpoint state). Change 08 replaces the
+fixture Wave0 with the first real *worker* node: a bounded web source-intake
+worker agent runs per topic under a real attempt-scoped tool policy with
+untrusted-data discipline, a real `wave0.source-intake` v1 result contract is
+registered in the generalized validation registry, and a real source-floor gate
+replaces the fixture sequence rule. The lifecycle result STILL reports
+`implementation_mode=full_fake` because Wave1, synthesis, HITL2, readiness, and
+final delivery are still deterministic fakes and produce no findings or report.
 
 ## Work-Unit Kernel
 
@@ -65,6 +69,37 @@ brief-generation failure routes through `hitl1 --exhausted--> blocked`.
 
 No `backend/`, `frontend/`, root config, extension, skill, Agent/SOUL, MCP, ACP,
 or lead-agent middleware surface is modified by the real HITL1 change.
+
+## Real Wave0 And Source-Intake Worker
+
+Real Wave0 is the first real *worker* node. It reads the planner-owned
+`topic_registry` and materializes one immutable source-intake `WorkSpec` per
+topic through the shared work-unit controller. Each work unit runs a bounded
+web worker agent through the runtime node-agent bridge under a real
+`ExecutionPolicy` with web search/fetch tools and attempt-scoped read/write
+roots. All fetched content is treated as untrusted data and placed in the
+`<untrusted-source-data>` block; the deny-by-default `ToolPolicyMiddleware`
+blocks any tool/path the worker is not allow-listed for.
+
+A real `wave0.source-intake` v1 result contract (canonical source URLs, source
+metadata, baseline facts, fetch/cache refs, limitations) is registered in a
+generalized `(result_contract, result_schema_version)` validation registry.
+Submit validation canonicalizes URLs, verifies fetch/cache refs, and deduplicates
+sources per topic. A real source-floor gate replaces the fixture sequence rule
+with per-topic independent-source coverage enforced at submit-validation time.
+An honest degraded-capture contract records unreachable sources as typed
+limitations rather than fabricating success.
+
+Real Wave0 is available only in the mixed implementation map with
+`bootstrap=real`, `hitl1=real`, `topic_planning=real`, and `wave0=real`.
+Selecting `wave0=real` without the real topic chain fails before graph
+invocation. The full-fake Wave0 fixture path remains deterministic and does NOT
+construct the runtime node-agent bridge. Web-tool provisioning is an operator
+configuration prerequisite; this change declares the worker tool-policy surface
+without adding a specific provider.
+
+No `backend/`, `frontend/`, root config, extension, skill, Agent/SOUL, MCP, ACP,
+or lead-agent middleware surface is modified by the real Wave0 change.
 
 ## Requirements
 

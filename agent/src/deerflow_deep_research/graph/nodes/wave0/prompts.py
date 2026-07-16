@@ -15,11 +15,11 @@ from deerflow_deep_research.domain.context import NodeExecutionRequest
 from deerflow_deep_research.domain.work_units import (
     MAX_SOURCE_REFS,
     MAX_SOURCE_TITLE_CHARS,
+    Attempt,
     Wave0SourceIntakeResult,
     Wave0SourceMeta,
     Wave0WorkerOutput,
     WorkSpec,
-    Attempt,
 )
 
 
@@ -100,19 +100,11 @@ def parse_wave0_worker_output(text: str) -> Wave0WorkerOutput:
 def build_wave0_result_document(
     spec: WorkSpec,
     attempt: Attempt,
-    output: Wave0WorkerOutput,
+    metas: tuple[Wave0SourceMeta, ...],
+    baseline_facts: tuple[str, ...],
+    limitations: str,
 ) -> Wave0SourceIntakeResult:
-    """Merge the worker output with work-spec identity into the persisted result doc."""
-    sources = tuple(
-        Wave0SourceMeta(
-            source_id=source.source_id,
-            canonical_url=source.canonical_url,
-            title=source.title,
-            content_ref=source.content_ref,
-            fetch_status=source.fetch_status,
-        )
-        for source in output.sources
-    )
+    """Merge the worker-built source metas with work-spec identity into the doc."""
     return Wave0SourceIntakeResult(
         schema_version=1,
         research_id=spec.research_id,
@@ -124,10 +116,10 @@ def build_wave0_result_document(
         spec_hash=spec.spec_hash,
         result_contract="wave0.source-intake",
         output_paths=spec.required_outputs,
-        source_ids=tuple(source.source_id for source in sources),
-        sources=sources,
-        baseline_facts=output.baseline_facts,
-        limitations=output.limitations,
+        source_ids=tuple(meta.source_id for meta in metas),
+        sources=metas,
+        baseline_facts=baseline_facts,
+        limitations=limitations,
     )
 
 

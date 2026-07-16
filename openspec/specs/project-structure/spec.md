@@ -29,6 +29,14 @@ planner prompt template). These paths SHALL be registered in
 `agent/AGENTS.md` block. topic_planning is not a HITL node, so no import-policy
 exception is added: its modules import only `domain`/`engine`.
 
+Real Wave0 SHALL add only canonical downstream production paths owned by this change:
+`agent/src/deerflow_deep_research/graph/nodes/wave0/prompts.py` (the source-intake
+worker prompt). The real `wave0.source-intake` result-contract model SHALL live inside
+the existing wave0 package. These paths SHALL be registered in
+`openspec/governance/project-structure.toml` and reflected in the generated
+`agent/AGENTS.md` block. wave0 is not a HITL node, so no import-policy exception is
+added: its modules import only `domain`/`engine`.
+
 #### Scenario: Canonical HITL1 paths pass
 - **WHEN** the folder contract inspects this change after implementation
 - **THEN** the new profile, HITL1 prompt, and `runtime/request_bundle.py` paths appear under the canonical downstream package and no Deep Research source appears under `backend/` or `frontend/`
@@ -36,6 +44,10 @@ exception is added: its modules import only `domain`/`engine`.
 #### Scenario: Canonical topic planning paths pass
 - **WHEN** the folder contract inspects this change after implementation
 - **THEN** the new `domain/topics.py` and `topic_planning/prompts.py` paths appear under the canonical downstream package, topic_planning imports only `domain`/`engine`, and no Deep Research source appears under `backend/` or `frontend/`
+
+#### Scenario: Canonical Wave0 paths pass
+- **WHEN** the folder contract inspects this change after implementation
+- **THEN** the new `wave0/prompts.py` path appears under the canonical downstream package, wave0 imports only `domain`/`engine`, and no Deep Research source appears under `backend/` or `frontend/`
 
 #### Scenario: Canonical scaffold passes
 - **WHEN** the folder contract inspects a fresh change 00 checkout

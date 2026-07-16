@@ -216,6 +216,17 @@ async def test_full_fake_recipe_keeps_unavailable_capabilities_and_no_request_wr
         await deps.capabilities.run_agent(context=deps.agent_context, request=object())
 
 
+def test_full_fake_recipe_does_not_require_wave0_worker_bridge() -> None:
+    """Full-fake recipe SHALL NOT construct a RuntimeNodeAgentBridge for Wave0.
+
+    @impl WAN-005
+    @impl REG-002
+    """
+    recipe = ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE)
+    assert recipe.requires_wave0_worker_bridge is False
+    assert recipe.requires_node_agent_bridge is False
+
+
 async def test_request_bundle_create_error_surfaces_without_graph_invocation(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_stores(monkeypatch)
 

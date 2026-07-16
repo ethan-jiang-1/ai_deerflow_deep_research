@@ -129,6 +129,12 @@ def output_path(research_id: str, work_id: str, attempt_id: str, relative_output
     return f"{attempt_dir(research_id, work_id, attempt_id)}/outputs/{relative}"
 
 
+def source_content_path(research_id: str, work_id: str, attempt_id: str, name: str) -> str:
+    """Canonical bundle path for a fetched/cached source content artifact."""
+    relative = _canonical_relative(name, label="source", max_length=256)
+    return f"{attempt_dir(research_id, work_id, attempt_id)}/cache/{relative}"
+
+
 def evidence_ledger_path(research_id: str) -> str:
     return f"{bundle_root(research_id)}/{EVIDENCE_SUBTREE}/{EVIDENCE_LEDGER}"
 

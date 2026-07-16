@@ -155,7 +155,9 @@ def _candidate(spec: WorkSpec, result_bytes: bytes | None = None, **overrides: o
     return CandidateResult.model_validate(payload)
 
 
-def _artifacts(spec: WorkSpec, candidate: CandidateResult, result_bytes: bytes | None = None) -> dict[str, ArtifactRead]:
+def _artifacts(
+    spec: WorkSpec, candidate: CandidateResult, result_bytes: bytes | None = None
+) -> dict[str, ArtifactRead]:
     result_bytes = result_bytes or _result_doc(spec)
     output_bytes = b'{"claims":[]}'
     artifacts: dict[str, ArtifactRead] = {
@@ -193,7 +195,8 @@ def test_wave0_result_identity_mismatch_is_rejected() -> None:
     bad_doc = _result_doc(spec, worker_role="other_worker")
     candidate = _candidate(spec, result_bytes=bad_doc)
     artifacts = _artifacts(spec, candidate, result_bytes=bad_doc)
-    assert SubmissionValidationCode.IDENTITY_MISMATCH in validate_submission_candidate(spec, attempt, candidate, artifacts)
+    codes = validate_submission_candidate(spec, attempt, candidate, artifacts)
+    assert SubmissionValidationCode.IDENTITY_MISMATCH in codes
 
 
 def test_wave0_non_canonical_source_url_is_rejected() -> None:
@@ -222,10 +225,17 @@ def test_wave0_source_ids_diverging_from_doc_is_rejected() -> None:
         spec,
         source_ids=("source:1", "source:2"),
         sources=[
-            {"source_id": "source:1", "canonical_url": "https://example.com/path", "title": "A", "content_ref": SOURCE_REF, "fetch_status": "fetched"},
+            {
+                "source_id": "source:1",
+                "canonical_url": "https://example.com/path",
+                "title": "A",
+                "content_ref": SOURCE_REF,
+                "fetch_status": "fetched",
+            },
             diverged.model_dump(mode="python"),
         ],
     )
     candidate = _candidate(spec, result_bytes=doc)
     artifacts = _artifacts(spec, candidate, result_bytes=doc)
-    assert SubmissionValidationCode.INVALID_OUTPUT_SCHEMA in validate_submission_candidate(spec, attempt, candidate, artifacts)
+    codes = validate_submission_candidate(spec, attempt, candidate, artifacts)
+    assert SubmissionValidationCode.INVALID_OUTPUT_SCHEMA in codes

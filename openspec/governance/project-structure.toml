@@ -310,6 +310,11 @@ kind = "directory"
 owner = "PRS-003"
 
 [[required_paths]]
+path = "agent/src/deerflow_deep_research/graph/nodes/wave0/prompts.py"
+kind = "file"
+owner = "PRS-003"
+
+[[required_paths]]
 path = "agent/src/deerflow_deep_research/graph/nodes/wave1"
 kind = "directory"
 owner = "PRS-003"

@@ -37,25 +37,25 @@
 
 ## 7. Implementation map, lifecycle E2E, and regression
 
-- [ ] 7.1 Add red implementation-map tests that mixed mode (`bootstrap=real`, `hitl1=real`, `topic_planning=real`, `wave0=real`, every other phase `fake`) selects all four real factories and compiles; `wave0=real` without `topic_planning=real` fails closed; full-fake map is unchanged. @impl WAN-005, PRS-003
-- [ ] 7.2 Add a red mixed-graph lifecycle E2E through handlers that runs the real chain into real Wave0 with replay/fake web tools, then fake Wave1 onward to completion; assert accepted `SubmissionRecord`s/`accepted_submission_refs`, source refs, `implementation_mode=full_fake`, and no synthesis/report side effects. @impl WAN-001, WAN-003, WAN-005
-- [ ] 7.3 Add red E2E coverage for prompt-injected source (only limitation/rejection), unreachable-source degraded capture, duplicate-URL dedup, and repeated floor failure -> terminal `blocked`. @impl WAN-002, WAN-003, WAN-004, REG-005
-- [ ] 7.4 Add a full-fake regression test proving fake Wave0 and existing lifecycle E2E remain unchanged and do not construct `RuntimeNodeAgentBridge`. @impl WAN-005, REG-002
+- [x] 7.1 Add red implementation-map tests that mixed mode (`bootstrap=real`, `hitl1=real`, `topic_planning=real`, `wave0=real`, every other phase `fake`) selects all four real factories and compiles; `wave0=real` without `topic_planning=real` fails closed; full-fake map is unchanged. @impl WAN-005, PRS-003
+- [x] 7.2 Add a red mixed-graph lifecycle E2E through handlers that runs the real chain into real Wave0 with replay/fake web tools, then fake Wave1 onward to completion; assert accepted `SubmissionRecord`s/`accepted_submission_refs`, source refs, `implementation_mode=full_fake`, and no synthesis/report side effects. @impl WAN-001, WAN-003, WAN-005
+- [x] 7.3 Add red E2E coverage for prompt-injected source (only limitation/rejection), unreachable-source degraded capture, duplicate-URL dedup, and repeated floor failure -> terminal `blocked`. @impl WAN-002, WAN-003, WAN-004, REG-005
+- [x] 7.4 Add a full-fake regression test proving fake Wave0 and existing lifecycle E2E remain unchanged and do not construct `RuntimeNodeAgentBridge`. @impl WAN-005, REG-002
 
 ## 8. Structure, documentation, and governance
 
-- [ ] 8.1 Verify the active delta specs for `wave0-node` and `project-structure` still own the real result contract, worker/gate paths, and the result-contract registry permission after implementation edits. @impl WAN-001..005, PRS-001, PRS-002, PRS-003, PRS-004
-- [ ] 8.2 Add exact new production paths (`graph/nodes/wave0/prompts.py` and `graph/nodes/wave0/gate.py`) to `openspec/governance/project-structure.toml`; render the generated `agent/AGENTS.md` block with `python3 openspec/governance/check_project_architecture.py --render-guide`; pass `check_project_architecture.py`. @impl PRS-001, PRS-002, PRS-003, PRS-004
-- [ ] 8.3 Update human-authored `agent/AGENTS.md` (Current Status / Node Packages / state authority), `agent/README.md`, and `_backlog/plans/deep-research-08-wave0-node.md` with real Wave0, the source-intake result contract, the real source-floor gate, the untrusted-data worker, the real-topic-chain dependency, and the unchanged `backend/`/`frontend/` boundary. @impl WAN-001..005
-- [ ] 8.4 Verify `openspec/governance/req-registry.yaml` contains the `WAN` prefix and WAN-001 through WAN-005 descriptions, and that active delta specs own all WAN ids plus the modified PRS ids with no duplicate/unregistered/orphan/reused-retired requirements. @impl WAN-001..005, PRS-004
-- [ ] 8.5 Run configure/doctor contract tests and project doctor; verify real Wave0 adds no `extensions_config.json` key, public/custom skill, Agent/SOUL, mount, dependency, startup-only field, `backend/`, or `frontend/` change, and that doctor surfaces the web-tool provisioning prerequisite without adding a provider. @impl DEC-005
+- [x] 8.1 Verify the active delta specs for `wave0-node` and `project-structure` still own the real result contract, worker/gate paths, and the result-contract registry permission after implementation edits. @impl WAN-001..005, PRS-001, PRS-002, PRS-003, PRS-004
+- [x] 8.2 Add exact new production paths (`graph/nodes/wave0/prompts.py` and `graph/nodes/wave0/gate.py`) to `openspec/governance/project-structure.toml`; render the generated `agent/AGENTS.md` block with `python3 openspec/governance/check_project_architecture.py --render-guide`; pass `check_project_architecture.py`. @impl PRS-001, PRS-002, PRS-003, PRS-004
+- [x] 8.3 Update human-authored `agent/AGENTS.md` (Current Status / Node Packages / state authority), `agent/README.md`, and `_backlog/plans/deep-research-08-wave0-node.md` with real Wave0, the source-intake result contract, the real source-floor gate, the untrusted-data worker, the real-topic-chain dependency, and the unchanged `backend/`/`frontend/` boundary. @impl WAN-001..005
+- [x] 8.4 Verify `openspec/governance/req-registry.yaml` contains the `WAN` prefix and WAN-001 through WAN-005 descriptions, and that active delta specs own all WAN ids plus the modified PRS ids with no duplicate/unregistered/orphan/reused-retired requirements. @impl WAN-001..005, PRS-004
+- [x] 8.5 Run configure/doctor contract tests and project doctor; verify real Wave0 adds no `extensions_config.json` key, public/custom skill, Agent/SOUL, mount, dependency, startup-only field, `backend/`, or `frontend/` change, and that doctor surfaces the web-tool provisioning prerequisite without adding a provider. @impl DEC-005
 
 ## 9. Verification and hard done conditions
 
-- [ ] 9.1 Run focused domain/work-unit/graph/wave0 tests, then `cd agent && make test-unit && make test-contract`; fix all failures.
-- [ ] 9.2 Run `cd agent && make test-viability && make test-durability && make test-blocking-io`; verify mixed real-Wave0 E2E and blocked paths use existing infrastructure boundaries.
-- [ ] 9.3 Run `cd agent && make test` and verify the complete agent-owned suite, including full-fake, mixed-Wave0, blocked, injection, degraded, and restart lifecycle paths, is green.
-- [ ] 9.4 Run `cd agent && make format && make lint && make lock-check`; fix formatting, lint, or lock drift without adding unused dependencies.
-- [ ] 9.5 Run `python3 openspec/governance/check_project_architecture.py`, `python3 openspec/governance/check_project_reqs.py`, and `python3 openspec/governance/check_project_specs.py`; all three must pass.
-- [ ] 9.6 Run `openspec validate implement-deep-research-wave0-node --strict`; fix any artifact/schema issue.
-- [ ] 9.7 Inspect `git diff -- backend frontend config.example.yaml extensions_config.example.json` and verify it is empty; inspect the final diff for one wave0 worker authority, one result-contract registry, untrusted-data handling, no LLM-authored ledger, no fabricated sources, and complete `@impl` traceability before archive.
+- [x] 9.1 Run focused domain/work-unit/graph/wave0 tests, then `cd agent && make test-unit && make test-contract`; fix all failures.
+- [x] 9.2 Run `cd agent && make test-viability && make test-durability && make test-blocking-io`; verify mixed real-Wave0 E2E and blocked paths use existing infrastructure boundaries.
+- [x] 9.3 Run `cd agent && make test` and verify the complete agent-owned suite, including full-fake, mixed-Wave0, blocked, injection, degraded, and restart lifecycle paths, is green.
+- [x] 9.4 Run `cd agent && make format && make lint && make lock-check`; fix formatting, lint, or lock drift without adding unused dependencies.
+- [x] 9.5 Run `python3 openspec/governance/check_project_architecture.py`, `python3 openspec/governance/check_project_reqs.py`, and `python3 openspec/governance/check_project_specs.py`; all three must pass.
+- [x] 9.6 Run `openspec validate implement-deep-research-wave0-node --strict`; fix any artifact/schema issue.
+- [x] 9.7 Inspect `git diff -- backend frontend config.example.yaml extensions_config.example.json` and verify it is empty; inspect the final diff for one wave0 worker authority, one result-contract registry, untrusted-data handling, no LLM-authored ledger, no fabricated sources, and complete `@impl` traceability before archive.

@@ -84,6 +84,7 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/src/deerflow_deep_research/graph/nodes/topic_planning/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/topic_planning/prompts.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/wave0/` (directory; `PRS-003`)
+  - `agent/src/deerflow_deep_research/graph/nodes/wave0/prompts.py` (file; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/wave1/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/wave2_synthesis/` (directory; `PRS-003`)
   - `agent/src/deerflow_deep_research/graph/nodes/targeted_evidence/` (directory; `PRS-003`)
@@ -137,7 +138,7 @@ schema, parses deterministic JSON/free-text profile answers, loops through
 checkpointed `pending_profile` follow-up state on missing fields, and writes the
 final `request/profile.json` through a runtime-owned `RequestBundleStore`.
 
-Active change 07 replaces fake topic planning with the second real model-calling
+Change 07 replaces fake topic planning with the second real model-calling
 node. Real topic planning uses the runtime node-agent bridge to generate a
 validated structured topic plan from the checkpointed HITL1 profile constraints;
 a deterministic materializer derives stable topic ids/slugs and a must-answer
@@ -148,6 +149,27 @@ declares no capability, writes no sandbox file, and adds one
 `topic_planning --exhausted--> blocked` route. Every lifecycle result still
 reports `implementation_mode=full_fake` because evidence collection, synthesis,
 HITL2, and final delivery remain fake.
+
+Change 08 replaces the fake/sentinel Wave0 node with the first real *worker*
+node. Real Wave0 reads the planner-owned `topic_registry` and materializes one
+immutable source-intake `WorkSpec` per topic through the existing work-unit
+controller; a bounded web worker agent runs per work unit through the runtime
+node-agent bridge under a real attempt-scoped `ExecutionPolicy` with web
+search/fetch tools, treating all fetched content as untrusted data
+(`<untrusted-source-data>`, deny-by-default tool policy). The real
+`wave0.source-intake` v1 result contract (canonical source URLs, source
+metadata, baseline facts, fetch/cache refs, limitations) is registered in a
+generalized `(result_contract, result_schema_version)` validation registry
+alongside the existing fixture contract. A real source-floor gate replaces the
+fixture sequence rule: per-topic independent-source coverage is enforced at
+submit-validation time with URL canonicalization and dedup, and the gate routes
+`repair`/`pass`/`exhausted`. An honest degraded-capture contract records
+unreachable sources as typed limitations rather than fabricating success. Real
+Wave0 is selectable only in the mixed implementation map and requires
+`bootstrap=real`, `hitl1=real`, and `topic_planning=real`; selecting
+`wave0=real` without the real topic chain fails before graph invocation. The
+full-fake Wave0 fixture path remains deterministic and does NOT construct the
+node-agent bridge. `backend/` and `frontend/` are unchanged.
 
 Checkpointed `ResearchState` remains control authority, the validated submission
 ledger is evidence authority, and sandbox files are content authority. The
@@ -170,14 +192,21 @@ Real HITL1 is available only in the mixed recipe with `bootstrap=real` and
 `hitl1=real`; selecting `hitl1=real` without real bootstrap fails before graph
 invocation. Real topic planning is available only with `bootstrap=real`,
 `hitl1=real`, and `topic_planning=real`; selecting `topic_planning=real` without
-real HITL1 fails before graph invocation. The real nodes declare only the
-capabilities they consume (HITL1: `NodeCapability.REQUEST_BUNDLE`; topic
-planning: none) and do not receive bootstrap or work-unit capabilities. The
+real HITL1 fails before graph invocation. Real Wave0 is available only with
+`bootstrap=real`, `hitl1=real`, `topic_planning=real`, and `wave0=real`;
+selecting `wave0=real` without real topic planning fails before graph
+invocation. The real nodes declare only the capabilities they consume (HITL1:
+`NodeCapability.REQUEST_BUNDLE`; topic planning: none; Wave0:
+`NodeCapability.WORK_UNIT_CONTROLLER`). Wave0 is the first real worker node: it
+constructs a real `RuntimeNodeAgentBridge` with web tools and attempt-scoped
+policy, distinct from the zero-tool HITL1/topic-planning bridges. The
 normalized topology adds only `hitl1 --needs_followup--> hitl1`,
 `hitl1 --exhausted--> blocked`, and `topic_planning --exhausted--> blocked`;
-full-fake HITL1 and topic planning remain deterministic and do not construct
-the node-agent bridge or request-bundle writer. `backend/`, `frontend/`, config
-examples, extensions, skills, MCP/ACP, and Agent/SOUL surfaces stay unchanged.
+the Wave0 topology (`repair`/`pass`/`exhausted`) is unchanged from the fixture.
+Full-fake HITL1, topic planning, and Wave0 remain deterministic and do not
+construct the node-agent bridge or request-bundle writer. `backend/`,
+`frontend/`, config examples, extensions, skills, MCP/ACP, and Agent/SOUL
+surfaces stay unchanged.
 
 ## Ownership
 
@@ -274,7 +303,10 @@ profile fields and `profile_ref` rather than reparsing user text. Change 07 adds
 `domain/topics.py` (frozen topic contracts + deterministic materializer) and
 `graph/nodes/topic_planning/prompts.py` (planner prompt); it records the bounded
 topic registry as planner-owned checkpoint state (`topic_refs`/`topic_registry`)
-for Wave0 to consume. Later Wave,
+for Wave0 to consume. Change 08 adds `graph/nodes/wave0/prompts.py`
+(source-intake worker prompt) and the real `wave0.source-intake` result-contract
+model inside the existing wave0 package; the real gate definition lives in
+`engine/gate_fixtures.py` alongside the fixture gate. Later Wave,
 targeted-evidence, and rerun changes must reuse the work-unit component rather
 than introduce another submit, ledger, retry, or drain authority.
 

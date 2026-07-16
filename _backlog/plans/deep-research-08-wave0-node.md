@@ -1,9 +1,15 @@
 # Plan: Deep Research 08 - Wave0 Node
 
-> 类型: 设计 | 更新: 2026-07-12
+> 类型: 实现 | 状态: **已完成** | 更新: 2026-07-16
 > 对应 OpenSpec change: `implement-deep-research-wave0-node`
 > 依赖: 04 Work Unit Kernel、07 Topic Planning Node
 > 替换范围: fake Wave0 plan/worker/submit/gate/repair subgraph（`agent/src/deerflow_deep_research/graph/nodes/wave0/fake.py`）
+
+实施完成。真实实现位于：`graph/nodes/wave0/node.py` (real factory)、
+`graph/nodes/wave0/prompts.py` (worker prompt)、`graph/nodes/wave0/subgraph.py`
+(real worker/integration)、`engine/gate_fixtures.py` (real source-floor gate)。
+结果契约模型在 `domain/work_units.py`（`Wave0SourceIntakeResult`,
+`Wave0SourceMeta`）；校验注册在 `engine/work_units/validation.py`。
 
 ## 地基已具备（来自 01）
 

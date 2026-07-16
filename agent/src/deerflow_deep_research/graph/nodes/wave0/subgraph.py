@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import Any
 
-from deerflow_deep_research.domain.bundle import result_path
+from deerflow_deep_research.domain.bundle import result_path, source_content_path
 from deerflow_deep_research.domain.context import NodeExecutionResult
 from deerflow_deep_research.domain.enums import NodeFinishReason
 from deerflow_deep_research.domain.invocation import WorkUnitControllerDependencies
@@ -24,6 +24,7 @@ from deerflow_deep_research.domain.work_units import (
     Attempt,
     CandidateResult,
     SourceRef,
+    Wave0SourceMeta,
     WorkSpec,
     canonical_json_bytes,
     compute_candidate_hash,
@@ -46,6 +47,7 @@ WAVE0_REAL_POLICY = PolicyRef(name="real-wave0", version="v1")
 def _content_hash(data: bytes) -> str:
     digest = hashlib.sha256(data).digest()
     return "h_" + base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
 
 WAVE0_FIXTURE_INTENTS = tuple(
     WorkIntent(
@@ -138,19 +140,43 @@ async def run_wave0_work_units_real(
         if not isinstance(result, NodeExecutionResult) or result.finish_reason is not NodeFinishReason.SUCCESS:
             raise ValueError("wave0_worker_failed")
         output = parse_wave0_worker_output(result.summary)
-        document = build_wave0_result_document(spec, attempt, output)
+        metas: list[Wave0SourceMeta] = []
+        source_refs: list[SourceRef] = []
+        for index, source in enumerate(output.sources):
+            cache_name = f"source-{index}.json"
+            content = canonical_json_bytes(
+                {
+                    "source_id": source.source_id,
+                    "canonical_url": source.canonical_url,
+                    "title": source.title,
+                    "fetch_status": source.fetch_status,
+                }
+            )
+            await writer.write_source(cache_name, content)
+            content_ref = source_content_path(spec.research_id, spec.work_id, attempt.attempt_id, cache_name)
+            content_hash = _content_hash(content)
+            byte_count = len(content)
+            metas.append(
+                Wave0SourceMeta(
+                    source_id=source.source_id,
+                    canonical_url=source.canonical_url,
+                    title=source.title,
+                    content_ref=content_ref,
+                    fetch_status=source.fetch_status,
+                )
+            )
+            source_refs.append(
+                SourceRef(
+                    source_id=source.source_id,
+                    canonical_url=source.canonical_url,
+                    content_ref=content_ref,
+                    content_hash=content_hash,
+                    byte_count=byte_count,
+                )
+            )
+        document = build_wave0_result_document(spec, attempt, tuple(metas), output.baseline_facts, output.limitations)
         result_bytes = canonical_json_bytes(document)
         await writer.write_result(document)
-        source_refs = tuple(
-            SourceRef(
-                source_id=source.source_id,
-                canonical_url=source.canonical_url,
-                content_ref=source.content_ref,
-                content_hash=source.content_hash,
-                byte_count=source.byte_count,
-            )
-            for source in output.sources
-        )
         payload: dict[str, Any] = {
             "schema_version": 1,
             "research_id": spec.research_id,

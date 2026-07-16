@@ -67,13 +67,13 @@ def _validate_result_doc_envelope(
     doc: object,
 ) -> list[SubmissionValidationCode]:
     doc_identity = (
-        getattr(doc, "research_id"),
-        getattr(doc, "generation"),
-        getattr(doc, "phase"),
-        getattr(doc, "work_id"),
-        getattr(doc, "attempt_id"),
-        getattr(doc, "worker_role"),
-        getattr(doc, "spec_hash"),
+        doc.research_id,
+        doc.generation,
+        doc.phase,
+        doc.work_id,
+        doc.attempt_id,
+        doc.worker_role,
+        doc.spec_hash,
     )
     expected_identity = (
         spec.research_id,
@@ -88,9 +88,9 @@ def _validate_result_doc_envelope(
     if doc_identity != expected_identity:
         codes.append(SubmissionValidationCode.IDENTITY_MISMATCH)
     if (
-        getattr(doc, "result_contract") != spec.result_contract
-        or getattr(doc, "output_paths") != spec.required_outputs
-        or getattr(doc, "source_ids") != tuple(ref.source_id for ref in candidate.source_refs)
+        doc.result_contract != spec.result_contract
+        or doc.output_paths != spec.required_outputs
+        or doc.source_ids != tuple(ref.source_id for ref in candidate.source_refs)
     ):
         codes.append(SubmissionValidationCode.INVALID_OUTPUT_SCHEMA)
     return codes

@@ -176,6 +176,23 @@ def _final_delivery_fixture_map() -> dict[str, FailureCode]:
 # ---- Public registry -------------------------------------------------------
 
 
+def build_wave0_real_gate_def() -> GateDefinition:
+    """Real Wave0 gate: shared completion/drain rule only (no fixture sequence).
+
+    The fixture ``FixtureSequenceRule`` is dropped because the real node does not
+    consume ``fixture_plan``; coverage comes from accepted ``SubmissionRecord``s
+    validated by the work-unit completion rule.
+
+    @impl WAN-004
+    """
+    return GateDefinition(
+        phase="wave0",
+        rules=(_work_unit_completion_rule(),),
+        default_budget=3,
+        route_map=_wave_route_map(),
+    )
+
+
 def build_fixture_gate_defs() -> dict[str, GateDefinition]:
     """Return per-phase ``GateDefinition`` for all gated phases in the fake graph.
 
@@ -237,4 +254,5 @@ def build_fixture_gate_defs() -> dict[str, GateDefinition]:
 __all__ = [
     "FixtureSequenceRule",
     "build_fixture_gate_defs",
+    "build_wave0_real_gate_def",
 ]

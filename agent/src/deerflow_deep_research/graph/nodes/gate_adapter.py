@@ -11,7 +11,10 @@ from collections.abc import Mapping
 from typing import Any
 
 from deerflow_deep_research.domain.gate import GateDefinition
-from deerflow_deep_research.engine.gate_fixtures import build_fixture_gate_defs
+from deerflow_deep_research.engine.gate_fixtures import (
+    build_fixture_gate_defs,
+    build_wave0_real_gate_def,
+)
 from deerflow_deep_research.engine.gate_kernel import (
     evaluate_gate,
     gate_result_to_state_update,
@@ -33,7 +36,13 @@ def default_gate_defs() -> dict[str, GateDefinition]:
     return dict(build_fixture_gate_defs())
 
 
+def real_wave0_gate_def() -> GateDefinition:
+    """Return the real Wave0 ``GateDefinition`` (completion/drain only)."""
+    return build_wave0_real_gate_def()
+
+
 __all__ = [
     "default_gate_defs",
     "evaluate_gate_for_node",
+    "real_wave0_gate_def",
 ]

@@ -31,9 +31,9 @@
 
 ## 6. Real Wave0 gate with source floor and degraded capture
 
-- [ ] 6.1 Add red tests for the real wave0 gate (`graph/nodes/wave0/gate.py`): it drops `FixtureSequenceRule`, keeps `WorkUnitCompletionRule`, and routes `repair`/`pass`/`exhausted`; a topic below the independent-source floor routes `repair` (then `exhausted`); a covering plan routes `pass`; gate rules stay pure (no I/O). @impl WAN-004
-- [ ] 6.2 Add red tests that source-floor coverage is enforced at submit-validation time (insufficient independent sources reject the candidate) and that a degraded capture is accepted only when the floor is otherwise met. @impl WAN-004
-- [ ] 6.3 Implement the real wave0 gate definition and register it for real wave0 while keeping the fixture gate for fake wave0; until 6.1/6.2 are green. @impl WAN-004
+- [x] 6.1 Add red tests for the real wave0 gate (`graph/nodes/wave0/gate.py`): it drops `FixtureSequenceRule`, keeps `WorkUnitCompletionRule`, and routes `repair`/`pass`/`exhausted`; a topic below the independent-source floor routes `repair` (then `exhausted`); a covering plan routes `pass`; gate rules stay pure (no I/O). @impl WAN-004
+- [x] 6.2 Add red tests that source-floor coverage is enforced at submit-validation time (insufficient independent sources reject the candidate) and that a degraded capture is accepted only when the floor is otherwise met. @impl WAN-004
+- [x] 6.3 Implement the real wave0 gate definition and register it for real wave0 while keeping the fixture gate for fake wave0; until 6.1/6.2 are green. @impl WAN-004
 
 ## 7. Implementation map, lifecycle E2E, and regression
 

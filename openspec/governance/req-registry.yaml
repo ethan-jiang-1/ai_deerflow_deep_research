@@ -31,6 +31,7 @@
 prefixes:
   BON: bootstrap-node
   DEC: deployment-configuration
+  EVC: evidence-critic-nodes
   GAK: gate-kernel
   HIN: hitl1-node
   NOA: node-agent-runtime
@@ -103,6 +104,13 @@ REG-008: research-graph-lifecycle — Large research content stays out of the ch
 REG-009: research-graph-lifecycle — Checkpointed control state, the validated submission ledger, and sandbox artifact files remain three distinct authorities
 REG-010: research-graph-lifecycle — A minimal research bundle layout and path-containment contract scope every sandbox write to its research and attempt root
 REG-011: research-graph-lifecycle — A versioned ResearchState schema fails closed on incompatible versions and never silently resets or auto-migrates
+
+# evidence-critic-nodes
+EVC-001: evidence-critic-nodes — SourceDiagnostic agent produces a typed trust and materiality assessment from assigned accepted evidence with per-source trust tier, materiality, marketing risk, and cross-verification need
+EVC-002: evidence-critic-nodes — ClaimVerifier agent produces typed evidence-backed claim assessment with verdicts (supported/weakened/contradicted/uncertain), support refs, counter refs, and reason referencing only assigned source ids
+EVC-003: evidence-critic-nodes — Critics run as bounded read-only agent loops under a zero-tool read-only ExecutionPolicy and cannot write phase, gate, ledger, or another node's artifacts
+EVC-004: evidence-critic-nodes — Critic output uses versioned structured Pydantic schema with deterministic materializer writing canonical JSON to the sandbox
+EVC-005: evidence-critic-nodes — Author and critic use independent model configurations, prompt templates, and agent sessions with conflicting results recorded as gaps rather than majority-vote truth
 
 # gate-kernel
 GAK-001: gate-kernel — Gate definitions collect all rules and produce deterministic verdicts with typed PhaseVerdict and route_map

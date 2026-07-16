@@ -78,6 +78,10 @@ def test_explicit_registry_loads_package_root_only_specs() -> None:
             # Change 08 implements real Wave0; it declares the work-unit controller capability.
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
             assert spec.capabilities == frozenset({NodeCapability.WORK_UNIT_CONTROLLER})
+        elif name == "targeted_evidence":
+            # Change 09 implements real targeted_evidence (critic dispatch); declares no capability.
+            assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
+            assert spec.capabilities == frozenset()
         else:
             assert spec.real_factory is UNAVAILABLE_REAL_FACTORY
         assert spec.logical_name == name

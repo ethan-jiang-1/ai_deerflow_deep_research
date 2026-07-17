@@ -156,9 +156,7 @@ def test_wave0_repair_prompt_carries_bounded_tool_results_as_untrusted_data() ->
 
 
 def test_worker_source_canonicalizes_untrusted_model_url() -> None:
-    source = WorkerSource.model_validate(
-        _worker_source(canonical_url="HTTPS://Example.com:443/path/#frag")
-    )
+    source = WorkerSource.model_validate(_worker_source(canonical_url="HTTPS://Example.com:443/path/#frag"))
 
     assert source.canonical_url == "https://example.com/path"
 
@@ -200,6 +198,25 @@ def test_wave0_worker_output_normalizes_bounded_limitations_list() -> None:
     )
 
     assert output.limitations == "Search snippets only; No full-text fetch"
+
+
+def test_wave0_worker_output_keeps_valid_sources_and_records_dropped_items() -> None:
+    output = parse_wave0_worker_output(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "sources": [
+                    _worker_source(source_id="source:valid"),
+                    _worker_source(source_id="source:bad-url", canonical_url="not-a-url"),
+                    _worker_source(source_id="source:bad-status", fetch_status="maybe"),
+                ],
+                "limitations": "Search-only evidence",
+            }
+        )
+    )
+
+    assert tuple(source.source_id for source in output.sources) == ("source:valid",)
+    assert output.limitations == "Search-only evidence; Dropped 2 invalid source records."
 
 
 def test_build_wave0_result_document_merges_identity_and_sources() -> None:

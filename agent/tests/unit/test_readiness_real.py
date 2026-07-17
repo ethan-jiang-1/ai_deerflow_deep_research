@@ -10,6 +10,8 @@ from deerflow_deep_research.domain.lifecycle import LifecycleStatus
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
 from deerflow_deep_research.graph.nodes.readiness.node import build_real
 
+LEDGER_HASH = "h_" + "A" * 43
+
 
 def _deps():
     graph = GraphContextView(
@@ -39,7 +41,7 @@ class TestRealReadiness:
         state = {
             "research_id": "r_" + "A" * 43,
             "generation": 0,
-            "accepted_submission_refs": ("ref:1", "ref:2"),
+            "accepted_submission_refs": ("h_" + "B" * 43, "h_" + "C" * 43),
             "must_answer_questions": ("Q1", "Q2"),
             "consumed_request_ids": ("req_001",),
         }
@@ -48,6 +50,22 @@ class TestRealReadiness:
         assert result["phase"] == "readiness"
         assert result["readiness_blocked_count"] == 0
         assert result["readiness_report_plan"] is not None
+
+    def test_canonical_ledger_hash_passes_provenance(self) -> None:
+        import asyncio
+
+        state = {
+            "research_id": "r_" + "A" * 43,
+            "generation": 0,
+            "accepted_submission_refs": (LEDGER_HASH,),
+            "must_answer_questions": ("Q1",),
+            "consumed_request_ids": ("req_001",),
+        }
+
+        result = asyncio.run(build_real(_deps())(state))
+
+        assert result["route"] == "pass"
+        assert result["readiness_hard_failures"] == ()
 
     def test_no_evidence_routes_exhausted(self) -> None:
         import asyncio
@@ -84,7 +102,7 @@ class TestRealReadiness:
         state = {
             "research_id": "r_" + "A" * 43,
             "generation": 0,
-            "accepted_submission_refs": ("ref:1",),
+            "accepted_submission_refs": (LEDGER_HASH,),
             "must_answer_questions": (),
             "consumed_request_ids": (),
         }
@@ -98,7 +116,7 @@ class TestRealReadiness:
         state = {
             "research_id": "r_" + "A" * 43,
             "generation": 0,
-            "accepted_submission_refs": ("ref:1",),
+            "accepted_submission_refs": (LEDGER_HASH,),
             "must_answer_questions": ("Q1", "Q2"),
             "consumed_request_ids": ("req_001",),
         }

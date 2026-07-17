@@ -1,7 +1,10 @@
 # runtime-operations Specification
 
+> req: RUO-001, RUO-002, RUO-003, RUO-004
+
 ## Purpose
-TBD - created by archiving change harden-deep-research-runtime-operations. Update Purpose after archive.
+Harden non-interactive execution and recovery without changing topology or full-fake behavior.
+
 ## Requirements
 ### Requirement: Non-interactive mode requires policy
 
@@ -50,4 +53,3 @@ Non-interactive policy SHALL NOT alter graph topology or full-fake behavior. Ful
 #### Scenario: Full-fake graph unchanged
 - **WHEN** the full-fake graph runs with runtime hardening changes
 - **THEN** all nodes produce the same outputs as before
-

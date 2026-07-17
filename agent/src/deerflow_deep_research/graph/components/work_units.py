@@ -279,6 +279,50 @@ async def _rehydrate_active_replay(
     return tuple(specs_by_id.values()), attempts_by_work_id
 
 
+def _orphaned_attempt_updates(
+    parent_state: Mapping[str, Any],
+    *,
+    generation: int,
+    terminal_at: datetime,
+) -> tuple[dict[str, dict[str, Any]], dict[str, str], dict[str, dict[str, str]]]:
+    attempts = parent_state.get("attempts_by_id", {})
+    statuses = parent_state.get("work_status_by_id", {})
+    active = parent_state.get("active_attempt_by_work_id", {})
+    specs = parent_state.get("work_specs_by_id", {})
+    attempt_updates: dict[str, dict[str, Any]] = {}
+    status_updates: dict[str, str] = {}
+    failure_updates: dict[str, dict[str, str]] = {}
+    detail_hash = compute_failure_detail_hash(terminal_code=AttemptTerminalCode.ORPHANED)
+
+    for attempt_id, raw_status in sorted(statuses.items()):
+        match = ATTEMPT_ID_RE.fullmatch(attempt_id)
+        if match is None or int(match.group("generation")) >= generation:
+            continue
+        if AttemptStatus(raw_status) is not AttemptStatus.RUNNING:
+            continue
+        work_id = match.group("work_id")
+        try:
+            attempt = AttemptRef.model_validate(attempts[attempt_id])
+            WorkSpecRef.model_validate(specs[work_id])
+        except (KeyError, ValueError) as exc:
+            raise ValueError("orphan_attempt_replay_invalid") from exc
+        if active.get(work_id) != attempt_id or attempt.started_at is None or attempt.terminal_at is not None:
+            raise ValueError("orphan_attempt_replay_invalid")
+        attempt_updates[attempt_id] = {
+            "created_at": attempt.created_at,
+            "started_at": attempt.started_at,
+            "expires_at": attempt.expires_at,
+            "terminal_at": terminal_at,
+            "terminal_code": AttemptTerminalCode.ORPHANED.value,
+        }
+        status_updates[attempt_id] = AttemptStatus.FAILED.value
+        failure_updates[attempt_id] = {
+            "failure_code": FailureCode.WORK_FAILED.value,
+            "detail_hash": detail_hash,
+        }
+    return attempt_updates, status_updates, failure_updates
+
+
 async def _rehydrate_canonical_spec(
     parent_state: Mapping[str, Any],
     controller: WorkUnitControllerDependencies,
@@ -548,6 +592,7 @@ async def run_work_unit_component(
     _TERMINAL_TO_FAILURE: dict[AttemptTerminalCode, FailureCode] = {
         AttemptTerminalCode.WORKER_FAILED: FailureCode.WORK_FAILED,
         AttemptTerminalCode.VALIDATION_FAILED: FailureCode.INVALID_OUTPUT_SCHEMA,
+        AttemptTerminalCode.ORPHANED: FailureCode.WORK_FAILED,
         AttemptTerminalCode.DEADLINE_EXCEEDED: FailureCode.WORK_TIMED_OUT,
         AttemptTerminalCode.EXPIRED: FailureCode.WORK_TIMED_OUT,
     }
@@ -607,15 +652,20 @@ async def run_work_unit_component(
         work_id: record.attempt_id for work_id, record in sorted(records.items())
     }
     terminal_attempt_by_work_id.update({failure.work_id: failure.attempt_id for failure in failure_summaries})
+    orphan_attempts, orphan_statuses, orphan_failures = _orphaned_attempt_updates(
+        parent_state,
+        generation=config.generation,
+        terminal_at=config.clock(),
+    )
     parent_update = {
         "work_specs_by_id": {
             work_id: WorkSpecRef(worker_role=spec.worker_role, spec_hash=spec.spec_hash).model_dump(mode="json")
             for work_id, spec in specs.items()
         },
-        "attempts_by_id": attempt_refs,
-        "work_status_by_id": statuses,
+        "attempts_by_id": {**orphan_attempts, **attempt_refs},
+        "work_status_by_id": {**orphan_statuses, **statuses},
         "active_attempt_by_work_id": {},
-        "terminal_failures_by_attempt_id": terminal_failures,
+        "terminal_failures_by_attempt_id": {**orphan_failures, **terminal_failures},
         "accepted_submission_refs": tuple(record.record_hash for _, record in sorted(records.items())),
         "pending_work_ids": tuple(child["pending_work_ids"]),
         "batch_cursor": child["batch_cursor"],

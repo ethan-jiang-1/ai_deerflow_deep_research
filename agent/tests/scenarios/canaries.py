@@ -183,18 +183,11 @@ class _UsageTracker(BaseCallbackHandler):
             from pydantic import ValidationError
 
             from deerflow_deep_research.domain.wave1 import Wave1WorkerOutput
-            from deerflow_deep_research.domain.work_units import Wave0WorkerOutput
+            from deerflow_deep_research.domain.work_units import Wave0WorkerOutput, WorkerSource
 
             raw_sources = payload.get("sources")
             sources = raw_sources if isinstance(raw_sources, list) else []
-            source_keys = sorted(
-                {
-                    str(key)
-                    for source in sources
-                    if isinstance(source, dict)
-                    for key in source
-                }
-            )[:16]
+            source_keys = sorted({str(key) for source in sources if isinstance(source, dict) for key in source})[:16]
             first_source = next((source for source in sources if isinstance(source, dict)), {})
             shape.update(
                 {
@@ -205,17 +198,27 @@ class _UsageTracker(BaseCallbackHandler):
                     },
                 }
             )
+            raw_wave0_errors: list[str] = []
+            for index, source in enumerate(sources):
+                try:
+                    WorkerSource.model_validate(source)
+                except ValidationError as exc:
+                    raw_wave0_errors.extend(
+                        f"sources.{index}.{'.'.join(str(part) for part in error['loc'])}:{error['type']}"
+                        for error in exc.errors(include_input=False, include_url=False)
+                    )
             try:
                 Wave0WorkerOutput.model_validate(payload)
             except ValidationError as exc:
                 shape["wave0_schema_valid"] = False
-                shape["wave0_validation_errors"] = [
+                normalized_errors = [
                     f"{'.'.join(str(part) for part in error['loc'])}:{error['type']}"
-                    for error in exc.errors(include_input=False, include_url=False)[:16]
+                    for error in exc.errors(include_input=False, include_url=False)
                 ]
+                shape["wave0_validation_errors"] = list(dict.fromkeys([*raw_wave0_errors, *normalized_errors]))[:16]
             else:
                 shape["wave0_schema_valid"] = True
-                shape["wave0_validation_errors"] = []
+                shape["wave0_validation_errors"] = list(dict.fromkeys(raw_wave0_errors))[:16]
             try:
                 Wave1WorkerOutput.model_validate(payload)
             except ValidationError as exc:
@@ -227,6 +230,55 @@ class _UsageTracker(BaseCallbackHandler):
             else:
                 shape["wave1_schema_valid"] = True
                 shape["wave1_validation_errors"] = []
+        if isinstance(payload, dict) and "findings" in payload:
+            from pydantic import ValidationError
+
+            from deerflow_deep_research.domain.synthesis import SynthesisFinding, SynthesisResult
+
+            raw_synthesis_errors: list[str] = []
+            raw_findings = payload.get("findings")
+            raw_relations = payload.get("relations")
+            raw_gaps = payload.get("gaps")
+            shape["finding_count"] = len(raw_findings) if isinstance(raw_findings, list) else 0
+            shape["relation_count"] = len(raw_relations) if isinstance(raw_relations, list) else 0
+            shape["gap_count"] = len(raw_gaps) if isinstance(raw_gaps, list) else 0
+            shape["finding_item_keys"] = sorted(
+                {str(key) for finding in raw_findings or () if isinstance(finding, dict) for key in finding}
+            )[:16]
+            shape["relation_item_keys"] = sorted(
+                {str(key) for relation in raw_relations or () if isinstance(relation, dict) for key in relation}
+            )[:16]
+            shape["gap_item_keys"] = sorted(
+                {str(key) for gap in raw_gaps or () if isinstance(gap, dict) for key in gap}
+            )[:16]
+            shape["gap_item_types"] = sorted({type(gap).__name__ for gap in raw_gaps or ()})[:8]
+            if isinstance(raw_findings, list):
+                for index, finding in enumerate(raw_findings):
+                    try:
+                        SynthesisFinding.model_validate(finding)
+                    except ValidationError as exc:
+                        raw_synthesis_errors.extend(
+                            f"findings.{index}.{'.'.join(str(part) for part in error['loc'])}:{error['type']}"
+                            for error in exc.errors(include_input=False, include_url=False)
+                        )
+            try:
+                SynthesisResult.model_validate(payload)
+            except ValidationError as exc:
+                shape["synthesis_schema_valid"] = False
+                normalized_errors = [
+                    f"{'.'.join(str(part) for part in error['loc'])}:{error['type']}"
+                    for error in exc.errors(include_input=False, include_url=False)
+                ]
+                shape["synthesis_validation_errors"] = list(dict.fromkeys([*raw_synthesis_errors, *normalized_errors]))[
+                    :16
+                ]
+                shape["synthesis_raw_error_count"] = len(raw_synthesis_errors)
+                shape["synthesis_normalized_error_count"] = len(normalized_errors)
+            else:
+                shape["synthesis_schema_valid"] = True
+                shape["synthesis_validation_errors"] = list(dict.fromkeys(raw_synthesis_errors))[:16]
+                shape["synthesis_raw_error_count"] = len(raw_synthesis_errors)
+                shape["synthesis_normalized_error_count"] = 0
         return shape
 
     def diagnostic_summary(self) -> str:

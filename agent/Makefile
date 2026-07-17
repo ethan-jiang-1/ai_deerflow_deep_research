@@ -1,6 +1,7 @@
 .PHONY: install lock-check format lint test test-fast test-integration test-live test-release-e2e test-unit test-contract test-viability test-durability test-blocking-io test-postgres test-assets test-req-coverage demo demo-scripted demo-tui
 
 DEMO_ARGS ?=
+LOCAL_ENV_ARG := $(if $(wildcard .env),--env-file .env,)
 
 install:
 	uv sync --extra operations
@@ -56,14 +57,14 @@ test-integration:
 test-live:
 	rm -rf .reports/live
 	mkdir -p .reports/live
-	uv run --extra operations python scripts/live_preflight.py --require-web
-	LIVE_REPORT_DIR=.reports/live uv run --extra operations pytest -m "requires_llm and not release_e2e"
+	uv run $(LOCAL_ENV_ARG) --extra operations python scripts/live_preflight.py --require-web
+	LIVE_REPORT_DIR=.reports/live uv run $(LOCAL_ENV_ARG) --extra operations pytest -m "requires_llm and not release_e2e"
 
 test-release-e2e:
 	rm -rf .reports/release
 	mkdir -p .reports/release
-	uv run --extra operations python scripts/release_preflight.py
-	RELEASE_REPORT_DIR=.reports/release uv run --extra operations pytest -m release_e2e
+	uv run $(LOCAL_ENV_ARG) --extra operations python scripts/release_preflight.py
+	RELEASE_REPORT_DIR=.reports/release uv run $(LOCAL_ENV_ARG) --extra operations pytest -m release_e2e
 
 test-assets:
 	uv run --extra operations python scripts/check_test_assets.py

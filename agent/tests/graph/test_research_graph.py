@@ -4,6 +4,7 @@
 @impl REG-002
 @impl REG-003
 @impl REG-004
+@impl RUO-004
 """
 
 from __future__ import annotations
@@ -123,6 +124,7 @@ def _response(descriptor, message_id: str, value: str, *, option: bool = False) 
 
 @pytest.mark.asyncio
 async def test_happy_path_suspends_twice_and_completes_with_fresh_attempt_dependencies() -> None:
+    """@impl RUO-004"""
     context, resolver = _context()
     graph = build_research_graph().compile(checkpointer=InMemorySaver())
     config = {"configurable": {"thread_id": "happy"}}

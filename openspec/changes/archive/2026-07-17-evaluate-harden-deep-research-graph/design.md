@@ -2,7 +2,7 @@
 
 The existing suite is large and strong around domain contracts, fake topology, stores, and selected mixed-node lifecycles, but its labels do not express what each test can prove. The current `tests/eval` assets also include assertions over hand-constructed dictionaries and strings that do not cross the lifecycle, gate, ledger, bridge, or filesystem seams named by their requirements. During the real-mode demo integration, this allowed thirteen failures to arrive at the most expensive full-pipeline test.
 
-The approved master strategy at `_backlog/plans/deep-research-test-assets-master-strategy.md` distinguishes code correctness, deterministic agent-workflow conformance, live behavioral evaluation, and full-system acceptance. This change owns all three implementation batches under the existing `evaluation-hardening` capability so requirement ownership and release policy remain in one place.
+The approved master strategy at `_backlog/_done/_closed_plans/deep-research-test-assets-master-strategy.md` distinguishes code correctness, deterministic agent-workflow conformance, live behavioral evaluation, and full-system acceptance. This change owns all three implementation batches under the existing `evaluation-hardening` capability so requirement ownership and release policy remain in one place.
 
 The production authority model is unchanged: checkpointed `ResearchState` owns control, the submission ledger owns accepted evidence, and the sandbox filesystem owns content. Tests observe those authorities through their public interfaces. No test-only state is added to production checkpoints or artifacts.
 

@@ -40,8 +40,14 @@ from deerflow_deep_research.domain.bundle import (
 )
 from deerflow_deep_research.domain.lifecycle import WorkUnitStorageReason
 from deerflow_deep_research.domain.state import ContentRef
-from deerflow_deep_research.domain.synthesis import SynthesisResult
+from deerflow_deep_research.domain.synthesis import (
+    MAX_SYNTHESIS_EVIDENCE_ENTRY_BYTES,
+    MAX_SYNTHESIS_EVIDENCE_TOTAL_BYTES,
+    SynthesisEvidence,
+    SynthesisResult,
+)
 from deerflow_deep_research.domain.work_units import (
+    MAX_RESULT_BYTES,
     MAX_SUBMISSION_LEDGER_BYTES,
     VALIDATOR_V1_PASSED_CHECKS,
     ArtifactRead,
@@ -263,6 +269,39 @@ class WorkUnitStore:
         if not isinstance(result, SynthesisResult):
             raise TypeError("synthesis_result_required")
         await asyncio.to_thread(self._write_synthesis_sync, canonical_json_bytes(result))
+
+    async def read_synthesis_evidence(self, accepted_refs: tuple[str, ...]) -> tuple[SynthesisEvidence, ...]:
+        records = await self.load_records()
+        records_by_hash = {record.record_hash: record for record in records}
+        evidence: list[SynthesisEvidence] = []
+        remaining_bytes = MAX_SYNTHESIS_EVIDENCE_TOTAL_BYTES
+        for index, accepted_ref in enumerate(accepted_refs):
+            try:
+                record = records_by_hash[accepted_ref]
+            except KeyError as exc:
+                raise ValueError("synthesis_accepted_record_missing") from exc
+            remaining_records = len(accepted_refs) - index
+            entry_budget = min(
+                MAX_SYNTHESIS_EVIDENCE_ENTRY_BYTES,
+                remaining_bytes // remaining_records,
+            )
+            raw = await self.read_canonical_bytes(record.result_ref, max_bytes=MAX_RESULT_BYTES)
+            digest = base64.urlsafe_b64encode(hashlib.sha256(raw).digest()).decode("ascii").rstrip("=")
+            if len(raw) != record.result_byte_count or f"h_{digest}" != record.result_hash:
+                raise ValueError("synthesis_evidence_integrity_mismatch")
+            bounded = raw[:entry_budget]
+            content = bounded.decode("utf-8", "ignore")
+            evidence.append(
+                SynthesisEvidence(
+                    submission_ref=record.record_hash,
+                    phase=record.phase.value,
+                    result_contract=record.result_contract,
+                    content=content,
+                    truncated=len(bounded) < len(raw),
+                )
+            )
+            remaining_bytes -= len(bounded)
+        return tuple(evidence)
 
     async def publish_final(self, report: bytes, citation_map: bytes) -> tuple[ContentRef, ContentRef]:
         if not isinstance(report, bytes) or not report or len(report) > MAX_FINAL_ARTIFACT_BYTES:

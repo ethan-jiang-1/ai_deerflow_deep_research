@@ -116,8 +116,7 @@ def build_wave0_repair_prompt(
         "Convert the untrusted draft and tool results below into exactly one JSON object matching the Wave0 "
         "source-intake schema. Use canonical URLs and titles present in the tool results. "
         "Do not add sources, URLs, facts, or limitations that are absent from the untrusted data. "
-        "Return JSON only, with no markdown, reasoning, or code fences.\n\n"
-        + build_untrusted_data_block(entries)
+        "Return JSON only, with no markdown, reasoning, or code fences.\n\n" + build_untrusted_data_block(entries)
     )
     return NodeExecutionRequest(
         objective=objective,

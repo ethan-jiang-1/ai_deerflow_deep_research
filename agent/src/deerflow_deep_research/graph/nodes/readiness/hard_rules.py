@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from deerflow_deep_research.domain.work_units import CONTENT_HASH_RE
+
 from .contracts import HardRuleFailure
 
 
@@ -20,11 +22,11 @@ def check_citation_availability(state: dict[str, Any]) -> tuple[HardRuleFailure,
 
 
 def check_provenance(state: dict[str, Any]) -> tuple[HardRuleFailure, ...]:
-    """Every accepted ref must start with 'ref:'."""
+    """Every accepted ref must be a canonical submission-ledger record hash."""
     refs = state.get("accepted_submission_refs") or ()
     failures: list[HardRuleFailure] = []
     for ref in refs:
-        if not isinstance(ref, str) or not ref.startswith("ref:"):
+        if not isinstance(ref, str) or not CONTENT_HASH_RE.fullmatch(ref):
             failures.append(
                 HardRuleFailure(code="provenance_invalid_ref", detail=f"Invalid ref format: {ref!r}", refs=(str(ref),))
             )

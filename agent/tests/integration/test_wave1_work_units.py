@@ -36,11 +36,18 @@ class ForbiddenCapabilities:
 
 
 class ScriptedWave1Capabilities:
-    def __init__(self, *, malformed: bool = False, malformed_once: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        malformed: bool = False,
+        malformed_once: bool = False,
+        reverse_sources: bool = False,
+    ) -> None:
         self.contexts: list[NodeAgentContext] = []
         self.requests: list[object] = []
         self.malformed = malformed
         self.malformed_once = malformed_once
+        self.reverse_sources = reverse_sources
 
     async def run_agent(self, *, context, request):
         if not isinstance(context, NodeAgentContext):
@@ -50,23 +57,39 @@ class ScriptedWave1Capabilities:
         if self.malformed or (self.malformed_once and len(self.contexts) == 1):
             return NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary="not-json")
         source_id = f"source:{context.attempt_id[-3:]}"
+        sources = [
+            {
+                "source_id": source_id,
+                "canonical_url": f"https://example.com/{context.attempt_id}",
+                "title": "Scripted evidence",
+            }
+        ]
+        support_refs = [source_id]
+        if self.reverse_sources:
+            sources = [
+                {
+                    "source_id": "source:z",
+                    "canonical_url": "https://example.com/z",
+                    "title": "Z source",
+                },
+                {
+                    "source_id": "source:a",
+                    "canonical_url": "https://example.com/a",
+                    "title": "A source",
+                },
+            ]
+            support_refs = ["source:z", "source:a"]
         return NodeExecutionResult(
             finish_reason=NodeFinishReason.SUCCESS,
             summary=json.dumps(
                 {
                     "schema_version": 1,
-                    "sources": [
-                        {
-                            "source_id": source_id,
-                            "canonical_url": f"https://example.com/{context.attempt_id}",
-                            "title": "Scripted evidence",
-                        }
-                    ],
+                    "sources": sources,
                     "claims": [
                         {
                             "claim_id": f"claim:w1_{context.attempt_id[-3:]}",
                             "statement": "The scripted source supports this claim.",
-                            "support_refs": [source_id],
+                            "support_refs": support_refs,
                             "counter_refs": [],
                         }
                     ],
@@ -256,6 +279,50 @@ async def test_real_wave1_crosses_worker_context_artifact_validator_and_ledger(t
     assert "forged" not in records[0].source_refs[0].content_ref
     persisted = await store.read_canonical_bytes(records[0].result_ref, max_bytes=256 * 1024)
     assert json.loads(persisted)["claims"][0]["support_refs"] == [records[0].source_refs[0].source_id]
+
+
+async def test_real_wave1_canonicalizes_provider_source_order_before_candidate_validation(tmp_path) -> None:
+    graph_context = GraphContextView(
+        research_scope_id=RESEARCH_ID,
+        workspace_root=f"/mnt/user-data/workspace/deep-research/{RESEARCH_ID}",
+        uploads_root="/mnt/user-data/uploads",
+        outputs_root=f"/mnt/user-data/outputs/deep-research/{RESEARCH_ID}",
+    )
+    capabilities = ScriptedWave1Capabilities(reverse_sources=True)
+    store = WorkUnitStore(
+        workspace_host_path=tmp_path,
+        research_id=RESEARCH_ID,
+        clock=lambda: NOW,
+        monotonic=time.monotonic,
+        lock_sleep=time.sleep,
+        token_factory=lambda: "7" * 32,
+        fault_hook=None,
+    )
+    controller = WorkUnitControllerDependencies(
+        store=store,
+        resolver=RuntimeWorkUnitDependencyResolver(
+            graph_context,
+            BaseResolver(graph_context, capabilities),
+            store,
+        ),
+    )
+    topics = ({"topic_id": "storage", "title": "Storage", "scope": "Storage economics"},)
+
+    result = await wave1_subgraph.run_wave1_work_units_real(
+        _state() | {"topic_registry": topics},
+        controller=controller,
+        topic_registry=topics,
+        capabilities=capabilities,
+        wave0_urls=frozenset(),
+        clock=lambda: NOW,
+    )
+
+    records = await store.load_records()
+    assert result.parent_update["accepted_submission_refs"] == (records[0].record_hash,)
+    assert tuple(source.source_id for source in records[0].source_refs) == ("source:a", "source:z")
+    persisted = json.loads(await store.read_canonical_bytes(records[0].result_ref, max_bytes=256 * 1024))
+    assert persisted["source_ids"] == ["source:a", "source:z"]
+    assert persisted["claims"][0]["support_refs"] == ["source:a", "source:z"]
 
 
 async def test_real_wave1_malformed_output_becomes_typed_worker_failure_without_ledger(tmp_path) -> None:

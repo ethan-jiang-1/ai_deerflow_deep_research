@@ -331,6 +331,55 @@ Use red-before-green deterministic tests. Model-facing tests use
 `FakeToolCallingModel` or `ReplayChatModel`; real API tests require the
 `requires_llm` marker. Add `@impl XXX-001` at the owning implementation surface.
 
+## Test And Evaluation Policy
+
+Classify every new asset as one of four classes: code correctness, deterministic
+agent-workflow conformance, live behavioral evaluation, or full-system release
+acceptance. Do not use unit/integration/E2E labels alone to claim authenticity.
+
+The authenticity ladder is `FAKE_GRAPH` -> `REAL_NODE_FAKE_CAPABILITIES` ->
+`SCRIPTED_REAL_WORKFLOW` -> `LIVE_REAL_DEPENDENCIES` -> `FULL_REAL_PIPELINE`.
+A lower level cannot satisfy a higher claim. Full-fake success proves topology,
+not a real agent loop; scripted success proves policy mechanics, not provider
+output distribution; one full-real success proves acceptance for that isolated
+run, not a general quality threshold.
+
+Place new regressions at the lowest responsible one of five stable seams:
+
+1. Domain/engine contracts, reducers, validation, gates, and state invariants.
+2. `NodeSpec` plus `NodeExecutionCapabilities` for real node behavior.
+3. Runtime adapter, node-agent bridge, middleware, policy, budget, and store protocols.
+4. Lifecycle handlers and mixed graphs for start/resume/status/cancel and real prefixes.
+5. The real public entry for live provider behavior and full-pipeline acceptance.
+
+Scenarios under `tests/scenarios/` must declare stable id, risk family,
+requirements, optional regressions, entrypoint, required authenticity,
+preconditions, scripted inputs/live requirements, expected route/terminal,
+artifacts and citations, hard invariants, metrics, and permitted degradation.
+Workflow-conformance scenarios use real project nodes, graph, middleware,
+policy, budget, validators, gates, stores, checkpoints, and local filesystem;
+replace only external model/tool APIs, deterministic time/randomness, and
+supported fault boundaries. Failure diagnostics must include scenario, lane,
+authenticity, and failed invariant without raw provider content, credentials, or
+host paths.
+
+Selection and cadence are fixed. Pull requests and pushes run
+`.github/workflows/agent-tests.yml`: lint, asset and requirement governance,
+`make test-fast`, and `make test-integration`, all without credentials or public
+network. Nightly/manual `.github/workflows/agent-live-evaluation.yml` runs
+`make test-live`. Manual/reusable `.github/workflows/agent-release-e2e.yml` runs
+deterministic gates before `make test-release-e2e`. Explicit live/release
+selection must fail strict preflight rather than skip when credentials or
+confirmation are absent. Preserve bounded visible retries, unique identities,
+redacted reports, and archive scans.
+
+Every live/release discovery must be recorded in
+`docs/regression-descent.md`. Add the smallest red-before-green deterministic
+regression at the lowest stable seam when replayable. If behavior depends on a
+provider distribution that cannot be faithfully replayed, retain a bounded live
+scenario and explicit provider-only rationale; never replace it with a
+tautological mock. Do not close the discovery on E2E logs alone.
+
 ## Commands
 
 Run from `agent/`:
@@ -340,7 +389,13 @@ make install       # sync the locked project with the operations extra
 make lock-check    # verify uv.lock matches pyproject.toml
 make format        # Ruff fixes and formatting
 make lint          # Ruff lint and format check
-make test          # complete agent-owned test suite
+make test          # complete network-free deterministic union
+make test-fast     # deterministic contract/domain/engine/unit/graph/eval subset
+make test-integration # deterministic integration/workflow/blocking-I/O subset
+make test-live     # strict credentialed short live canaries
+make test-release-e2e # explicit-confirmation isolated full-real acceptance
+make test-assets   # executable incident/scenario/selector/regression inventories
+make test-req-coverage # alive requirements mapped to collected deterministic tests
 make test-unit     # unit tests only
 make test-contract # contract tests only
 make test-viability # hard reflected-runtime and nested-cancellation gate

@@ -217,7 +217,7 @@ async def test_hitl2_is_deterministic_zero_tool_node(monkeypatch) -> None:
             "research_id": dependencies.graph_context.research_scope_id,
             "generation": 0,
             "start_message_id": "human-start",
-            "accepted_submission_refs": ("ref:1",),
+            "accepted_submission_refs": ("h_" + "R" * 43,),
             "synthesis_gaps": (),
             "consumed_request_ids": (),
             "consumed_message_ids": (),
@@ -243,7 +243,7 @@ async def test_rerun_readiness_and_final_delivery_are_deterministic_zero_tool_no
         {
             "research_id": research_id,
             "generation": 0,
-            "accepted_submission_refs": ("ref:1",),
+            "accepted_submission_refs": ("h_" + "R" * 43,),
             "must_answer_questions": (),
             "consumed_request_ids": ("request-1",),
             "execution_trace": (),

@@ -123,6 +123,29 @@ async def test_invalid_plan_retries_once_then_records() -> None:
     assert "previous plan failed validation" in caps.requests[1].objective.lower()
 
 
+async def test_minimal_quick_profile_repairs_multi_topic_plan_to_exactly_one() -> None:
+    multi_topic = _plan_json(
+        _topic("Batteries", "Grid battery economics", "Q1"),
+        _topic("Markets", "Grid storage markets", "Q1"),
+    )
+    single_topic = _plan_json(_topic("Grid storage", "Grid storage evidence", "Q1"))
+    caps = _Caps(_result(multi_topic), _result(single_topic))
+
+    result = await topic_planning_node.build_real(_deps(caps))(
+        _state(
+            research_depth="quick_overview",
+            cost_tolerance="minimal",
+            time_budget="very_quick",
+            must_answer_questions=("Q1",),
+        )
+    )
+
+    assert result["route"] == "next"
+    assert result["topic_refs"] == ("grid-storage",)
+    assert len(caps.requests) == 2
+    assert "previous plan failed validation" in caps.requests[1].objective.lower()
+
+
 async def test_repeated_invalid_plan_exhausts_without_topic_state() -> None:
     caps = _Caps(_result("not-json"), _result('{"still":"invalid"}'))
     result = await topic_planning_node.build_real(_deps(caps))(_state())

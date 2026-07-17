@@ -30,6 +30,32 @@ MAX_STATEMENT_CHARS = 2000
 MAX_QUESTION_CHARS = 500
 
 
+def _normalize_scoped_id(value: str, *, prefix: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError("scoped_id_invalid")
+    raw = value.strip()
+    for known_prefix in ("claim:w1_", "q:w1_", "claim:", "question:", "q:"):
+        if raw.lower().startswith(known_prefix):
+            raw = raw[len(known_prefix) :]
+            break
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", raw).strip("_-")[:64]
+    if not slug:
+        raise ValueError("scoped_id_invalid")
+    return prefix + slug
+
+
+def _normalize_source_id(value: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError("source_id_invalid")
+    raw = value.strip()
+    if SOURCE_ID_RE.fullmatch(raw):
+        return raw
+    slug = re.sub(r"[^a-zA-Z0-9_.:-]+", "_", raw).strip("_.:-")[:64]
+    if not slug:
+        raise ValueError("source_id_invalid")
+    return f"source:w1_{slug}"
+
+
 class OpenQuestionState(StrEnum):
     RESOLVED = "resolved"
     TARGETED_SEARCH = "targeted_search"
@@ -45,6 +71,11 @@ class ClaimDraft(_FrozenModel):
     support_refs: Annotated[tuple[str, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
     counter_refs: Annotated[tuple[str, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
 
+    @field_validator("claim_id", mode="before")
+    @classmethod
+    def normalize_claim_id(cls, value: str) -> str:
+        return _normalize_scoped_id(value, prefix="claim:w1_")
+
     @model_validator(mode="after")
     def validate_refs_disjoint(self) -> ClaimDraft:
         overlap = set(self.support_refs) & set(self.counter_refs)
@@ -59,6 +90,39 @@ class OpenQuestion(_FrozenModel):
     question_id: str = Field(pattern=re.compile(r"^q:w1_[a-zA-Z0-9_-]{1,64}$"))
     question: str = Field(min_length=1, max_length=MAX_QUESTION_CHARS)
     state: OpenQuestionState
+
+    @field_validator("question_id", mode="before")
+    @classmethod
+    def normalize_question_id(cls, value: str) -> str:
+        return _normalize_scoped_id(value, prefix="q:w1_")
+
+    @field_validator("state", mode="before")
+    @classmethod
+    def normalize_state(cls, value: str | OpenQuestionState) -> str | OpenQuestionState:
+        if isinstance(value, OpenQuestionState):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("open_question_state_invalid")
+        normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+        aliases = {
+            "resolved": OpenQuestionState.RESOLVED,
+            "answered": OpenQuestionState.RESOLVED,
+            "closed": OpenQuestionState.RESOLVED,
+            "targeted_search": OpenQuestionState.TARGETED_SEARCH,
+            "needs_more_research": OpenQuestionState.TARGETED_SEARCH,
+            "needs_research": OpenQuestionState.TARGETED_SEARCH,
+            "needs_evidence": OpenQuestionState.TARGETED_SEARCH,
+            "open": OpenQuestionState.TARGETED_SEARCH,
+            "unresolved": OpenQuestionState.TARGETED_SEARCH,
+            "deferred": OpenQuestionState.DEFERRED,
+            "later": OpenQuestionState.DEFERRED,
+            "requires_internal_data": OpenQuestionState.REQUIRES_INTERNAL_DATA,
+            "internal_data_required": OpenQuestionState.REQUIRES_INTERNAL_DATA,
+        }
+        try:
+            return aliases[normalized]
+        except KeyError as exc:
+            raise ValueError("open_question_state_invalid") from exc
 
 
 class Wave1SourceRef(_FrozenModel):
@@ -80,6 +144,11 @@ class Wave1WorkerSource(_FrozenModel):
     canonical_url: str = Field(min_length=1, max_length=2048)
     title: str = Field(min_length=1, max_length=512)
 
+    @field_validator("source_id", mode="before")
+    @classmethod
+    def normalize_source_id(cls, value: str) -> str:
+        return _normalize_source_id(value)
+
     @field_validator("canonical_url")
     @classmethod
     def normalize_url(cls, value: str) -> str:
@@ -97,6 +166,55 @@ class Wave1WorkerOutput(_FrozenModel):
     source_ids: Annotated[tuple[str, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
     claims: Annotated[tuple[ClaimDraft, ...], Field(max_length=MAX_CLAIMS_PER_WORK)] = ()
     open_questions: Annotated[tuple[OpenQuestion, ...], Field(max_length=MAX_OPEN_QUESTIONS)] = ()
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_provider_source_refs(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        raw_sources = payload.get("sources")
+        source_mapping: dict[str, str] = {}
+        used_ids: set[str] = set()
+        if isinstance(raw_sources, (tuple, list)):
+            normalized_sources: list[object] = []
+            for raw_source in raw_sources:
+                if not isinstance(raw_source, dict):
+                    normalized_sources.append(raw_source)
+                    continue
+                source = dict(raw_source)
+                raw_id = source.get("source_id")
+                if not isinstance(raw_id, str):
+                    normalized_sources.append(source)
+                    continue
+                normalized_id = _normalize_source_id(raw_id)
+                base_id = normalized_id
+                suffix = 2
+                while normalized_id in used_ids and source_mapping.get(str(raw_id)) != normalized_id:
+                    normalized_id = f"{base_id}_{suffix}"
+                    suffix += 1
+                used_ids.add(normalized_id)
+                source_mapping[raw_id] = normalized_id
+                source["source_id"] = normalized_id
+                normalized_sources.append(source)
+            payload["sources"] = normalized_sources
+        if isinstance(payload.get("source_ids"), (tuple, list)):
+            payload["source_ids"] = [source_mapping.get(item, item) for item in payload["source_ids"]]
+        raw_claims = payload.get("claims")
+        if isinstance(raw_claims, (tuple, list)):
+            normalized_claims: list[object] = []
+            for raw_claim in raw_claims:
+                if not isinstance(raw_claim, dict):
+                    normalized_claims.append(raw_claim)
+                    continue
+                claim = dict(raw_claim)
+                for field_name in ("support_refs", "counter_refs"):
+                    refs = claim.get(field_name)
+                    if isinstance(refs, (tuple, list)):
+                        claim[field_name] = [source_mapping.get(ref, ref) for ref in refs]
+                normalized_claims.append(claim)
+            payload["claims"] = normalized_claims
+        return payload
 
     @model_validator(mode="after")
     def validate_source_ids_match(self) -> Wave1WorkerOutput:

@@ -121,16 +121,79 @@ configuration scripts; runtime code does not acquire it implicitly.
 ```bash
 make format
 make lint
-make test
+make test              # complete network-free deterministic union
+make test-fast         # contract/domain/engine/unit/graph/eval tests
+make test-integration  # integration/workflow/blocking-I/O tests
 make test-viability
 make test-durability
 make test-blocking-io
+make test-assets       # incident, scenario, selector, and regression inventories
+make test-req-coverage # alive requirements -> collected deterministic tests
+make test-live         # credentialed short live canaries; strict preflight
+RELEASE_E2E_CONFIRM=1 make test-release-e2e # isolated full-real acceptance
 make demo               # interactive zero-API fake lifecycle (show all 11 phases)
 make demo-scripted      # deterministic non-interactive fake (CI)
 make demo-real          # interactive real pipeline (requires ANTHROPIC_API_KEY)
 make demo-real-scripted # deterministic non-interactive real (CI, requires creds)
 make demo-tui           # standalone Textual real-mode visualization
 ```
+
+## Testing And Evaluation
+
+Deep Research maintains four distinct asset classes. Code-correctness tests
+cover deterministic domain, engine, runtime, checkpoint, sandbox, store, and
+filesystem contracts. Agent-workflow conformance tests run real nodes, graph
+prefixes, middleware, policies, budgets, parsers, submit, gates, and artifacts
+with scripted model/tool adapters. Behavioral evaluation runs bounded real
+model/tool canaries and separates hard invariants from non-blocking quality and
+cost metrics. Full-system acceptance enters through the real public tool and
+runs the isolated all-real pipeline through final delivery.
+
+Every test and report carries an authenticity claim from this ladder:
+
+1. `FAKE_GRAPH` proves topology and graph-owned control flow.
+2. `REAL_NODE_FAKE_CAPABILITIES` proves a real node's typed state and route behavior.
+3. `SCRIPTED_REAL_WORKFLOW` proves the real bridge, middleware, policy, loop, stores, and gates.
+4. `LIVE_REAL_DEPENDENCIES` proves observed model/tool-provider behavior under explicit bounds.
+5. `FULL_REAL_PIPELINE` proves one isolated end-to-end acceptance run.
+
+A lower level cannot satisfy a higher claim. The preferred stable test seams,
+from narrowest to broadest, are domain/engine interfaces; `NodeSpec` plus
+`NodeExecutionCapabilities`; runtime adapter/bridge/store protocols; lifecycle
+handlers plus mixed graphs; and the real public entry.
+
+Reusable manifests live in `tests/scenarios/`. Each scenario declares a stable
+id, risk family, requirement and optional regression ids, entrypoint,
+authenticity, preconditions, scripted/live inputs, expected route and terminal
+outcome, artifacts/citations, hard invariants, metrics, and permitted
+degradation. Internal nodes, middleware, gates, validators, and stores stay real
+when a scenario claims workflow conformance; only true external model/tool,
+time, randomness, and supported fault boundaries may be replaced. Deterministic
+scenarios require no credential or public network.
+
+Selection is intentionally non-overlapping. `make test` is the complete
+network-free deterministic union and excludes `requires_llm`, `release_e2e`,
+and `postgres`. `make test-live` runs the three shortest real prefixes and
+writes redacted reports under `.reports/live`. `make test-release-e2e` requires
+explicit confirmation plus model and Tavily credentials, uses fresh
+thread/run/research/checkpoint identity, and writes `.reports/release`. An
+explicitly selected live or release lane fails preflight when its environment is
+incomplete; it never silently skips.
+
+CI follows the same authority split: `agent-tests.yml` runs deterministic gates
+on pull requests and pushes; `agent-live-evaluation.yml` runs short canaries on
+the nightly schedule or manual dispatch; `agent-release-e2e.yml` runs only on
+manual/reusable release invocation after deterministic gates. Hard lifecycle,
+authority, containment, artifact, citation, and cleanup invariants are blocking.
+Subjective quality thresholds remain reported until a reviewed later change
+promotes a stable baseline.
+
+Every live or release defect follows the regression-descent policy in
+`docs/regression-descent.md`: record a redacted discovery, classify its risk and
+lowest stable seam, add the smallest red-before-green deterministic regression
+when it is replayable, and retain an explicit provider-only live rationale when
+it is not. A successful demo or single full-real run never replaces the lower
+test assets or proves distributional quality by itself.
 
 `make demo` and `make demo-scripted` are zero-dependency: no Gateway, config,
 model credentials, or network needed. They show every pipeline phase from bootstrap

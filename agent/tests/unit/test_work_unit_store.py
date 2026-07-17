@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import fcntl
+import hashlib
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,6 +39,11 @@ from deerflow_deep_research.runtime.work_unit_store import (
 
 RESEARCH_ID = "r_" + "A" * 43
 NOW = datetime(2026, 7, 14, 1, 2, 3, 4, tzinfo=UTC)
+
+
+def _content_hash(content: bytes) -> str:
+    digest = base64.urlsafe_b64encode(hashlib.sha256(content).digest()).decode("ascii").rstrip("=")
+    return f"h_{digest}"
 
 
 def _candidate(work_ordinal: int = 0, attempt_ordinal: int = 0, **overrides: object) -> CandidateResult:
@@ -326,6 +333,26 @@ async def test_read_canonical_bytes_uses_the_contained_no_follow_reader(tmp_path
     assert await store.read_canonical_bytes(ref, max_bytes=64) == b'{"schema_version":1}'
     with pytest.raises(FileNotFoundError, match="artifact_missing"):
         await store.read_canonical_bytes(ref.replace("work-spec.json", "missing.json"), max_bytes=64)
+
+
+async def test_synthesis_evidence_reads_only_committed_result_with_integrity_check(tmp_path: Path) -> None:
+    store = await _store(tmp_path)
+    content = b'{"schema_version":1,"sources":[{"title":"accepted evidence"}]}'
+    candidate = _candidate(result_hash=_content_hash(content), result_byte_count=len(content))
+    result_path = tmp_path / candidate.result_ref.removeprefix("workspace/")
+    await asyncio.to_thread(result_path.parent.mkdir, parents=True)
+    await asyncio.to_thread(result_path.write_bytes, content)
+    committed = await store.commit_candidate(candidate, scope=("topic:0",))
+
+    evidence = await store.read_synthesis_evidence((committed.record.record_hash,))
+
+    assert len(evidence) == 1
+    assert evidence[0].submission_ref == committed.record.record_hash
+    assert evidence[0].content == content.decode()
+    assert evidence[0].truncated is False
+    await asyncio.to_thread(result_path.write_bytes, b"tampered")
+    with pytest.raises(ValueError, match="synthesis_evidence_integrity_mismatch"):
+        await store.read_synthesis_evidence((committed.record.record_hash,))
 
 
 async def test_contained_read_rejects_symlink_escape_and_oversize(tmp_path: Path) -> None:

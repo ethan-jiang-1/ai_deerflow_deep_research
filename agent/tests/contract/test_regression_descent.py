@@ -15,11 +15,7 @@ def test_regression_descent_log_classifies_each_discovery_and_names_live_rationa
     path = Path("docs/regression-descent.md")
     text = path.read_text(encoding="utf-8")
     collected = collect_deterministic_selectors()
-    rows = [
-        line
-        for line in text.splitlines()
-        if line.startswith("| LIVE-") or line.startswith("| RELEASE-")
-    ]
+    rows = [line for line in text.splitlines() if line.startswith("| LIVE-") or line.startswith("| RELEASE-")]
 
     assert len(rows) >= 7
     for row in rows:

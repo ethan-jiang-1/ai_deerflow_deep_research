@@ -4,7 +4,7 @@ The Deep Research real-mode demo exposed thirteen failures only after expensive 
 
 ## What Changes
 
-- Establish one three-batch testing control plane for code correctness, deterministic agent-workflow conformance, and live/release evaluation, using `_backlog/plans/deep-research-test-assets-master-strategy.md` as the approved design input.
+- Establish one three-batch testing control plane for code correctness, deterministic agent-workflow conformance, and live/release evaluation, using `_backlog/_done/_closed_plans/deep-research-test-assets-master-strategy.md` as the approved design input.
 - Audit the current suite against the thirteen real-mode incident classes, add only missing deterministic regressions, and expose stable `make` targets and an agent-owned PR workflow that never requires network or model credentials.
 - Define reusable typed scenarios and test adapters for trusted runtime context, local mounted sandbox/filesystem behavior, scripted model/tool conversations, unique run identity, redacted diagnostics, and fault injection.
 - Exercise each real node and each high-risk real-prefix workflow through real graph, runtime bridge, middleware, policy, budget, parser, submission, gate, checkpoint, and artifact code while replacing only true external model/tool dependencies.

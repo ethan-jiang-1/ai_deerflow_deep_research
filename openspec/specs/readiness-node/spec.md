@@ -1,22 +1,25 @@
 # readiness-node Specification
 
+> req: REA-001, REA-002, REA-003, REA-004, REA-005, REA-006, REA-007
+
 ## Purpose
-TBD - created by archiving change implement-deep-research-readiness-node. Update Purpose after archive.
+Determine whether accepted evidence and HITL decisions are structurally and semantically ready for final delivery.
+
 ## Requirements
 ### Requirement: Hard checks verify citation availability, provenance, and HITL2 consumption
 
-The readiness node SHALL run three deterministic hard checks on pre-existing state: accepted submissions are non-empty (`check_citation_availability`), all refs have valid `ref:` prefix (`check_provenance`), and at least one HITL2 request was consumed (`check_hitl2_consumption`). Failures SHALL be collected as `HardRuleFailure` tuples. Structural failures (no evidence, bad provenance) SHALL cause the node to route to `exhausted` with `BLOCKED` terminal status — these indicate preconditions that repair cannot fix.
+The readiness node SHALL run three deterministic hard checks on pre-existing state: accepted submissions are non-empty (`check_citation_availability`), all refs are canonical `h_` submission-ledger record hashes (`check_provenance`), and at least one HITL2 request was consumed (`check_hitl2_consumption`). Failures SHALL be collected as `HardRuleFailure` tuples. Structural failures (no evidence, bad provenance) SHALL cause the node to route to `exhausted` with `BLOCKED` terminal status — these indicate preconditions that repair cannot fix.
 
 #### Scenario: No accepted evidence is a structural failure
 - **WHEN** `accepted_submission_refs` is empty
 - **THEN** the node produces a `citation_no_accepted_evidence` failure and routes to `exhausted` with `terminal_status=BLOCKED`
 
 #### Scenario: Valid evidence passes citation availability
-- **WHEN** `accepted_submission_refs` contains at least one valid ref starting with `ref:`
+- **WHEN** `accepted_submission_refs` contains at least one canonical `h_` submission-ledger record hash
 - **THEN** the citation availability check produces zero failures
 
 #### Scenario: Malformed ref is a provenance failure
-- **WHEN** an accepted submission ref is `"bad-format"` (no `ref:` prefix)
+- **WHEN** an accepted submission ref is `"bad-format"` rather than a canonical ledger hash
 - **THEN** the node produces a `provenance_invalid_ref` failure with the malformed ref
 
 #### Scenario: No HITL2 consumption is a structural failure
@@ -110,4 +113,3 @@ Real readiness SHALL require `hitl2=real`. Selecting `readiness=real` without `h
 #### Scenario: Real readiness coexists with fake final_delivery
 - **WHEN** readiness is real but final_delivery is still fake
 - **THEN** the graph routes `pass` → `final_delivery` and the fake final handles it
-

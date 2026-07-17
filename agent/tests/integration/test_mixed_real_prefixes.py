@@ -48,10 +48,6 @@ def _wave1_output(source_id: str, url: str) -> str:
                     "source_id": source_id,
                     "canonical_url": url,
                     "title": "Deep evidence",
-                    "content_ref": "workspace/forged",
-                    "content_hash": "h_" + "Z" * 43,
-                    "byte_count": 999,
-                    "is_new_vs_wave0": True,
                 }
             ],
             "source_ids": [source_id],
@@ -67,8 +63,15 @@ def _synthesis_output() -> str:
             "schema_version": 1,
             "findings": [],
             "relations": [],
-            "gaps": [],
-            "summary": "Evidence synthesized without unsupported findings.",
+            "gaps": [
+                {
+                    "gap_id": "gap:scripted_evidence_limit",
+                    "description": "The scripted evidence does not support a substantive cross-topic finding.",
+                    "priority": 3,
+                    "affected_topics": ["topic:storage"],
+                }
+            ],
+            "summary": "Evidence synthesized as an explicit gap without unsupported findings.",
         }
     )
 

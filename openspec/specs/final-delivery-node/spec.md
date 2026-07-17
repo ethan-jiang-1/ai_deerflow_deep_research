@@ -1,7 +1,10 @@
 # final-delivery-node Specification
 
+> req: FID-001, FID-002, FID-003, FID-004, FID-005
+
 ## Purpose
-TBD - created by archiving change implement-deep-research-final-delivery-node. Update Purpose after archive.
+Produce bounded final report artifacts, verify their evidence integrity, and complete the lifecycle idempotently.
+
 ## Requirements
 ### Requirement: Writer produces report and claim-citation map
 
@@ -50,4 +53,3 @@ Real final delivery SHALL require readiness=real. Full-fake path preserved. Topo
 #### Scenario: Real final_delivery requires real readiness
 - **WHEN** final_delivery=real without readiness=real
 - **THEN** recipe construction fails
-

@@ -12,7 +12,7 @@ from deerflow_deep_research.domain.lifecycle import WorkUnitStorageReason
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies, NodeCapability
 from deerflow_deep_research.domain.state import WORK_UNIT_GATE_PREVIEW_FIELDS, merge_trace, preview_work_unit_update
 from deerflow_deep_research.domain.work_units import WORK_UNIT_GATE_VIEW_KEY, WorkSpecRef, canonical_json_bytes
-from deerflow_deep_research.engine.work_units.kernel import allocate_attempt, materialize_work_spec
+from deerflow_deep_research.engine.work_units.kernel import allocate_attempt, materialize_work_spec, transition_attempt
 from deerflow_deep_research.graph.builder import _node_wrapper
 from deerflow_deep_research.graph.components.work_units import reconcile_parent_ledger_authority
 from deerflow_deep_research.graph.nodes.gate_adapter import default_gate_defs
@@ -392,6 +392,61 @@ async def test_reconcile_matrix_executes_active_retry_and_copies_canonical_first
     retry_ref = first_ref.parent.parent / retry.attempt_id / "work-spec.json"
     assert first_ref.read_bytes() == retry_ref.read_bytes() == canonical_json_bytes(spec)
     assert len(await store.load_records()) == 1
+
+
+async def test_recovery_fails_running_attempt_from_prior_generation_with_orphan_reason(tmp_path) -> None:
+    """@impl RUO-003"""
+    context, store = _context(tmp_path)
+    assert context.work_units is not None
+    stale_spec = materialize_work_spec(
+        research_id=RESEARCH_ID,
+        generation=0,
+        phase="wave0",
+        work_ordinal=0,
+        intent=WAVE0_FIXTURE_INTENTS[0],
+    )
+    stale_attempt = transition_attempt(
+        allocate_attempt(stale_spec, attempt_ordinal=0, created_at=NOW),
+        status="running",
+        at=NOW,
+    )
+    await store.write_work_spec(stale_spec, stale_attempt)
+    state = _state()
+    state.update(
+        generation=1,
+        work_specs_by_id={
+            stale_spec.work_id: WorkSpecRef(
+                worker_role=stale_spec.worker_role,
+                spec_hash=stale_spec.spec_hash,
+            ).model_dump(mode="json")
+        },
+        attempts_by_id={
+            stale_attempt.attempt_id: {
+                "created_at": NOW,
+                "started_at": NOW,
+                "expires_at": None,
+                "terminal_at": None,
+                "terminal_code": None,
+            }
+        },
+        work_status_by_id={stale_attempt.attempt_id: "running"},
+        active_attempt_by_work_id={stale_spec.work_id: stale_attempt.attempt_id},
+    )
+
+    recovered = await run_wave0_work_units(
+        state,
+        controller=context.work_units,
+        clock=lambda: NOW,
+    )
+
+    assert recovered.parent_update["work_status_by_id"][stale_attempt.attempt_id] == "failed"
+    assert recovered.parent_update["attempts_by_id"][stale_attempt.attempt_id]["terminal_code"] == "orphaned"
+    assert recovered.parent_update["terminal_failures_by_attempt_id"][stale_attempt.attempt_id]["failure_code"] == (
+        "work_failed"
+    )
+    assert recovered.parent_update["active_attempt_by_work_id"] == {}
+    assert recovered.gate_view.planned_work_ids == tuple(f"g1_wave0_w{ordinal:04d}" for ordinal in range(3))
+    assert len(await store.load_records()) == 3
 
 
 @pytest.mark.parametrize(

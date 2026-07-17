@@ -98,8 +98,6 @@ def build_wave1_repair_prompt(
     )
     return NodeExecutionRequest(
         objective=objective,
-        expected_output=(
-            "A JSON object with schema_version=1, sources, optional claims, and optional open_questions."
-        ),
+        expected_output=("A JSON object with schema_version=1, sources, optional claims, and optional open_questions."),
         tools_enabled=False,
     )

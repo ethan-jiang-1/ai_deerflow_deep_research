@@ -70,6 +70,54 @@ class TestWave1WorkerOutput:
         )
         assert result.open_questions[0].state == OpenQuestionState.DEFERRED
 
+    def test_provider_ids_and_question_state_are_normalized(self) -> None:
+        result = Wave1WorkerOutput(
+            schema_version=1,
+            claims=(
+                {
+                    "claim_id": "claim 1",
+                    "statement": "A provider-shaped claim.",
+                    "support_refs": (),
+                    "counter_refs": (),
+                },
+            ),
+            open_questions=(
+                {
+                    "question_id": "question 1",
+                    "question": "What remains unknown?",
+                    "state": "needs_more_research",
+                },
+            ),
+        )
+
+        assert result.claims[0].claim_id == "claim:w1_claim_1"
+        assert result.open_questions[0].question_id == "q:w1_question_1"
+        assert result.open_questions[0].state is OpenQuestionState.TARGETED_SEARCH
+
+    def test_provider_source_ids_and_claim_refs_are_normalized_together(self) -> None:
+        result = Wave1WorkerOutput(
+            schema_version=1,
+            sources=(
+                {
+                    "source_id": "Source 1 / official",
+                    "canonical_url": "https://example.com/source-1",
+                    "title": "Official source",
+                },
+            ),
+            claims=(
+                {
+                    "claim_id": "claim 1",
+                    "statement": "A provider-shaped claim.",
+                    "support_refs": ("Source 1 / official",),
+                    "counter_refs": (),
+                },
+            ),
+        )
+
+        assert result.sources[0].source_id == "source:w1_Source_1_official"
+        assert result.source_ids == ("source:w1_Source_1_official",)
+        assert result.claims[0].support_refs == ("source:w1_Source_1_official",)
+
     def test_rejects_unknown_field(self) -> None:
         with pytest.raises(ValidationError):
             Wave1WorkerOutput(schema_version=1, bogus="x")  # type: ignore[call-arg]

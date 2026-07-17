@@ -49,6 +49,14 @@ class PlannerInputs:
         questions = tuple(q for q in self.must_answer_questions if isinstance(q, str) and q.strip())
         return questions or (self.request_text.strip(),)
 
+    @property
+    def single_topic(self) -> bool:
+        return (
+            self.research_depth == "quick_overview"
+            and self.cost_tolerance == "minimal"
+            and self.time_budget == "very_quick"
+        )
+
 
 def _profile_payload(inputs: PlannerInputs) -> dict[str, object]:
     return {
@@ -67,11 +75,7 @@ def build_planner_prompt(inputs: PlannerInputs, *, repair_error: str | None = No
     """Build the bounded planner ``NodeExecutionRequest`` from profile constraints."""
     if not isinstance(inputs.request_text, str) or not inputs.request_text.strip():
         raise ValueError("request_text_required")
-    single_topic = (
-        inputs.research_depth == "quick_overview"
-        and inputs.cost_tolerance == "minimal"
-        and inputs.time_budget == "very_quick"
-    )
+    single_topic = inputs.single_topic
     repair = ""
     if repair_error:
         repair = (

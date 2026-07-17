@@ -134,6 +134,28 @@ def test_live_usage_tracker_identifies_one_embedded_json_object_without_preservi
     assert "Analysis complete" not in tracker.diagnostic_summary()
 
 
+def test_live_usage_tracker_reports_synthesis_schema_errors_without_values() -> None:
+    tracker = _UsageTracker(model_id="deepseek/test")
+    message = AIMessage(
+        content=json.dumps(
+            {
+                "schema_version": 1,
+                "findings": [{"finding_id": "private invalid id"}],
+                "relations": [],
+                "gaps": [],
+                "summary": "private synthesis text",
+            }
+        )
+    )
+    tracker.on_llm_end(SimpleNamespace(generations=[[SimpleNamespace(message=message)]]))
+
+    shape = json.loads(tracker.diagnostic_summary())[0]
+    assert shape["synthesis_schema_valid"] is False
+    assert "findings.0.finding_id:string_pattern_mismatch" in shape["synthesis_validation_errors"]
+    assert "private invalid id" not in tracker.diagnostic_summary()
+    assert "private synthesis text" not in tracker.diagnostic_summary()
+
+
 async def test_live_runner_reports_attempts_metrics_cost_and_redacts_diagnostics() -> None:
     attempts = iter(
         (

@@ -1,7 +1,10 @@
 # rerun-node Specification
 
+> req: REN-001, REN-002, REN-003, REN-004, REN-005, REN-006, REN-007
+
 ## Purpose
-TBD - created by archiving change implement-deep-research-rerun-node. Update Purpose after archive.
+Plan bounded generation reruns while preserving accepted evidence authority and resetting only affected projections.
+
 ## Requirements
 ### Requirement: Rerun scope is parsed from the `hitl2_rerun_payload` checkpoint field
 
@@ -134,4 +137,3 @@ Real rerun SHALL require `hitl2=real` (which transitively requires the full chai
 #### Scenario: Real rerun back edges coexist with fake-compat edge keys
 - **WHEN** the real rerun node routes to `"topic_planning"`, `"wave0"`, or `"wave1"`
 - **THEN** the graph topology accepts the route — the conditional edge map includes the new semantic keys alongside the existing `"next"` key (fake backward compat) and `"exhausted"` key, both of which route to the same targets as before
-

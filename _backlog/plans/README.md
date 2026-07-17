@@ -1,6 +1,6 @@
 # Active Plans — 活跃 plan/分析文档列表
 
-> 最后更新: 2026-07-16 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
+> 最后更新: 2026-07-17 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
 >
 > **plan 没有编号，文件名即标识。完成后文件名不变，位置即状态。**
 
@@ -25,13 +25,8 @@
 | [deep-research-16-final-delivery-node.md](deep-research-16-final-delivery-node.md) | final writer、integrity gate 与 workspace-to-outputs artifact publish（← 下一个） |
 | [deep-research-17-runtime-operations.md](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress 与 operator recovery |
 | [deep-research-demo-full-pipeline.md](deep-research-demo-full-pipeline.md) | Demo CLI fake + CLI real + TUI real 三合一设计 |
-| [deep-research-test-assets-master-strategy.md](deep-research-test-assets-master-strategy.md) | **总控**：三批测试资产战略；OpenSpec change `evaluate-harden-deep-research-graph` 已提案 |
-| [test-assets-postmortem-real-mode-integration.md](test-assets-postmortem-real-mode-integration.md) | 总控输入：real-mode 集成事故、根因与时间线 |
-| [test-assets-layered-strategy.md](test-assets-layered-strategy.md) | 总控输入：早期分层策略；roadmap 已由总控计划取代 |
-| [test-assets-bug-to-test-mapping.md](test-assets-bug-to-test-mapping.md) | 总控输入：已知 bug 回归 inventory，Batch 1 重新核验 |
-| [test-assets-demo-design-coverage.md](test-assets-demo-design-coverage.md) | 总控输入：Demo/public-entry 设计决策覆盖 |
 
-**Next available plan ID: CLS-003**（移入 `_closed_plans/` 时分配）
+**Next available plan ID: CLS-008**（移入 `_closed_plans/` 时分配）
 
 ## 已归档（移至 `_done/_closed_plans/`）
 
@@ -54,6 +49,11 @@
 | deep-research-14-rerun-node.md | 14 | 2026-07-16 |
 | deep-research-15-readiness-node.md | 15 | 2026-07-16 |
 | deep-research-tui-hitl-terminal-workbench.md | CLS-001 | 2026-07-13 |
+| test-assets-postmortem-real-mode-integration.md | CLS-003 | 2026-07-17 |
+| test-assets-bug-to-test-mapping.md | CLS-004 | 2026-07-17 |
+| test-assets-demo-design-coverage.md | CLS-005 | 2026-07-17 |
+| test-assets-layered-strategy.md | CLS-006 | 2026-07-17 |
+| deep-research-test-assets-master-strategy.md | CLS-007 | 2026-07-17 |
 
 ---
 

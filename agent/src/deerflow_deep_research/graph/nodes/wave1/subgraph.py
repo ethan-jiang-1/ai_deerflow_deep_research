@@ -128,7 +128,8 @@ async def _wave1_worker(
         output = parse_wave1_worker_output(repaired.summary)
     normalized_sources: list[Wave1SourceRef] = []
     source_refs: list[SourceRef] = []
-    for index, source in enumerate(output.sources):
+    ordered_sources = tuple(sorted(output.sources, key=lambda source: (source.source_id, source.canonical_url)))
+    for index, source in enumerate(ordered_sources):
         cache_name = f"source-{index}.json"
         is_new_vs_wave0 = source.canonical_url not in wave0_urls
         content = canonical_json_bytes(
@@ -163,6 +164,15 @@ async def _wave1_worker(
             )
         )
 
+    normalized_claims = tuple(
+        claim.model_copy(
+            update={
+                "support_refs": tuple(sorted(set(claim.support_refs))),
+                "counter_refs": tuple(sorted(set(claim.counter_refs))),
+            }
+        )
+        for claim in output.claims
+    )
     document = Wave1SourceIntakeResult(
         schema_version=1,
         research_id=spec.research_id,
@@ -176,7 +186,7 @@ async def _wave1_worker(
         output_paths=spec.required_outputs,
         sources=tuple(normalized_sources),
         source_ids=tuple(source.source_id for source in normalized_sources),
-        claims=output.claims,
+        claims=normalized_claims,
         open_questions=output.open_questions,
     )
     result_bytes = canonical_json_bytes(document)

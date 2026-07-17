@@ -97,6 +97,7 @@ class AttemptTerminalCode(StrEnum):
     WORKER_FAILED = "worker_failed"
     VALIDATION_FAILED = "validation_failed"
     CANDIDATE_CONFLICT = "candidate_conflict"
+    ORPHANED = "orphaned"
     DEADLINE_EXCEEDED = "deadline_exceeded"
     EXPIRED = "expired"
     CANCELLED = "cancelled"
@@ -414,6 +415,7 @@ class Attempt(_FrozenModel):
                 AttemptTerminalCode.WORKER_FAILED,
                 AttemptTerminalCode.VALIDATION_FAILED,
                 AttemptTerminalCode.CANDIDATE_CONFLICT,
+                AttemptTerminalCode.ORPHANED,
             },
             AttemptStatus.TIMED_OUT: {AttemptTerminalCode.DEADLINE_EXCEEDED, AttemptTerminalCode.EXPIRED},
             AttemptStatus.CANCELLED: {AttemptTerminalCode.CANCELLED, AttemptTerminalCode.SUPERSEDED},
@@ -867,6 +869,36 @@ class Wave0WorkerOutput(_FrozenModel):
     baseline_facts: Annotated[tuple[str, ...], Field(default=(), max_length=MAX_BASELINE_FACTS)] = ()
     limitations: str = Field(default="", max_length=MAX_SOURCE_LIMITATIONS_CHARS)
 
+    @model_validator(mode="before")
+    @classmethod
+    def retain_valid_sources(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        raw_sources = payload.get("sources")
+        if not isinstance(raw_sources, (tuple, list)):
+            return payload
+        retained: list[dict[str, Any]] = []
+        dropped = 0
+        for raw_source in raw_sources:
+            try:
+                source = WorkerSource.model_validate(raw_source)
+            except (TypeError, ValueError):
+                dropped += 1
+                continue
+            retained.append(source.model_dump(mode="json"))
+        payload["sources"] = retained
+        if dropped:
+            note = f"Dropped {dropped} invalid source records."
+            limitations = payload.get("limitations")
+            if limitations is None:
+                payload["limitations"] = note
+            elif isinstance(limitations, str):
+                payload["limitations"] = f"{limitations.rstrip('; ')}; {note}" if limitations.strip() else note
+            elif isinstance(limitations, (tuple, list)):
+                payload["limitations"] = [*limitations, note]
+        return payload
+
     @field_validator("limitations", mode="before")
     @classmethod
     def normalize_limitations(cls, value: Any) -> str:
@@ -1059,6 +1091,7 @@ class AttemptTerminalUpdate(_FrozenModel):
                 AttemptTerminalCode.WORKER_FAILED,
                 AttemptTerminalCode.VALIDATION_FAILED,
                 AttemptTerminalCode.CANDIDATE_CONFLICT,
+                AttemptTerminalCode.ORPHANED,
             },
             AttemptStatus.TIMED_OUT: {AttemptTerminalCode.DEADLINE_EXCEEDED, AttemptTerminalCode.EXPIRED},
             AttemptStatus.CANCELLED: {AttemptTerminalCode.CANCELLED, AttemptTerminalCode.SUPERSEDED},

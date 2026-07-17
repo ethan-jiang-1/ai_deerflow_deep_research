@@ -5,7 +5,7 @@
 > 输入: `test-assets-postmortem-real-mode-integration.md`、
 > `test-assets-bug-to-test-mapping.md`、`test-assets-demo-design-coverage.md`、
 > `test-assets-layered-strategy.md`
-> 状态: 总控计划；通过一个 OpenSpec change 内的三个顺序 batch 落地
+> 状态: 已完成；OpenSpec change `evaluate-harden-deep-research-graph` 的三个顺序 batch 均已通过
 
 ## 背景 / 问题
 
@@ -20,9 +20,9 @@ filesystem、worker capability、policy、budget、structured output、gate 和 
 1. 它们以一次事故为中心，没有形成新节点和新 workflow 可重复使用的资产规则。
 2. 它们把 unit、integration、smoke、E2E 当成主要分类，却没有单独定义
    Agent workflow conformance 和非确定性行为评估。
-3. 文档中的测试数量、bug 数量和仓库现状已经漂移；当前 `agent/` 可收集
+3. 提案时文档中的测试数量、bug 数量和仓库现状已经漂移；当时 `agent/` 可收集
    1134 个测试，但仍没有独立 agent PR CI、实际 `requires_llm` suite 或
-   nightly/release 门禁。
+   nightly/release 门禁。下述落地记录给出最终名称与状态。
 
 本计划的目标不是简单增加测试数量，而是让每一类风险在最早、最小、最可诊断的
 测试层被发现。Full-real E2E 保留为系统验收，不再承担日常低层 bug 定位。
@@ -229,9 +229,31 @@ Release   full-real acceptance E2E + stable quality thresholds
 - `test-assets-layered-strategy.md`：其“前移风险、减少 E2E”结论保留，具体四层/四 change
   roadmap 由本计划的四类资产、真实性阶梯和三批路线取代。
 
-四份材料不在本计划创建时立即关闭。Batch 1 将其有效发现转成可执行 inventory 后，
-把已被吸收的三份设计/映射材料移入 closed plans；postmortem 可作为历史证据一并关闭。
-本总控计划在 Batch 3 完成后关闭。
+Batch 1 已将四份材料的有效发现转成 executable incident/scenario inventories；三份
+设计/映射材料与 postmortem 现作为历史证据一并移入 closed plans。本总控计划在
+Batch 3 live/release gate 通过后同步关闭。
+
+## 最终落地记录
+
+三个 batch 均由 OpenSpec change `evaluate-harden-deep-research-graph` 实施并通过：
+
+- 确定性命令：`make test-fast`、`make test-integration`、`make test`；默认 union
+  排除 `requires_llm`、`release_e2e` 和 `postgres`，并拒绝公网访问。
+- 治理命令：`make test-assets` 与 `make test-req-coverage`，分别执行 incident/scenario/
+  selector/regression inventory 和 requirement-to-collected-test coverage。
+- Live 命令：`make test-live`；workflow 为 `.github/workflows/agent-live-evaluation.yml`，
+  nightly 或手动运行三条最短真实前缀，缺凭据时严格 preflight 失败。
+- Release 命令：`RELEASE_E2E_CONFIRM=1 make test-release-e2e`；workflow 为
+  `.github/workflows/agent-release-e2e.yml`，仅在 deterministic gate 后手动/复用运行。
+- PR/push workflow 为 `.github/workflows/agent-tests.yml`，执行 lock、lint、asset/
+  requirement governance、fast 与 integration/workflow gates。
+
+Batch 3 的完整凭据化 live lane 已通过（包含三条 canary），随后一次 fresh-identity
+full-real acceptance 通过全部八项 hard invariant：completed terminal、ordered lifecycle
+（保留可见 retry visits）、accepted evidence、两个 final artifacts、citation bindings、
+containment、cleanup 和 checkpoint isolation。Live/release archives 的 secret 与 raw host
+path 扫描无匹配。所有 live/E2E 修复均记录于 `agent/docs/regression-descent.md`，可重放的
+缺陷已在最低稳定 seam 增加 red-before-green deterministic regression。
 
 ## Non-Goals
 
@@ -251,10 +273,10 @@ Release   full-real acceptance E2E + stable quality thresholds
 
 ## 落地关联
 
-本 plan 只定义总控策略和三批顺序，不直接充当 implementation change。实际落地由一个
-OpenSpec change `evaluate-harden-deep-research-graph` 统一拥有。OpenSpec 没有原生父子
-change 机制；另建空 umbrella 或三个平行 change 都会造成 spec ownership 重复。
+本 plan 定义的总控策略和三批顺序已由一个 OpenSpec change
+`evaluate-harden-deep-research-graph` 统一落地。OpenSpec 没有原生父子 change 机制；
+没有创建空 umbrella 或三个平行 change，避免了 spec ownership 重复。
 
-该 change 的 tasks 必须保留 Batch 1 → Batch 2 → Batch 3 的顺序和各自完成条件。每个
-batch 都是可单独验证的里程碑，但 change 只有在三批全部完成、live/release 门禁已形成
-明确可执行策略后才可 archive。不得把三个 batch 改写为一组无法分段验收的混合任务。
+该 change 的 tasks 保留了 Batch 1 → Batch 2 → Batch 3 的顺序和各自完成条件。三个
+batch 均已独立验证，live/release 门禁已成为明确可执行策略；master 与四份输入 plan
+因此满足关闭条件。

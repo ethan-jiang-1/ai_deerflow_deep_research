@@ -203,7 +203,11 @@ def project_terminal_failure(
         if not validation_codes:
             raise ValueError("validation_codes_required")
         failure = _VALIDATION_FAILURE_MAP.get(validation_codes[0], FailureCode.INVALID_OUTPUT_SCHEMA)
-    elif code in {AttemptTerminalCode.WORKER_FAILED, AttemptTerminalCode.CANDIDATE_CONFLICT}:
+    elif code in {
+        AttemptTerminalCode.WORKER_FAILED,
+        AttemptTerminalCode.CANDIDATE_CONFLICT,
+        AttemptTerminalCode.ORPHANED,
+    }:
         failure = FailureCode.WORK_FAILED
     elif code in {AttemptTerminalCode.DEADLINE_EXCEEDED, AttemptTerminalCode.EXPIRED}:
         failure = FailureCode.WORK_TIMED_OUT

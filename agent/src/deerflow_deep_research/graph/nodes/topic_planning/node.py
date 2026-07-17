@@ -59,9 +59,11 @@ async def _generate_plan(
             return None
         try:
             plan: TopicPlan = parse_plan_output(result.summary)
+            if inputs.single_topic and len(plan.topics) != 1:
+                raise ValueError("topic_count_profile_mismatch")
             return materialize_topic_plan(plan, inputs.coverage_questions)
         except (TypeError, ValueError) as exc:
-            repair_error = type(exc).__name__
+            repair_error = str(exc) or type(exc).__name__
     return None
 
 

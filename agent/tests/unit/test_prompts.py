@@ -1,4 +1,7 @@
-"""Package-resource prompt loading and untrusted-source projection (NOA-004)."""
+"""Package-resource prompt loading and untrusted-source projection.
+
+@impl NOA-004
+"""
 
 from __future__ import annotations
 

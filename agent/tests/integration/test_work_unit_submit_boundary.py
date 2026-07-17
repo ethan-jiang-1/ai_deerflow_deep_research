@@ -1,3 +1,8 @@
+"""Controller submit authority and atomic publication integration.
+
+@impl WOU-004
+"""
+
 from __future__ import annotations
 
 import base64

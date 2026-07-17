@@ -67,6 +67,11 @@ def build_planner_prompt(inputs: PlannerInputs, *, repair_error: str | None = No
     """Build the bounded planner ``NodeExecutionRequest`` from profile constraints."""
     if not isinstance(inputs.request_text, str) or not inputs.request_text.strip():
         raise ValueError("request_text_required")
+    single_topic = (
+        inputs.research_depth == "quick_overview"
+        and inputs.cost_tolerance == "minimal"
+        and inputs.time_budget == "very_quick"
+    )
     repair = ""
     if repair_error:
         repair = (
@@ -80,9 +85,13 @@ def build_planner_prompt(inputs: PlannerInputs, *, repair_error: str | None = No
             "conservative topics that still cover every must-answer question."
         )
     profile = json.dumps(_profile_payload(inputs), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    topic_instruction = (
+        "Decompose the confirmed research profile into exactly one scoped research topic."
+        if single_topic
+        else "Decompose the confirmed research profile into a bounded set of scoped research topics."
+    )
     objective = (
-        "Decompose the confirmed research profile into a bounded set of scoped research "
-        "topics. Every must-answer question MUST be bound to at least one topic. Do not "
+        f"{topic_instruction} Every must-answer question MUST be bound to at least one topic. Do not "
         "invent topic ids or slugs; the system derives them. Topics must be distinct and "
         "non-overlapping."
         f"{breadth}{repair}\n\nConfirmed profile:\n{profile}"
@@ -101,7 +110,7 @@ def build_planner_prompt(inputs: PlannerInputs, *, repair_error: str | None = No
             "exclusions",
         ],
         "bounds": {
-            "topics": f"1-{MAX_TOPICS} entries",
+            "topics": "exactly 1 entry" if single_topic else f"1-{MAX_TOPICS} entries",
             "must_answer_bindings": "1-8 strings drawn from the profile must_answer_questions",
             "title": f"<= {MAX_TOPIC_TITLE_CHARS} chars",
             "scope": f"<= {MAX_TOPIC_SCOPE_CHARS} chars",

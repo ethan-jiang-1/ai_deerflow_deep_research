@@ -18,7 +18,7 @@ The production authority model is unchanged: checkpointed `ResearchState` owns c
 
 **Non-Goals:**
 
-- Do not modify `backend/`, `frontend/`, the lead-agent graph, production topology, checkpoint schema, sandbox layout, configured tools/models, skills, Agent/SOUL, MCP, ACP, or DeerFlow task subagents.
+- Do not modify `backend/`, `frontend/`, the lead-agent graph, production topology, checkpoint schema, sandbox layout, configured tools/models, skills, Agent/SOUL, MCP, ACP, or DeerFlow task subagents. A discovered live/release defect may receive a narrow production conformance fix only when an existing capability spec already requires the behavior and a red deterministic regression proves the defect at the lowest stable seam.
 - Do not use line coverage or raw test count as an acceptance target.
 - Do not add test hooks to production interfaces or expose private implementation seams.
 - Do not make subjective quality thresholds blocking until repeated live observations establish a reviewed baseline.

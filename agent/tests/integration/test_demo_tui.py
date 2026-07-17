@@ -1,4 +1,8 @@
-"""Pilot coverage for the standalone Deep Research lifecycle demo TUI."""
+"""Pilot coverage for the standalone Deep Research lifecycle demo TUI.
+
+@impl RED-001
+@impl RED-002
+"""
 
 from __future__ import annotations
 
@@ -19,9 +23,7 @@ def _fake_recipe():
     from _demo_core import DemoAdapter
 
     adapter = DemoAdapter()
-    return _original_build_demo_recipe(
-        mode="fake", work_unit_store_factory=adapter.create_work_unit_store
-    )
+    return _original_build_demo_recipe(mode="fake", work_unit_store_factory=adapter.create_work_unit_store)
 
 
 from demo_tui import DeepResearchDemoTUI  # noqa: E402

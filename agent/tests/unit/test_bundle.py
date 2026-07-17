@@ -1,4 +1,8 @@
-"""Pure change-02 bundle layout, path containment, and authority boundary (REG-009, REG-010)."""
+"""Pure change-02 bundle layout, path containment, and authority boundary.
+
+@impl REG-009
+@impl REG-010
+"""
 
 from __future__ import annotations
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Protocol, runtime_checkable
 
 from pydantic import Field
 
@@ -57,3 +57,8 @@ class SynthesisResult(_FrozenModel):
     relations: Annotated[tuple[CrossTopicRelation, ...], Field(max_length=MAX_RELATIONS)] = ()
     gaps: Annotated[tuple[GapRecord, ...], Field(max_length=32)] = ()
     summary: str = Field(default="", max_length=8000)
+
+
+@runtime_checkable
+class SynthesisBundleStoreProtocol(Protocol):
+    async def write_synthesis(self, result: SynthesisResult) -> None: ...

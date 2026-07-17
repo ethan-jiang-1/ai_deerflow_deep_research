@@ -1,0 +1,40 @@
+name: Agent deterministic tests
+
+on:
+  pull_request:
+    paths:
+      - "agent/**"
+      - "openspec/**"
+      - ".github/workflows/agent-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "agent/**"
+      - "openspec/**"
+      - ".github/workflows/agent-tests.yml"
+
+concurrency:
+  group: agent-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --extra operations --extra demo-tui
+      - run: make lock-check
+      - run: make lint
+      - run: make test-assets
+      - run: make test-req-coverage
+      - run: make test-fast
+      - run: make test-integration

@@ -5,7 +5,7 @@
 > 输入: `test-assets-postmortem-real-mode-integration.md`、
 > `test-assets-bug-to-test-mapping.md`、`test-assets-demo-design-coverage.md`、
 > `test-assets-layered-strategy.md`
-> 状态: 总控计划；通过三个顺序 OpenSpec change 落地
+> 状态: 总控计划；通过一个 OpenSpec change 内的三个顺序 batch 落地
 
 ## 背景 / 问题
 
@@ -145,7 +145,7 @@ deterministic workflow、live eval 和 release E2E 复用。每个 scenario 固�
 
 ### Batch 1: Correctness Foundation And Incident Closure
 
-OpenSpec change: `establish-deep-research-test-control-plane`
+Owning OpenSpec change: `evaluate-harden-deep-research-graph`，Batch 1
 
 1. 以当前测试收集结果为准，按风险、seam 和真实性阶梯审计现有资产；不照搬旧文档的
    “21 个新测试”，不以新增数量作为完成标准。
@@ -166,7 +166,7 @@ OpenSpec change: `establish-deep-research-test-control-plane`
 
 ### Batch 2: Deterministic Agent Workflow Assets
 
-OpenSpec change: `add-deterministic-agent-workflow-conformance`
+Owning OpenSpec change: `evaluate-harden-deep-research-graph`，Batch 2
 
 1. 每个 real 节点至少有一个成功 scenario 和一个该节点最高风险的
    failure / repair / exhausted scenario。
@@ -184,7 +184,7 @@ OpenSpec change: `add-deterministic-agent-workflow-conformance`
 
 ### Batch 3: Live Evaluation And Release Acceptance
 
-OpenSpec change: `add-live-agent-evaluation-and-release-gates`
+Owning OpenSpec change: `evaluate-harden-deep-research-graph`，Batch 3
 
 1. 增加 `make test-live`，nightly 至少运行 start→HITL1、HITL1→topic planning 和单 topic
    Wave0 三个最短真实切片。
@@ -251,11 +251,10 @@ Release   full-real acceptance E2E + stable quality thresholds
 
 ## 落地关联
 
-本 plan 只定义总控策略和三批顺序，不直接充当 implementation change。实际落地依次创建：
+本 plan 只定义总控策略和三批顺序，不直接充当 implementation change。实际落地由一个
+OpenSpec change `evaluate-harden-deep-research-graph` 统一拥有。OpenSpec 没有原生父子
+change 机制；另建空 umbrella 或三个平行 change 都会造成 spec ownership 重复。
 
-1. `establish-deep-research-test-control-plane`
-2. `add-deterministic-agent-workflow-conformance`
-3. `add-live-agent-evaluation-and-release-gates`
-
-三个 change 必须引用本 plan，并分别满足对应 Batch 的完成条件；不得把三批压成一个无法
-独立验收的大 change。
+该 change 的 tasks 必须保留 Batch 1 → Batch 2 → Batch 3 的顺序和各自完成条件。每个
+batch 都是可单独验证的里程碑，但 change 只有在三批全部完成、live/release 门禁已形成
+明确可执行策略后才可 archive。不得把三个 batch 改写为一组无法分段验收的混合任务。

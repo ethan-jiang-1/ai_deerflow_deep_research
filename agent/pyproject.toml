@@ -42,7 +42,9 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
+    "workflow: deterministic tests that traverse a real agent workflow with external adapters replaced",
     "requires_llm: tests that require an explicitly configured real model API",
+    "release_e2e: full-real release acceptance tests",
     "postgres: tests that require the isolated Postgres test service",
 ]
 

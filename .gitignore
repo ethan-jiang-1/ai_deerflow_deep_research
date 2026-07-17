@@ -44,6 +44,7 @@ skills/public/deep-research-controller/
 logs/
 log/
 debug.log
+agent/.reports/
 
 # Local git hooks (keep only on this machine, do not push)
 .githooks/
@@ -73,5 +74,4 @@ config.yaml.bak
 _ln_*
 
 .agents
-
 

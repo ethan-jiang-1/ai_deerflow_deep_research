@@ -1,3 +1,9 @@
+"""Work-unit state and one-way attempt lifecycle contracts.
+
+@impl WOU-002
+@impl WOU-007
+"""
+
 from __future__ import annotations
 
 import json

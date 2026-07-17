@@ -1,3 +1,9 @@
+"""Runtime work-unit store, replay, and serialization contracts.
+
+@impl WOU-005
+@impl WOU-006
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -270,6 +276,19 @@ async def test_store_factory_rejects_unverified_workspace_without_mutation(tmp_p
         )
     assert excinfo.value.reason is WorkUnitStorageReason.WORKSPACE_ALIAS_MISMATCH
     assert not await asyncio.to_thread(os.listdir, tmp_path)
+
+
+async def test_store_factory_accepts_verified_temp_workspace(tmp_path: Path) -> None:
+    async def ready(*_args, **_kwargs) -> WorkUnitStorageCheck:
+        return WorkUnitStorageCheck("ready", "local_thread_mount")
+
+    store = await WorkUnitStore.create(
+        _envelope(tmp_path),
+        research_id=RESEARCH_ID,
+        storage_verifier=ready,
+    )
+    assert store.research_id == RESEARCH_ID
+    assert await store.load_records() == ()
 
 
 async def test_concurrent_same_candidate_observes_one_record(tmp_path: Path) -> None:

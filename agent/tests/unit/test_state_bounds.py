@@ -1,4 +1,7 @@
-"""Pure change-02 checkpoint size bound and content-ref rule (REG-008)."""
+"""Pure change-02 checkpoint size bound and content-ref rule.
+
+@impl REG-008
+"""
 
 from __future__ import annotations
 

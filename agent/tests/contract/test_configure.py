@@ -1,4 +1,7 @@
-"""Contracts for structural, reversible Deep Research configuration."""
+"""Contracts for structural, reversible Deep Research configuration.
+
+@impl DEC-002
+"""
 
 from __future__ import annotations
 

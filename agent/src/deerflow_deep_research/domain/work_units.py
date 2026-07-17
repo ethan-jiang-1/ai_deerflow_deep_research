@@ -786,9 +786,74 @@ class WorkerSource(_FrozenModel):
     @field_validator("canonical_url")
     @classmethod
     def validate_url(cls, value: str) -> str:
-        if canonicalize_source_url(value) != value:
-            raise ValueError("canonical_url_not_canonical")
-        return value
+        return canonicalize_source_url(value)
+
+    @field_validator("fetch_status", mode="before")
+    @classmethod
+    def normalize_fetch_status(cls, value: Any) -> str:
+        if not isinstance(value, str):
+            raise ValueError("fetch_status_invalid")
+        normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+        if normalized in {
+            "fetched",
+            "available",
+            "accessible",
+            "retrieved",
+            "success",
+            "successful",
+            "successfully_fetched",
+            "verified",
+            "found",
+            "ok",
+            "complete",
+            "completed",
+        }:
+            return "fetched"
+        if normalized in {
+            "degraded",
+            "unavailable",
+            "unreachable",
+            "failed",
+            "paywalled",
+            "partial",
+            "blocked",
+            "timeout",
+            "error",
+            "not_found",
+        }:
+            return "degraded"
+        negative_markers = (
+            "degrad",
+            "unavail",
+            "unreach",
+            "fail",
+            "paywall",
+            "partial",
+            "block",
+            "timeout",
+            "error",
+            "not_",
+            "unverified",
+            "denied",
+        )
+        if any(marker in normalized for marker in negative_markers):
+            return "degraded"
+        positive_markers = (
+            "fetch",
+            "avail",
+            "access",
+            "retriev",
+            "success",
+            "verif",
+            "found",
+            "complete",
+            "search",
+            "indexed",
+            "live",
+        )
+        if any(marker in normalized for marker in positive_markers):
+            return "fetched"
+        raise ValueError("fetch_status_invalid")
 
 
 WAVE0_WORKER_OUTPUT_SCHEMA_VERSION = 1
@@ -801,6 +866,17 @@ class Wave0WorkerOutput(_FrozenModel):
     sources: Annotated[tuple[WorkerSource, ...], Field(min_length=1, max_length=MAX_SOURCE_REFS)]
     baseline_facts: Annotated[tuple[str, ...], Field(default=(), max_length=MAX_BASELINE_FACTS)] = ()
     limitations: str = Field(default="", max_length=MAX_SOURCE_LIMITATIONS_CHARS)
+
+    @field_validator("limitations", mode="before")
+    @classmethod
+    def normalize_limitations(cls, value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (tuple, list)) and all(isinstance(item, str) for item in value):
+            return "; ".join(item.strip() for item in value if item.strip())
+        raise ValueError("limitations_invalid")
 
     @field_validator("baseline_facts")
     @classmethod

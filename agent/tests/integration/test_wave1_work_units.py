@@ -1,10 +1,20 @@
+"""Wave1 work-unit planning, validation, gate, and open-question integration.
+
+@impl WON-001
+@impl WON-003
+@impl WON-004
+@impl WON-006
+"""
+
 from __future__ import annotations
 
+import json
 import time
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext
+from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext, NodeExecutionResult
+from deerflow_deep_research.domain.enums import NodeFinishReason
 from deerflow_deep_research.domain.invocation import GraphInvocationContext, WorkUnitControllerDependencies
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies, NodeCapability
 from deerflow_deep_research.domain.state import WORK_UNIT_GATE_PREVIEW_FIELDS, merge_trace, preview_work_unit_update
@@ -25,9 +35,51 @@ class ForbiddenCapabilities:
         raise AssertionError("fixture work must not call an agent")
 
 
+class ScriptedWave1Capabilities:
+    def __init__(self, *, malformed: bool = False, malformed_once: bool = False) -> None:
+        self.contexts: list[NodeAgentContext] = []
+        self.requests: list[object] = []
+        self.malformed = malformed
+        self.malformed_once = malformed_once
+
+    async def run_agent(self, *, context, request):
+        if not isinstance(context, NodeAgentContext):
+            raise TypeError("node_agent_context_required")
+        self.contexts.append(context)
+        self.requests.append(request)
+        if self.malformed or (self.malformed_once and len(self.contexts) == 1):
+            return NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary="not-json")
+        source_id = f"source:{context.attempt_id[-3:]}"
+        return NodeExecutionResult(
+            finish_reason=NodeFinishReason.SUCCESS,
+            summary=json.dumps(
+                {
+                    "schema_version": 1,
+                    "sources": [
+                        {
+                            "source_id": source_id,
+                            "canonical_url": f"https://example.com/{context.attempt_id}",
+                            "title": "Scripted evidence",
+                        }
+                    ],
+                    "claims": [
+                        {
+                            "claim_id": f"claim:w1_{context.attempt_id[-3:]}",
+                            "statement": "The scripted source supports this claim.",
+                            "support_refs": [source_id],
+                            "counter_refs": [],
+                        }
+                    ],
+                    "open_questions": [],
+                }
+            ),
+        )
+
+
 class BaseResolver:
-    def __init__(self, graph_context: GraphContextView) -> None:
+    def __init__(self, graph_context: GraphContextView, capabilities=None) -> None:
         self._graph_context = graph_context
+        self._capabilities = capabilities or ForbiddenCapabilities()
 
     def resolve(self, *, logical_name, attempt_id, policy):
         return NodeBuildDependencies(
@@ -40,7 +92,7 @@ class BaseResolver:
                 attempt_root=f"{self._graph_context.workspace_root}/attempts/{attempt_id}",
                 policy_name=policy.name,
             ),
-            capabilities=ForbiddenCapabilities(),
+            capabilities=self._capabilities,
         )
 
 
@@ -139,3 +191,109 @@ async def test_wave1_reuses_shared_kernel_with_distinct_fixture_scope_and_conten
         "g0_wave1_w0005",
     )
     assert len(await store.load_records()) == 6
+
+
+async def test_real_wave1_crosses_worker_context_artifact_validator_and_ledger(tmp_path) -> None:
+    """@impl EVH-003, EVH-004, EVH-008"""
+    graph_context = GraphContextView(
+        research_scope_id=RESEARCH_ID,
+        workspace_root=f"/mnt/user-data/workspace/deep-research/{RESEARCH_ID}",
+        uploads_root="/mnt/user-data/uploads",
+        outputs_root=f"/mnt/user-data/outputs/deep-research/{RESEARCH_ID}",
+    )
+    capabilities = ScriptedWave1Capabilities(malformed_once=True)
+    store = WorkUnitStore(
+        workspace_host_path=tmp_path,
+        research_id=RESEARCH_ID,
+        clock=lambda: NOW,
+        monotonic=time.monotonic,
+        lock_sleep=time.sleep,
+        token_factory=lambda: "2" * 32,
+        fault_hook=None,
+    )
+    controller = WorkUnitControllerDependencies(
+        store=store,
+        resolver=RuntimeWorkUnitDependencyResolver(
+            graph_context,
+            BaseResolver(graph_context, capabilities),
+            store,
+        ),
+    )
+    state = _state() | {
+        "topic_registry": (
+            {
+                "topic_id": "storage",
+                "title": "Storage",
+                "scope": "Storage economics",
+                "must_answer_bindings": ("Q1",),
+            },
+        )
+    }
+
+    result = await wave1_subgraph.run_wave1_work_units_real(
+        state,
+        controller=controller,
+        topic_registry=state["topic_registry"],
+        capabilities=capabilities,
+        wave0_urls=frozenset(),
+        clock=lambda: NOW,
+    )
+
+    assert len(capabilities.contexts) == 2
+    request = capabilities.requests[0]
+    assert request.minimum_tool_calls == 1
+    assert request.tool_call_limit == 3
+    assert "content_ref" not in request.expected_output
+    assert "content_hash" not in request.expected_output
+    assert "byte_count" not in request.expected_output
+    assert "is_new_vs_wave0" not in request.expected_output
+    assert capabilities.requests[1].tools_enabled is False
+    assert "/work/g0_wave1_w0000/g0_wave1_w0000_a00" in capabilities.contexts[0].attempt_root
+    records = await store.load_records()
+    assert len(records) == 1
+    assert result.parent_update["accepted_submission_refs"] == (records[0].record_hash,)
+    assert records[0].source_refs[0].content_ref.endswith("/cache/source-0.json")
+    assert "forged" not in records[0].source_refs[0].content_ref
+    persisted = await store.read_canonical_bytes(records[0].result_ref, max_bytes=256 * 1024)
+    assert json.loads(persisted)["claims"][0]["support_refs"] == [records[0].source_refs[0].source_id]
+
+
+async def test_real_wave1_malformed_output_becomes_typed_worker_failure_without_ledger(tmp_path) -> None:
+    graph_context = GraphContextView(
+        research_scope_id=RESEARCH_ID,
+        workspace_root=f"/mnt/user-data/workspace/deep-research/{RESEARCH_ID}",
+        uploads_root="/mnt/user-data/uploads",
+        outputs_root=f"/mnt/user-data/outputs/deep-research/{RESEARCH_ID}",
+    )
+    capabilities = ScriptedWave1Capabilities(malformed=True)
+    store = WorkUnitStore(
+        workspace_host_path=tmp_path,
+        research_id=RESEARCH_ID,
+        clock=lambda: NOW,
+        monotonic=time.monotonic,
+        lock_sleep=time.sleep,
+        token_factory=lambda: "4" * 32,
+        fault_hook=None,
+    )
+    controller = WorkUnitControllerDependencies(
+        store=store,
+        resolver=RuntimeWorkUnitDependencyResolver(
+            graph_context,
+            BaseResolver(graph_context, capabilities),
+            store,
+        ),
+    )
+    topics = ({"topic_id": "storage", "title": "Storage", "scope": "Storage economics"},)
+
+    result = await wave1_subgraph.run_wave1_work_units_real(
+        _state() | {"topic_registry": topics},
+        controller=controller,
+        topic_registry=topics,
+        capabilities=capabilities,
+        wave0_urls=frozenset(),
+        clock=lambda: NOW,
+    )
+
+    assert result.parent_update["accepted_submission_refs"] == ()
+    assert tuple(result.parent_update["work_status_by_id"].values()) == ("failed",)
+    assert await store.load_records() == ()

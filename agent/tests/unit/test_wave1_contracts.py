@@ -30,13 +30,8 @@ class TestWave1WorkerOutput:
                     "source_id": "source:w1a",
                     "canonical_url": "https://example.com/a",
                     "title": "Example A",
-                    "content_ref": "workspace/deep-research/r_X/attempt/a/cache/s.json",
-                    "content_hash": "h_" + "A" * 43,
-                    "byte_count": 100,
-                    "is_new_vs_wave0": True,
                 },
             ),
-            source_ids=("source:w1a",),
             claims=(
                 {
                     "claim_id": "claim:w1_test001",
@@ -46,10 +41,10 @@ class TestWave1WorkerOutput:
                 },
             ),
         )
-        assert result.sources[0].is_new_vs_wave0 is True
+        assert result.source_ids == ("source:w1a",)
         assert result.claims[0].support_refs == ("source:w1a",)
 
-    def test_is_new_vs_wave0_false(self) -> None:
+    def test_source_ids_are_derived_when_omitted(self) -> None:
         result = Wave1WorkerOutput(
             schema_version=1,
             sources=(
@@ -57,15 +52,10 @@ class TestWave1WorkerOutput:
                     "source_id": "source:w1b",
                     "canonical_url": "https://example.com/b",
                     "title": "Old",
-                    "content_ref": "workspace/deep-research/r_X/attempt/a/cache/o.json",
-                    "content_hash": "h_" + "B" * 43,
-                    "byte_count": 50,
-                    "is_new_vs_wave0": False,
                 },
             ),
-            source_ids=("source:w1b",),
         )
-        assert result.sources[0].is_new_vs_wave0 is False
+        assert result.source_ids == ("source:w1b",)
 
     def test_open_question_with_state(self) -> None:
         result = Wave1WorkerOutput(
@@ -97,10 +87,6 @@ class TestWave1WorkerOutput:
                         "source_id": "source:w1a",
                         "canonical_url": "https://example.com/a",
                         "title": "A",
-                        "content_ref": "workspace/deep-research/r_X/attempt/a/cache/a.json",
-                        "content_hash": "h_" + "C" * 43,
-                        "byte_count": 10,
-                        "is_new_vs_wave0": True,
                     },
                 ),
                 source_ids=("source:w1b",),
@@ -114,13 +100,8 @@ class TestWave1WorkerOutput:
                     "source_id": "source:w1c",
                     "canonical_url": "https://example.com/c",
                     "title": "C",
-                    "content_ref": "workspace/deep-research/r_X/attempt/a/cache/c.json",
-                    "content_hash": "h_" + "D" * 43,
-                    "byte_count": 200,
-                    "is_new_vs_wave0": True,
                 },
             ),
-            source_ids=("source:w1c",),
             claims=(
                 {
                     "claim_id": "claim:w1_c001",

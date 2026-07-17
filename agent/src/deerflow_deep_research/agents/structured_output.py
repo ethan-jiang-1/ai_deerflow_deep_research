@@ -53,6 +53,7 @@ def project_success(
     artifact_refs: tuple[ArtifactRef, ...],
     *,
     policy: ExecutionPolicy,
+    untrusted_tool_results: tuple[str, ...] = (),
 ) -> NodeExecutionResult:
     allowed_roots = (*policy.read_roots, *policy.write_roots)
     validate_artifact_refs(artifact_refs, allowed_roots=allowed_roots)
@@ -61,6 +62,7 @@ def project_success(
         finish_reason=NodeFinishReason.SUCCESS,
         summary=bounded_summary,
         artifact_refs=artifact_refs,
+        untrusted_tool_results=untrusted_tool_results,
     )
 
 

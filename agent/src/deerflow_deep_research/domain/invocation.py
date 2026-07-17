@@ -13,6 +13,8 @@ from deerflow_deep_research.domain.bootstrap import BootstrapBundleStoreProtocol
 from deerflow_deep_research.domain.context import GraphContextView
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies, PolicyRef
 from deerflow_deep_research.domain.profile import RequestBundleStoreProtocol
+from deerflow_deep_research.domain.publication import PublicationBundleStoreProtocol
+from deerflow_deep_research.domain.synthesis import SynthesisBundleStoreProtocol
 from deerflow_deep_research.domain.work_units import Attempt, AttemptArtifactWriter, WorkSpec, WorkUnitStoreProtocol
 
 
@@ -60,6 +62,8 @@ class GraphInvocationContext:
     work_units: WorkUnitControllerDependencies | None = None
     bootstrap_bundle: BootstrapBundleStoreProtocol | None = None
     request_bundle: RequestBundleStoreProtocol | None = None
+    synthesis_bundle: SynthesisBundleStoreProtocol | None = None
+    publication_bundle: PublicationBundleStoreProtocol | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.graph_context, GraphContextView):
@@ -70,6 +74,12 @@ class GraphInvocationContext:
             raise TypeError("bootstrap_bundle must implement BootstrapBundleStoreProtocol")
         if self.request_bundle is not None and not isinstance(self.request_bundle, RequestBundleStoreProtocol):
             raise TypeError("request_bundle must implement RequestBundleStoreProtocol")
+        if self.synthesis_bundle is not None and not isinstance(self.synthesis_bundle, SynthesisBundleStoreProtocol):
+            raise TypeError("synthesis_bundle must implement SynthesisBundleStoreProtocol")
+        if self.publication_bundle is not None and not isinstance(
+            self.publication_bundle, PublicationBundleStoreProtocol
+        ):
+            raise TypeError("publication_bundle must implement PublicationBundleStoreProtocol")
 
 
 __all__ = ["GraphInvocationContext", "NodeDependencyResolver"]

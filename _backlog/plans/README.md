@@ -24,9 +24,8 @@
 | [deep-research-structured-output-linting.md](deep-research-structured-output-linting.md) | 治理：agent YAML/JSON 结构化输出 lint（提案，Phase 2 已随 04 解锁） |
 | [deep-research-16-final-delivery-node.md](deep-research-16-final-delivery-node.md) | final writer、integrity gate 与 workspace-to-outputs artifact publish（← 下一个） |
 | [deep-research-17-runtime-operations.md](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress 与 operator recovery |
-| [deep-research-18-evaluation-hardening.md](deep-research-18-evaluation-hardening.md) | 全链路质量评估、故障注入与 production hardening |
 | [deep-research-demo-full-pipeline.md](deep-research-demo-full-pipeline.md) | Demo CLI fake + CLI real + TUI real 三合一设计 |
-| [deep-research-test-assets-master-strategy.md](deep-research-test-assets-master-strategy.md) | **总控**：代码正确性、Agent workflow、live eval 与 release E2E 的三批测试资产战略 |
+| [deep-research-test-assets-master-strategy.md](deep-research-test-assets-master-strategy.md) | **总控**：三批测试资产战略；OpenSpec change `evaluate-harden-deep-research-graph` 已提案 |
 | [test-assets-postmortem-real-mode-integration.md](test-assets-postmortem-real-mode-integration.md) | 总控输入：real-mode 集成事故、根因与时间线 |
 | [test-assets-layered-strategy.md](test-assets-layered-strategy.md) | 总控输入：早期分层策略；roadmap 已由总控计划取代 |
 | [test-assets-bug-to-test-mapping.md](test-assets-bug-to-test-mapping.md) | 总控输入：已知 bug 回归 inventory，Batch 1 重新核验 |

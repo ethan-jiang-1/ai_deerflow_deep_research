@@ -1,4 +1,7 @@
-"""Readiness diagnostics and credential redaction contract (DEC-005)."""
+"""Readiness diagnostics and credential redaction contract.
+
+@impl DEC-005
+"""
 
 from __future__ import annotations
 

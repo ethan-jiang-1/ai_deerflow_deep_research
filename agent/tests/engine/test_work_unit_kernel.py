@@ -1,3 +1,8 @@
+"""Work-unit kernel and deterministic drain contracts.
+
+@impl WOU-008
+"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

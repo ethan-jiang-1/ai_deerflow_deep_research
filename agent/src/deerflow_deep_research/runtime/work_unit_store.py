@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import fcntl
+import hashlib
 import os
 import stat
 import threading
@@ -24,13 +26,21 @@ from deerflow_deep_research.domain.bundle import (
     EVIDENCE_LEDGER,
     EVIDENCE_LOCK,
     EVIDENCE_SUBTREE,
+    FINAL_CITATION_MAP_FILENAME,
+    FINAL_REPORT_FILENAME,
+    FINAL_SUBTREE,
     WORK_SUBTREE,
     bundle_ref_to_virtual,
     bundle_root,
     evidence_staging_path,
+    final_citation_map_path,
+    final_report_path,
     is_evidence_staging_name,
+    synthesis_findings_path,
 )
 from deerflow_deep_research.domain.lifecycle import WorkUnitStorageReason
+from deerflow_deep_research.domain.state import ContentRef
+from deerflow_deep_research.domain.synthesis import SynthesisResult
 from deerflow_deep_research.domain.work_units import (
     MAX_SUBMISSION_LEDGER_BYTES,
     VALIDATOR_V1_PASSED_CHECKS,
@@ -56,6 +66,7 @@ from deerflow_deep_research.runtime.work_unit_storage import (
 
 LOCK_TIMEOUT_SECONDS = 2.0
 LOCK_RETRY_SECONDS = 0.025
+MAX_FINAL_ARTIFACT_BYTES = 2 * 1024 * 1024
 _BUNDLE_DIRECTORY = BUNDLE_ROOT.rsplit("/", 1)[-1]
 
 
@@ -247,6 +258,192 @@ class WorkUnitStore:
     async def write_work_spec(self, spec: WorkSpec, attempt: Attempt) -> None:
         self._validate_spec_attempt(spec, attempt)
         await self._write_attempt_file(spec, attempt, ("work-spec.json",), canonical_json_bytes(spec))
+
+    async def write_synthesis(self, result: SynthesisResult) -> None:
+        if not isinstance(result, SynthesisResult):
+            raise TypeError("synthesis_result_required")
+        await asyncio.to_thread(self._write_synthesis_sync, canonical_json_bytes(result))
+
+    async def publish_final(self, report: bytes, citation_map: bytes) -> tuple[ContentRef, ContentRef]:
+        if not isinstance(report, bytes) or not report or len(report) > MAX_FINAL_ARTIFACT_BYTES:
+            raise ValueError("final_report_invalid")
+        if not isinstance(citation_map, bytes) or not citation_map or len(citation_map) > MAX_FINAL_ARTIFACT_BYTES:
+            raise ValueError("final_citation_map_invalid")
+        await asyncio.to_thread(self._publish_final_sync, report, citation_map)
+        return (
+            self._final_content_ref(final_report_path(self.research_id), report, FINAL_REPORT_FILENAME),
+            self._final_content_ref(
+                final_citation_map_path(self.research_id),
+                citation_map,
+                FINAL_CITATION_MAP_FILENAME,
+            ),
+        )
+
+    @staticmethod
+    def _final_content_ref(path: str, content: bytes, summary: str) -> ContentRef:
+        digest = base64.urlsafe_b64encode(hashlib.sha256(content).digest()).decode("ascii").rstrip("=")
+        return ContentRef(
+            sandbox_path=path,
+            content_hash=f"h_{digest}",
+            schema_version=1,
+            short_summary=summary,
+        )
+
+    @staticmethod
+    def _read_named_file(directory_fd: int, name: str, *, max_bytes: int) -> bytes | None:
+        try:
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+        except FileNotFoundError:
+            return None
+        try:
+            _require_secure_regular(fd)
+            size = os.fstat(fd).st_size
+            if size > max_bytes:
+                raise ValueError("final_artifact_oversize")
+            chunks: list[bytes] = []
+            remaining = size
+            while remaining:
+                chunk = os.read(fd, min(remaining, 64 * 1024))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            content = b"".join(chunks)
+            if len(content) != size:
+                raise ValueError("final_artifact_short_read")
+            return content
+        finally:
+            os.close(fd)
+
+    @staticmethod
+    def _write_named_file(directory_fd: int, name: str, content: bytes) -> None:
+        fd = os.open(name, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600, dir_fd=directory_fd)
+        try:
+            _require_secure_regular(fd)
+            view = memoryview(content)
+            while view:
+                written = os.write(fd, view)
+                if written <= 0:
+                    raise OSError("short final artifact write")
+                view = view[written:]
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+    def _publish_final_sync(self, report: bytes, citation_map: bytes) -> None:
+        try:
+            workspace_fd = os.open(self._workspace_host_path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except OSError as exc:
+            raise WorkUnitStoreError(WorkUnitStorageReason.THREAD_MOUNT_UNAVAILABLE) from exc
+        opened = [workspace_fd]
+        staging_name = f".final.{self._token_factory()}.tmp"
+        staging_fd = -1
+        try:
+            current = workspace_fd
+            for part in (_BUNDLE_DIRECTORY, self.research_id):
+                current = _open_directory(current, part, create=True)
+                opened.append(current)
+            research_fd = current
+            try:
+                final_fd = os.open(
+                    FINAL_SUBTREE,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=research_fd,
+                )
+            except FileNotFoundError:
+                final_fd = -1
+            except OSError as exc:
+                raise WorkUnitStoreError(WorkUnitStorageReason.POSIX_PRIMITIVES_UNAVAILABLE) from exc
+            if final_fd >= 0:
+                try:
+                    existing = (
+                        self._read_named_file(final_fd, FINAL_REPORT_FILENAME, max_bytes=MAX_FINAL_ARTIFACT_BYTES),
+                        self._read_named_file(
+                            final_fd,
+                            FINAL_CITATION_MAP_FILENAME,
+                            max_bytes=MAX_FINAL_ARTIFACT_BYTES,
+                        ),
+                    )
+                finally:
+                    os.close(final_fd)
+                if existing == (report, citation_map):
+                    return
+                raise ValueError("final_artifact_write_conflict")
+
+            try:
+                os.mkdir(staging_name, 0o700, dir_fd=research_fd)
+            except FileExistsError:
+                raise ValueError("final_staging_conflict") from None
+            staging_fd = os.open(staging_name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=research_fd)
+            self._write_named_file(staging_fd, FINAL_REPORT_FILENAME, report)
+            self._write_named_file(staging_fd, FINAL_CITATION_MAP_FILENAME, citation_map)
+            os.fsync(staging_fd)
+            os.rename(staging_name, FINAL_SUBTREE, src_dir_fd=research_fd, dst_dir_fd=research_fd)
+            staging_name = ""
+            os.fsync(research_fd)
+        finally:
+            if staging_fd >= 0:
+                os.close(staging_fd)
+            if staging_name:
+                try:
+                    staging_fd = os.open(
+                        staging_name,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                        dir_fd=opened[-1],
+                    )
+                except OSError:
+                    staging_fd = -1
+                if staging_fd >= 0:
+                    for name in (FINAL_REPORT_FILENAME, FINAL_CITATION_MAP_FILENAME):
+                        try:
+                            os.unlink(name, dir_fd=staging_fd)
+                        except OSError:
+                            pass
+                    os.close(staging_fd)
+                    try:
+                        os.rmdir(staging_name, dir_fd=opened[-1])
+                    except OSError:
+                        pass
+            for fd in reversed(opened):
+                os.close(fd)
+
+    def _write_synthesis_sync(self, content: bytes) -> None:
+        try:
+            workspace_fd = os.open(self._workspace_host_path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except OSError as exc:
+            raise WorkUnitStoreError(WorkUnitStorageReason.THREAD_MOUNT_UNAVAILABLE) from exc
+        opened = [workspace_fd]
+        temp_name = ".findings.tmp"
+        try:
+            current = workspace_fd
+            for part in (_BUNDLE_DIRECTORY, self.research_id, "synthesis"):
+                current = _open_directory(current, part, create=True)
+                opened.append(current)
+            try:
+                fd = os.open(temp_name, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600, dir_fd=current)
+            except FileExistsError:
+                os.unlink(temp_name, dir_fd=current)
+                fd = os.open(temp_name, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600, dir_fd=current)
+            try:
+                view = memoryview(content)
+                while view:
+                    written = os.write(fd, view)
+                    if written <= 0:
+                        raise OSError("short synthesis write")
+                    view = view[written:]
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            final_name = synthesis_findings_path(self.research_id).rsplit("/", 1)[-1]
+            os.replace(temp_name, final_name, src_dir_fd=current, dst_dir_fd=current)
+            os.fsync(current)
+        finally:
+            try:
+                os.unlink(temp_name, dir_fd=opened[-1])
+            except OSError:
+                pass
+            for fd in reversed(opened):
+                os.close(fd)
 
     def attempt_artifact_writer(self, spec: WorkSpec, attempt: Attempt) -> _AttemptArtifactWriter:
         self._validate_spec_attempt(spec, attempt)
@@ -659,6 +856,7 @@ __all__ = [
     "CommitDisposition",
     "LOCK_RETRY_SECONDS",
     "LOCK_TIMEOUT_SECONDS",
+    "MAX_FINAL_ARTIFACT_BYTES",
     "WorkUnitCommitResult",
     "WorkUnitStore",
 ]

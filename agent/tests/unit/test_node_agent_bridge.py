@@ -1,6 +1,8 @@
 """Node-agent bridge, full-takeover factory, and no-clarification contract.
 
 @impl NOA-001
+@impl NOA-005
+@impl NOA-006
 """
 
 from __future__ import annotations
@@ -10,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from deerflow_deep_research.agents.policies import ExecutionBudget, ExecutionPolicy
+from deerflow_deep_research.agents.policies import ExecutionBudget, ExecutionPolicy, ToolPolicySpec
 from deerflow_deep_research.domain.context import NodeAgentContext, NodeExecutionRequest
 from deerflow_deep_research.domain.enums import NodeFinishReason
 from deerflow_deep_research.runtime import node_agent_bridge as bridge_module
-from deerflow_deep_research.runtime.node_agent_bridge import RuntimeNodeAgentBridge
+from deerflow_deep_research.runtime.node_agent_bridge import NodeAgentConfigurationError, RuntimeNodeAgentBridge
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
 from tests.fixtures.fake_models import (
     BlockingChatModel,
@@ -22,6 +24,7 @@ from tests.fixtures.fake_models import (
     ScriptedChatModel,
     ai_message,
 )
+from tests.fixtures.scripted_tools import ScriptedTool
 
 WORKSPACE = "/mnt/user-data/workspace/deep-research/r1"
 ATTEMPT = f"{WORKSPACE}/attempts/a1"
@@ -91,6 +94,48 @@ def _request() -> NodeExecutionRequest:
     return NodeExecutionRequest(objective="summarize the sources", expected_output="a short summary")
 
 
+def test_child_state_uses_public_sandbox_id_interface() -> None:
+    class PublicSandbox:
+        id = "public-sandbox"
+
+    bridge = _bridge(lambda: ScriptedChatModel(responses=[]), envelope=_envelope(parent_sandbox=PublicSandbox()))
+    state = bridge._ephemeral_child_state(_context(), _request())
+    assert state["sandbox"] == {"sandbox_id": "public-sandbox"}
+
+
+def test_default_model_resolver_rejects_empty_model_config() -> None:
+    class EmptyConfig:
+        models = []
+
+    envelope = _envelope()
+    object.__setattr__(envelope, "app_config", EmptyConfig())
+    with pytest.raises(NodeAgentConfigurationError) as exc_info:
+        bridge_module._default_model_resolver(envelope)
+    assert exc_info.value.code == "model_not_configured"
+
+
+def test_default_tools_resolver_rejects_missing_allowed_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Config:
+        tools = [object()]
+        models = [object()]
+
+    envelope = _envelope()
+    object.__setattr__(envelope, "app_config", Config())
+    monkeypatch.setattr("deerflow.tools.tools.get_available_tools", lambda **_kwargs: [])
+    base = _policy()
+    policy = ExecutionPolicy(
+        policy_name=base.policy_name,
+        allowed_tool_names=frozenset({"web_search"}),
+        read_roots=base.read_roots,
+        write_roots=base.write_roots,
+        attempt_root=base.attempt_root,
+        budget=base.budget,
+    )
+    with pytest.raises(NodeAgentConfigurationError) as exc_info:
+        bridge_module._default_tools_resolver(envelope, policy)
+    assert exc_info.value.code == "tools_unavailable"
+
+
 def _bridge(model_factory, *, envelope=None, policy=None, tools_resolver=lambda e, p: []) -> RuntimeNodeAgentBridge:
     return RuntimeNodeAgentBridge(
         envelope=envelope or _envelope(),
@@ -106,6 +151,93 @@ async def test_run_agent_completes_within_budget() -> None:
     result = await bridge.run_agent(context=_context(), request=_request())
     assert result.finish_reason == NodeFinishReason.SUCCESS
     assert result.summary == "the summary"
+
+
+async def test_request_requiring_tool_execution_rejects_direct_model_answer() -> None:
+    request = NodeExecutionRequest(
+        objective="collect one public source",
+        expected_output="one source record",
+        minimum_tool_calls=1,
+    )
+    bridge = _bridge(
+        lambda: ScriptedChatModel(responses=[ai_message('{"sources":[]}')]),
+        policy=ExecutionPolicy(
+            policy_name="web-required",
+            allowed_tool_names=frozenset({"web_search"}),
+            read_roots=(WORKSPACE,),
+            write_roots=(),
+            attempt_root=ATTEMPT,
+            budget=_budget(),
+        ),
+        tools_resolver=lambda _envelope, _policy: (),
+    )
+    result = await bridge.run_agent(context=_context(), request=request)
+    assert result.finish_reason == NodeFinishReason.FAILED
+    assert result.error_code == "required_tool_not_called"
+
+
+async def test_zero_tool_repair_request_does_not_resolve_or_expose_policy_tools() -> None:
+    resolved = False
+
+    def tools_resolver(_envelope, _policy):
+        nonlocal resolved
+        resolved = True
+        return (object(),)
+
+    request = NodeExecutionRequest(
+        objective="reformat the bounded draft",
+        expected_output="one JSON object",
+        tools_enabled=False,
+    )
+    bridge = _bridge(
+        lambda: ScriptedChatModel(responses=[ai_message('{"schema_version":1}')]),
+        policy=ExecutionPolicy(
+            policy_name="repair-no-tools",
+            allowed_tool_names=frozenset({"web_search"}),
+            read_roots=(WORKSPACE,),
+            write_roots=(),
+            attempt_root=ATTEMPT,
+            budget=_budget(),
+        ),
+        tools_resolver=tools_resolver,
+    )
+    result = await bridge.run_agent(context=_context(), request=request)
+    assert result.finish_reason == NodeFinishReason.SUCCESS
+    assert resolved is False
+
+
+async def test_success_result_carries_bounded_untrusted_tool_observations() -> None:
+    tool = ScriptedTool.create("web_search", "fixed source result")
+    policy = ExecutionPolicy(
+        policy_name="web-observation",
+        allowed_tool_names=frozenset({"web_search"}),
+        read_roots=(WORKSPACE,),
+        write_roots=(),
+        attempt_root=ATTEMPT,
+        budget=_budget(per_tool_result_bytes=8),
+        tool_specs=(ToolPolicySpec("web_search", "read", native_cancellable=True),),
+    )
+    bridge = _bridge(
+        lambda: ScriptedChatModel(
+            responses=[
+                ai_message(tool_calls=[{"name": "web_search", "args": {"query": "storage"}, "id": "call-1"}]),
+                ai_message('{"schema_version":1}'),
+            ]
+        ),
+        policy=policy,
+        tools_resolver=lambda _envelope, _policy: (tool.as_langchain_tool(),),
+    )
+    result = await bridge.run_agent(
+        context=_context(),
+        request=NodeExecutionRequest(
+            objective="collect one source",
+            expected_output="one JSON object",
+            minimum_tool_calls=1,
+            tool_call_limit=1,
+        ),
+    )
+    assert result.finish_reason == NodeFinishReason.SUCCESS
+    assert result.untrusted_tool_results == ("fixed so",)
 
 
 async def test_missing_parent_isolation_fails_closed() -> None:

@@ -47,9 +47,7 @@ def materialize_report_plan(
     # Provenance failures become blanket uncertainties
     for f in hard_failures:
         if f.code.startswith("provenance"):
-            uncertainties.append(
-                ReportPlanUncertainty(question="(provenance)", limitation=f.detail)
-            )
+            uncertainties.append(ReportPlanUncertainty(question="(provenance)", limitation=f.detail))
 
     return ReadinessReportPlan(
         schema_version=1,

@@ -152,7 +152,8 @@ def build_real(dependencies: NodeBuildDependencies):
             profile = finalize_profile(PartialResearchProfile(), degraded=True)
             profile_ref = await request_store.write_profile(profile)
             return node_update(
-                "hitl1", route="accepted",
+                "hitl1",
+                route="accepted",
                 **profile_state_fields(profile, profile_ref),
             )
 

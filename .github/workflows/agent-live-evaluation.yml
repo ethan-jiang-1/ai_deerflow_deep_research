@@ -1,0 +1,44 @@
+name: Agent live evaluation
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: agent-live-evaluation
+  cancel-in-progress: false
+
+jobs:
+  live-canaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: agent
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --extra operations
+      - name: Strict live credential preflight
+        run: uv run --extra operations python scripts/live_preflight.py --require-web
+      - name: Run bounded live canaries
+        run: make test-live
+      - name: Upload redacted scenario reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-live-scenario-reports
+          path: agent/.reports/live
+          if-no-files-found: warn
+          retention-days: 14

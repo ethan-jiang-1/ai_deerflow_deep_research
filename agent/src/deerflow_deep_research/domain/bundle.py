@@ -43,6 +43,9 @@ EVIDENCE_LEDGER = "submissions.jsonl"
 EVIDENCE_LOCK = ".submissions.lock"
 MARKER_FILENAME = "marker.json"
 PROFILE_FILENAME = "profile.json"
+SYNTHESIS_FINDINGS_FILENAME = "findings.json"
+FINAL_REPORT_FILENAME = "report.md"
+FINAL_CITATION_MAP_FILENAME = "claim-citation-map.json"
 
 _PROBE_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 _STAGING_RE = re.compile(r"^\.submissions\.[0-9a-f]{32}\.tmp$")
@@ -101,6 +104,18 @@ def marker_path(research_id: str) -> str:
 def profile_path(research_id: str) -> str:
     """Canonical path of the HITL1 profile artifact under the request subtree."""
     return f"{bundle_root(research_id)}/{REQUEST_SUBTREE}/{PROFILE_FILENAME}"
+
+
+def synthesis_findings_path(research_id: str) -> str:
+    return f"{bundle_root(research_id)}/{SYNTHESIS_SUBTREE}/{SYNTHESIS_FINDINGS_FILENAME}"
+
+
+def final_report_path(research_id: str) -> str:
+    return f"{bundle_root(research_id)}/{FINAL_SUBTREE}/{FINAL_REPORT_FILENAME}"
+
+
+def final_citation_map_path(research_id: str) -> str:
+    return f"{bundle_root(research_id)}/{FINAL_SUBTREE}/{FINAL_CITATION_MAP_FILENAME}"
 
 
 def attempt_dir(research_id: str, work_id: str, attempt_id: str) -> str:
@@ -243,6 +258,10 @@ def classify_bundle_path(path: str) -> BundlePathKind:
         name = tail[1]
         if name in {MARKER_FILENAME, PROFILE_FILENAME}:
             return BundlePathKind.CONTENT
+    if subtree == FINAL_SUBTREE and len(tail) == 2:
+        name = tail[1]
+        if name in {FINAL_REPORT_FILENAME, FINAL_CITATION_MAP_FILENAME}:
+            return BundlePathKind.CONTENT
     if subtree == WORK_SUBTREE and len(tail) >= 4:
         work_id, attempt_id = tail[1], tail[2]
         try:
@@ -283,6 +302,8 @@ __all__ = [
     "EVIDENCE_LOCK",
     "EVIDENCE_SUBTREE",
     "FINAL_SUBTREE",
+    "FINAL_REPORT_FILENAME",
+    "FINAL_CITATION_MAP_FILENAME",
     "MARKER_FILENAME",
     "PROFILE_FILENAME",
     "RESEARCH_ID_RE",
@@ -301,6 +322,8 @@ __all__ = [
     "evidence_ledger_path",
     "evidence_lock_path",
     "evidence_staging_path",
+    "final_citation_map_path",
+    "final_report_path",
     "first_work_spec_path",
     "is_audit_only",
     "marker_path",

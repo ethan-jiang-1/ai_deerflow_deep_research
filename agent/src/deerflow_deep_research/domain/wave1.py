@@ -9,12 +9,18 @@ import re
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
+from deerflow_deep_research.domain.lifecycle import LogicalPhase
 from deerflow_deep_research.domain.work_units import (
+    CONTENT_HASH_RE,
+    MAX_REQUIRED_OUTPUTS,
     MAX_SOURCE_REFS,
+    RESEARCH_ID_RE,
     SOURCE_ID_RE,
+    WORKER_ROLE_RE,
     _FrozenModel,
+    canonicalize_source_url,
 )
 
 CLAIM_ID_RE = re.compile(r"^claim:w1_[a-zA-Z0-9_-]{1,64}$")
@@ -67,6 +73,19 @@ class Wave1SourceRef(_FrozenModel):
     is_new_vs_wave0: bool
 
 
+class Wave1WorkerSource(_FrozenModel):
+    """Model-proposed Wave1 source metadata before runtime authority fields."""
+
+    source_id: str = Field(pattern=SOURCE_ID_RE.pattern)
+    canonical_url: str = Field(min_length=1, max_length=2048)
+    title: str = Field(min_length=1, max_length=512)
+
+    @field_validator("canonical_url")
+    @classmethod
+    def normalize_url(cls, value: str) -> str:
+        return canonicalize_source_url(value)
+
+
 WAVE1_WORKER_OUTPUT_SCHEMA_VERSION = 1
 
 
@@ -74,7 +93,7 @@ class Wave1WorkerOutput(_FrozenModel):
     """The Wave1 evidence worker's structured output document (WON-002)."""
 
     schema_version: Literal[1]
-    sources: Annotated[tuple[Wave1SourceRef, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
+    sources: Annotated[tuple[Wave1WorkerSource, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
     source_ids: Annotated[tuple[str, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
     claims: Annotated[tuple[ClaimDraft, ...], Field(max_length=MAX_CLAIMS_PER_WORK)] = ()
     open_questions: Annotated[tuple[OpenQuestion, ...], Field(max_length=MAX_OPEN_QUESTIONS)] = ()
@@ -82,8 +101,36 @@ class Wave1WorkerOutput(_FrozenModel):
     @model_validator(mode="after")
     def validate_source_ids_match(self) -> Wave1WorkerOutput:
         declared = tuple(source.source_id for source in self.sources)
-        if declared != self.source_ids:
+        if self.source_ids and declared != self.source_ids:
             raise ValueError("source_ids_mismatch")
-        if len(set(self.source_ids)) != len(self.source_ids):
+        if len(set(declared)) != len(declared):
             raise ValueError("source_ids_duplicate")
+        object.__setattr__(self, "source_ids", declared)
+        return self
+
+
+class Wave1SourceIntakeResult(_FrozenModel):
+    """Controller-bound Wave1 result document written to the attempt root."""
+
+    schema_version: Literal[1]
+    research_id: str = Field(pattern=RESEARCH_ID_RE.pattern)
+    generation: int = Field(ge=0, le=2)
+    phase: Literal[LogicalPhase.WAVE1]
+    work_id: str
+    attempt_id: str
+    worker_role: str = Field(pattern=WORKER_ROLE_RE.pattern)
+    spec_hash: str = Field(pattern=CONTENT_HASH_RE.pattern)
+    result_contract: Literal["wave1.source-intake"]
+    output_paths: Annotated[tuple[str, ...], Field(max_length=MAX_REQUIRED_OUTPUTS)] = ()
+    source_ids: Annotated[tuple[str, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
+    sources: Annotated[tuple[Wave1SourceRef, ...], Field(max_length=MAX_SOURCE_REFS)] = ()
+    claims: Annotated[tuple[ClaimDraft, ...], Field(max_length=MAX_CLAIMS_PER_WORK)] = ()
+    open_questions: Annotated[tuple[OpenQuestion, ...], Field(max_length=MAX_OPEN_QUESTIONS)] = ()
+
+    @model_validator(mode="after")
+    def validate_identity_and_sources(self) -> Wave1SourceIntakeResult:
+        if not self.attempt_id.startswith(f"{self.work_id}_a"):
+            raise ValueError("attempt_id_identity_mismatch")
+        if tuple(source.source_id for source in self.sources) != self.source_ids:
+            raise ValueError("source_ids_mismatch")
         return self

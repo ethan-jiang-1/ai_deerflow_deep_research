@@ -78,6 +78,20 @@ def _node_wrapper(
             dependencies = replace(dependencies, request_bundle=context.request_bundle)
         elif dependencies.request_bundle is not None:
             raise ValueError("request_bundle_capability_undeclared")
+        declares_synthesis_bundle = NodeCapability.SYNTHESIS_BUNDLE in spec.capabilities
+        if declares_synthesis_bundle and factory is spec.real_factory:
+            if context.synthesis_bundle is None:
+                raise ValueError("synthesis_bundle_capability_missing")
+            dependencies = replace(dependencies, synthesis_bundle=context.synthesis_bundle)
+        elif dependencies.synthesis_bundle is not None:
+            raise ValueError("synthesis_bundle_capability_undeclared")
+        declares_publication_bundle = NodeCapability.PUBLICATION_BUNDLE in spec.capabilities
+        if declares_publication_bundle and factory is spec.real_factory:
+            if context.publication_bundle is None:
+                raise ValueError("publication_bundle_capability_missing")
+            dependencies = replace(dependencies, publication_bundle=context.publication_bundle)
+        elif dependencies.publication_bundle is not None:
+            raise ValueError("publication_bundle_capability_undeclared")
         if dependencies.graph_context != context.graph_context:
             raise ValueError("dependency_context_mismatch")
         if dependencies.agent_context.node_name != logical_name:

@@ -1,4 +1,8 @@
-"""Pure change-02 typed ResearchState contracts (REG-006, REG-011)."""
+"""Pure change-02 typed ResearchState contracts.
+
+@impl REG-006
+@impl REG-011
+"""
 
 from __future__ import annotations
 

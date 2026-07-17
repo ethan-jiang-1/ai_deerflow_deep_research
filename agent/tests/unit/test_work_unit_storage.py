@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from deerflow.sandbox.local.local_sandbox import LocalSandbox, PathMapping
 
 from deerflow_deep_research.runtime.work_unit_storage import (
     check_prelaunch_work_unit_storage,
@@ -166,6 +167,27 @@ async def test_runtime_verifier_proves_bidirectional_alias_and_provider_identity
         provider_resolver=lambda: provider,
     )
     assert resolved.ready
+
+
+@pytest.mark.asyncio
+async def test_runtime_verifier_cleanup_is_idempotent_with_real_local_sandbox(tmp_path: Path) -> None:
+    sandbox = LocalSandbox(
+        "local:test-user:test-thread",
+        path_mappings=[PathMapping(container_path="/mnt/user-data/workspace", local_path=str(tmp_path))],
+    )
+    envelope = SimpleNamespace(
+        app_config=_config("deerflow.sandbox.local:LocalSandboxProvider"),
+        workspace_host_path=tmp_path,
+        parent_sandbox=sandbox,
+    )
+
+    result = await verify_runtime_work_unit_storage(
+        envelope,
+        research_id=RESEARCH_ID,
+        provider=FakeProvider(sandbox),
+    )
+
+    assert (result.status, result.reason) == ("ready", "local_thread_mount")
 
 
 @pytest.mark.asyncio

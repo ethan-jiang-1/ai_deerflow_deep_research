@@ -1,4 +1,10 @@
-"""Explicit topology and implementation-map contracts (REG-001/005)."""
+"""Explicit topology and implementation-map contracts.
+
+@impl HIT-003
+@impl REG-001
+@impl REG-005
+@impl WSN-004
+"""
 
 from __future__ import annotations
 

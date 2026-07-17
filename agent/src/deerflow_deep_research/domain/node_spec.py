@@ -26,6 +26,8 @@ if TYPE_CHECKING:
     from deerflow_deep_research.domain.bootstrap import BootstrapBundleStoreProtocol
     from deerflow_deep_research.domain.invocation import WorkUnitControllerDependencies
     from deerflow_deep_research.domain.profile import RequestBundleStoreProtocol
+    from deerflow_deep_research.domain.publication import PublicationBundleStoreProtocol
+    from deerflow_deep_research.domain.synthesis import SynthesisBundleStoreProtocol
 
 _LOGICAL_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 _POLICY_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{1,63}$")
@@ -50,6 +52,8 @@ class NodeCapability(StrEnum):
     WORK_UNIT_CONTROLLER = "work_unit_controller"
     BOOTSTRAP_BUNDLE = "bootstrap_bundle"
     REQUEST_BUNDLE = "request_bundle"
+    SYNTHESIS_BUNDLE = "synthesis_bundle"
+    PUBLICATION_BUNDLE = "publication_bundle"
 
 
 @dataclass(frozen=True)
@@ -60,6 +64,8 @@ class NodeBuildDependencies:
     work_units: WorkUnitControllerDependencies | None = None
     bootstrap_bundle: BootstrapBundleStoreProtocol | None = None
     request_bundle: RequestBundleStoreProtocol | None = None
+    synthesis_bundle: SynthesisBundleStoreProtocol | None = None
+    publication_bundle: PublicationBundleStoreProtocol | None = None
     max_rerun_generations: int = 2
 
 

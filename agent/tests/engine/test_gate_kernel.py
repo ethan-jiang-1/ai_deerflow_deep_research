@@ -282,6 +282,23 @@ class TestFatigue:
         res2 = evaluate_gate(s2, "wave0", gd2)
         assert res2.consecutive == 1  # reset
 
+    def test_successful_evaluation_resets_prior_failure_fatigue(self) -> None:
+        failing = _gate_def(rules=(_mk_rule("source_floor", FailureCode.WORK_FAILED),), default_budget=5)
+        first = evaluate_gate(_state(), "wave0", failing)
+        second = evaluate_gate(
+            _state(latest_gate_feedback=first.model_dump(), repair_budget_by_phase={"wave0": 4}),
+            "wave0",
+            failing,
+        )
+        passing = _gate_def()
+        success = evaluate_gate(
+            _state(latest_gate_feedback=second.model_dump(), repair_budget_by_phase={"wave0": 3}),
+            "wave0",
+            passing,
+        )
+        assert success.verdict is PhaseVerdict.PASS
+        assert success.consecutive == 1
+
     def test_cross_phase_isolation(self) -> None:
         rule = _mk_rule("r", FailureCode.WORK_FAILED)
         gd = _gate_def(rules=(rule,))

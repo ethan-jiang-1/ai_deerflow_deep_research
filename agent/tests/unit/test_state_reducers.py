@@ -1,4 +1,7 @@
-"""Pure change-02 ResearchState reducer invariants (REG-007)."""
+"""Pure change-02 ResearchState reducer invariants.
+
+@impl REG-007
+"""
 
 from __future__ import annotations
 

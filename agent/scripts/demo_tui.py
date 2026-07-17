@@ -129,7 +129,8 @@ class DeepResearchDemoTUI(App[None]):
             recipe = _recipe
         else:
             recipe = build_demo_recipe(
-                mode="real", work_unit_store_factory=self.adapter.create_work_unit_store,
+                mode="real",
+                work_unit_store_factory=self.adapter.create_work_unit_store,
             )
         self.host = build_demo_host(recipe=recipe)
         self.messages: list[Any] = []
@@ -144,7 +145,8 @@ class DeepResearchDemoTUI(App[None]):
 
     def compose(self) -> ComposeResult:
         yield Static(
-            Text("Deep Research · real pipeline demo", style="bold cyan"), id="banner",
+            Text("Deep Research · all-real pipeline demo", style="bold cyan"),
+            id="banner",
         )
         yield Static(_welcome_text(), id="pipeline")
         yield RichLog(id="log", wrap=True, markup=True, max_lines=500)

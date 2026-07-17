@@ -21,6 +21,7 @@ from deerflow_deep_research.domain.work_units import (
     compute_work_spec_hash,
 )
 from deerflow_deep_research.graph.nodes.wave0.prompts import (
+    build_wave0_repair_prompt,
     build_wave0_result_document,
     build_wave0_worker_prompt,
     parse_wave0_worker_output,
@@ -115,9 +116,16 @@ def test_build_wave0_worker_prompt_carries_topic_constraints() -> None:
     assert "Grid-scale batteries" in request.objective
     assert "Q1" in request.objective
     assert "untrusted data" in request.objective
+    assert "MUST call at least one available web search or fetch tool" in request.objective
+    assert request.minimum_tool_calls == 1
+    assert request.tool_call_limit == 3
     expected = json.loads(request.expected_output)
     assert expected["instruction"].startswith("Return exactly one JSON object")
     assert "sources" in expected["required_keys"]
+    assert set(expected["source_required_keys"]) == set(WorkerSource.model_fields)
+    assert "content_ref" not in request.objective
+    assert "content_hash" not in request.objective
+    assert "byte_count" not in request.objective
 
 
 def test_parse_wave0_worker_output_round_trip_and_rejects_invalid() -> None:
@@ -136,9 +144,62 @@ def test_parse_wave0_worker_output_round_trip_and_rejects_invalid() -> None:
         parse_wave0_worker_output(json.dumps({"schema_version": 1, "sources": []}))
 
 
-def test_worker_source_rejects_non_canonical_url() -> None:
-    with pytest.raises(ValidationError, match="canonical_url"):
-        WorkerSource.model_validate(_worker_source(canonical_url="HTTPS://Example.com:443/path/#frag"))
+def test_wave0_repair_prompt_carries_bounded_tool_results_as_untrusted_data() -> None:
+    request = build_wave0_repair_prompt(
+        "draft prose",
+        ('[{"url":"https://example.com/source","title":"Source"}]',),
+    )
+    assert request.tools_enabled is False
+    assert "<untrusted-source-data>" in request.objective
+    assert "https://example.com/source" in request.objective
+    assert "Return JSON only" in request.objective
+
+
+def test_worker_source_canonicalizes_untrusted_model_url() -> None:
+    source = WorkerSource.model_validate(
+        _worker_source(canonical_url="HTTPS://Example.com:443/path/#frag")
+    )
+
+    assert source.canonical_url == "https://example.com/path"
+
+
+@pytest.mark.parametrize(
+    "alias",
+    ["available", "accessible", "retrieved", "success", "available_via_search"],
+)
+def test_worker_source_normalizes_fetched_status_aliases(alias: str) -> None:
+    source = WorkerSource.model_validate(_worker_source(fetch_status=alias))
+
+    assert source.fetch_status == "fetched"
+
+
+@pytest.mark.parametrize(
+    "alias",
+    ["unavailable", "unreachable", "failed", "paywalled", "not_fetched", "unverified"],
+)
+def test_worker_source_normalizes_degraded_status_aliases(alias: str) -> None:
+    source = WorkerSource.model_validate(_worker_source(fetch_status=alias))
+
+    assert source.fetch_status == "degraded"
+
+
+def test_worker_source_rejects_unknown_fetch_status() -> None:
+    with pytest.raises(ValidationError, match="fetch_status"):
+        WorkerSource.model_validate(_worker_source(fetch_status="maybe"))
+
+
+def test_wave0_worker_output_normalizes_bounded_limitations_list() -> None:
+    output = parse_wave0_worker_output(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "sources": [_worker_source()],
+                "limitations": ["Search snippets only", "No full-text fetch"],
+            }
+        )
+    )
+
+    assert output.limitations == "Search snippets only; No full-text fetch"
 
 
 def test_build_wave0_result_document_merges_identity_and_sources() -> None:

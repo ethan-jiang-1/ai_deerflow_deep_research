@@ -1,4 +1,7 @@
-"""Deny-by-default tool and path policy contract (NOA-003)."""
+"""Deny-by-default tool and path policy contract.
+
+@impl NOA-003
+"""
 
 from __future__ import annotations
 
@@ -65,6 +68,18 @@ class FakeToolRequest:
         self.tool_call = {"name": name, "args": args, "id": "call-1"}
 
 
+class FakeModelRequest:
+    def __init__(self, *, tools, tool_choice) -> None:
+        self.tools = tools
+        self.tool_choice = tool_choice
+
+    def override(self, **overrides):
+        return FakeModelRequest(
+            tools=overrides.get("tools", self.tools),
+            tool_choice=overrides.get("tool_choice", self.tool_choice),
+        )
+
+
 class Handler:
     def __init__(self) -> None:
         self.called = False
@@ -103,6 +118,21 @@ async def test_allowed_read_within_read_root_dispatches() -> None:
 async def test_allowed_write_within_attempt_root_dispatches() -> None:
     handler = await _authorize("write_file", {"path": f"{ATTEMPT}/result.md"})
     assert handler.called is True
+
+
+async def test_tool_window_removes_tools_from_the_final_model_round() -> None:
+    middleware = ToolPolicyMiddleware(_policy(), tool_call_limit=1)
+    middleware.tool_calls = 1
+    seen = None
+
+    async def handler(request):
+        nonlocal seen
+        seen = request
+        return "done"
+
+    await middleware.awrap_model_call(FakeModelRequest(tools=["read_file"], tool_choice="auto"), handler)
+    assert seen.tools == []
+    assert seen.tool_choice is None
 
 
 # ── deny paths ──────────────────────────────────────────────────────────────

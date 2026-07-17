@@ -271,7 +271,12 @@ async def _verify_runtime_work_unit_storage(
             else:
                 cleanup_failed = True
             for directory in reversed(created_dirs):
-                await asyncio.to_thread(directory.rmdir)
+                try:
+                    await asyncio.to_thread(directory.rmdir)
+                except FileNotFoundError:
+                    # The sandbox-side cleanup resolves to the same mounted
+                    # host directories for LocalSandboxProvider.
+                    pass
             if await asyncio.to_thread(host_alias.exists):
                 cleanup_failed = True
         except Exception:

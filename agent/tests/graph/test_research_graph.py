@@ -1,4 +1,10 @@
-"""Complete request-independent fake graph routes (REG-001/002/004)."""
+"""Complete request-independent fake graph routes.
+
+@impl REG-001
+@impl REG-002
+@impl REG-003
+@impl REG-004
+"""
 
 from __future__ import annotations
 

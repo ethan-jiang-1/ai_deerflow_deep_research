@@ -1,4 +1,7 @@
-"""Generic GraphHost lifecycle and isolation contract (RUI-004)."""
+"""Generic GraphHost lifecycle and isolation contract.
+
+@impl RUI-004
+"""
 
 from __future__ import annotations
 

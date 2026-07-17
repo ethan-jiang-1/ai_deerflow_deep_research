@@ -13,7 +13,7 @@ def test_real_wave0_gate_is_completion_only() -> None:
     gate = build_wave0_real_gate_def()
     assert gate.phase == "wave0"
     assert len(gate.rules) == 1  # WorkUnitCompletionRule only; no FixtureSequenceRule
-    assert gate.default_budget == 3
+    assert gate.default_budget == 5
     assert gate.route_map[PhaseVerdict.PASS] == "pass"
     assert gate.route_map[PhaseVerdict.REPAIR] == "repair"
     assert gate.route_map[PhaseVerdict.BLOCKED] == "exhausted"

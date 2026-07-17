@@ -15,9 +15,6 @@ from deerflow_deep_research.domain.lifecycle import LifecycleStatus, TerminalRea
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
 from deerflow_deep_research.domain.state import PhaseStatus
 from deerflow_deep_research.domain.topics import (
-    MAX_TOPIC_TITLE_CHARS,
-    MAX_TOPICS,
-    MaterializedTopic,
     MaterializedTopics,
     TopicPlan,
     materialize_topic_plan,
@@ -42,49 +39,30 @@ def _exhausted_update() -> dict[str, object]:
     )
 
 
-def _synthesize_fallback_plan(coverage_questions: tuple[str, ...]) -> MaterializedTopics:
-    """Return a minimal valid plan when the LLM can't produce parseable output."""
-    if not coverage_questions:
-        coverage_questions = ("Investigate the research question",)
-    return MaterializedTopics(
-        topics=tuple(
-            MaterializedTopic(
-                topic_id=f"t-{i:02d}",
-                slug=f"topic-{i:02d}",
-                title=q[: MAX_TOPIC_TITLE_CHARS] if len(q) > MAX_TOPIC_TITLE_CHARS else q,
-                scope="Broad investigation using available sources",
-                must_answer_bindings=(q,) if q else (),
-            )
-            for i, q in enumerate(coverage_questions[:MAX_TOPICS])
-        ),
-        coverage={},
-    )
-
-
 async def _generate_plan(
     inputs: PlannerInputs,
     *,
     run_agent,
     agent_context,
-) -> MaterializedTopics:
-    """Call the planner with retries; fall back to a synthesised plan on failure."""
+) -> MaterializedTopics | None:
+    """Call the planner once plus one repair attempt, failing closed on exhaustion."""
     repair_error: str | None = None
-    for _attempt in range(4):
+    for _attempt in range(2):
         try:
             result = await run_agent(
                 context=agent_context,
                 request=build_planner_prompt(inputs, repair_error=repair_error),
             )
         except Exception:
-            return _synthesize_fallback_plan(inputs.coverage_questions)
+            return None
         if not isinstance(result, NodeExecutionResult) or result.finish_reason is not NodeFinishReason.SUCCESS:
-            continue
+            return None
         try:
             plan: TopicPlan = parse_plan_output(result.summary)
             return materialize_topic_plan(plan, inputs.coverage_questions)
         except (TypeError, ValueError) as exc:
             repair_error = type(exc).__name__
-    return _synthesize_fallback_plan(inputs.coverage_questions)
+    return None
 
 
 def build_real(dependencies: NodeBuildDependencies):

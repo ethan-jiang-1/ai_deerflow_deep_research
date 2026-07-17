@@ -8,7 +8,6 @@ from __future__ import annotations
 from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext
 from deerflow_deep_research.domain.lifecycle import LifecycleStatus
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
-from deerflow_deep_research.domain.state import PhaseStatus
 from deerflow_deep_research.graph.nodes.readiness.node import build_real
 
 

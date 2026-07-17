@@ -36,6 +36,7 @@ from deerflow_deep_research.graph.components.work_units import (
 )
 
 from .prompts import (
+    build_wave0_repair_prompt,
     build_wave0_result_document,
     build_wave0_worker_prompt,
     parse_wave0_worker_output,
@@ -149,7 +150,16 @@ async def run_wave0_work_units_real(
         )
         if not isinstance(result, NodeExecutionResult) or result.finish_reason is not NodeFinishReason.SUCCESS:
             raise ValueError("wave0_worker_failed")
-        output = parse_wave0_worker_output(result.summary)
+        try:
+            output = parse_wave0_worker_output(result.summary)
+        except ValueError as parse_error:
+            repaired = await capabilities.run_agent(
+                context=resolved.node_dependencies.agent_context,
+                request=build_wave0_repair_prompt(result.summary, result.untrusted_tool_results),
+            )
+            if not isinstance(repaired, NodeExecutionResult) or repaired.finish_reason is not NodeFinishReason.SUCCESS:
+                raise ValueError("wave0_worker_repair_failed") from parse_error
+            output = parse_wave0_worker_output(repaired.summary)
         metas: list[Wave0SourceMeta] = []
         source_refs: list[SourceRef] = []
         for index, source in enumerate(output.sources):

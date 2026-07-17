@@ -1,6 +1,6 @@
 """Red tests for critic agent factory runners.
 
-@impl EVC-001, EVC-002, EVC-003
+@impl EVC-001, EVC-002, EVC-003, EVC-005
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import json
 import pytest
 
 from deerflow_deep_research.agents.policies import ExecutionBudget, ExecutionPolicy
-from deerflow_deep_research.domain.context import NodeExecutionRequest, NodeExecutionResult
+from deerflow_deep_research.domain.context import NodeAgentContext, NodeExecutionRequest, NodeExecutionResult
 from deerflow_deep_research.domain.critics import (
     ClaimVerifierResult,
     SourceDiagnosticResult,
@@ -24,6 +24,17 @@ from deerflow_deep_research.graph.nodes.targeted_evidence.subgraph import (
 RESEARCH_ID = "r_" + "A" * 43
 ATTEMPT = "g0_wave2_a01"
 WS = "/tmp/ws"
+
+
+def _context() -> NodeAgentContext:
+    return NodeAgentContext(
+        research_scope_id=RESEARCH_ID,
+        node_name="targeted_evidence",
+        attempt_id=ATTEMPT,
+        workspace_root=WS,
+        attempt_root=f"{WS}/attempts/{ATTEMPT}",
+        policy_name="test-critic",
+    )
 
 
 def _policy() -> ExecutionPolicy:
@@ -83,20 +94,20 @@ _SOURCE_DIAG_OUTPUT = json.dumps(
 class TestRunSourceDiagnostic:
     async def test_calls_run_agent_once(self) -> None:
         cap = FakeCapabilities(_SOURCE_DIAG_OUTPUT)
-        result = await run_source_diagnostic(cap, ATTEMPT, RESEARCH_ID, ("source:1",), ("content",), WS)
+        result = await run_source_diagnostic(cap, _context(), ATTEMPT, RESEARCH_ID, ("source:1",), ("content",), WS)
         assert isinstance(result, SourceDiagnosticResult)
         assert len(cap.calls) == 1
 
     async def test_returns_typed_result(self) -> None:
         cap = FakeCapabilities(_SOURCE_DIAG_OUTPUT)
-        result = await run_source_diagnostic(cap, ATTEMPT, RESEARCH_ID, ("source:1",), ("content",), WS)
+        result = await run_source_diagnostic(cap, _context(), ATTEMPT, RESEARCH_ID, ("source:1",), ("content",), WS)
         assert result.schema_version == 1
         assert result.sources[0].trust_tier.value == "high"
 
     async def test_raises_on_invalid_output(self) -> None:
         cap = FakeCapabilities("not json")
         with pytest.raises(ValueError):
-            await run_source_diagnostic(cap, ATTEMPT, RESEARCH_ID, ("source:1",), ("content",), WS)
+            await run_source_diagnostic(cap, _context(), ATTEMPT, RESEARCH_ID, ("source:1",), ("content",), WS)
 
 
 _CLAIM_OUTPUT = json.dumps(
@@ -119,18 +130,18 @@ class TestRunClaimVerifier:
     async def test_calls_run_agent_once(self) -> None:
         cap = FakeCapabilities(_CLAIM_OUTPUT)
         claims = (("claim:1", "The sky is blue."),)
-        result = await run_claim_verifier(cap, ATTEMPT, RESEARCH_ID, claims, ("source:1",), WS)
+        result = await run_claim_verifier(cap, _context(), ATTEMPT, RESEARCH_ID, claims, ("source:1",), WS)
         assert isinstance(result, ClaimVerifierResult)
         assert len(cap.calls) == 1
 
     async def test_returns_typed_result(self) -> None:
         cap = FakeCapabilities(_CLAIM_OUTPUT)
         claims = (("claim:1", "test"),)
-        result = await run_claim_verifier(cap, ATTEMPT, RESEARCH_ID, claims, ("source:1",), WS)
+        result = await run_claim_verifier(cap, _context(), ATTEMPT, RESEARCH_ID, claims, ("source:1",), WS)
         assert result.claims[0].verdict.value == "supported"
 
     async def test_raises_on_invalid_output(self) -> None:
         cap = FakeCapabilities("bad json")
         claims = (("claim:1", "test"),)
         with pytest.raises(ValueError):
-            await run_claim_verifier(cap, ATTEMPT, RESEARCH_ID, claims, ("source:1",), WS)
+            await run_claim_verifier(cap, _context(), ATTEMPT, RESEARCH_ID, claims, ("source:1",), WS)

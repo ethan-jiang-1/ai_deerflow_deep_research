@@ -58,9 +58,7 @@ def build_real(_dependencies: NodeBuildDependencies):
         report_plan = materialize_report_plan(critic_output, hard_failures)
 
         # 4. Route determination
-        blocked_count = sum(
-            1 for pq in critic_output.per_question if pq.verdict == "blocked_repair_required"
-        )
+        blocked_count = sum(1 for pq in critic_output.per_question if pq.verdict == "blocked_repair_required")
 
         if has_structural_failure(hard_failures):
             route = "exhausted"

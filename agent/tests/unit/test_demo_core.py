@@ -1,7 +1,10 @@
 """Unit tests for shared demo core module.
 
 @impl DPL-001
+@impl DPL-002
 @impl DPL-003
+@impl DPL-004
+@impl DPL-005
 """
 
 from __future__ import annotations
@@ -19,9 +22,7 @@ def _scripts_path():
     """Ensure _demo_core is importable."""
     import sys
 
-    scripts = str(
-        __import__("pathlib").Path(__file__).resolve().parents[2] / "scripts"
-    )
+    scripts = str(__import__("pathlib").Path(__file__).resolve().parents[2] / "scripts")
     if scripts not in sys.path:
         sys.path.insert(0, scripts)
     return scripts
@@ -142,9 +143,8 @@ def test_runtime_with_custom_context(_scripts_path):
 
 
 def test_tool_call_basic(_scripts_path):
-    from langchain_core.messages import AIMessage
-
     from _demo_core import _tool_call
+    from langchain_core.messages import AIMessage
 
     msg = _tool_call("start", "call-start")
     assert isinstance(msg, AIMessage)
@@ -184,3 +184,22 @@ def test_all_real_modes_covers_logical_nodes(_scripts_path):
 
     for name in LOGICAL_NODES:
         assert ALL_REAL_MODES.get(name) == "real", f"ALL_REAL_MODES missing {name}"
+
+
+async def test_demo_adapter_provides_legal_unique_sandbox(_scripts_path):
+    from _demo_core import DemoAdapter
+
+    first = DemoAdapter()
+    second = DemoAdapter()
+    try:
+        first_envelope = await first.adapt(object())
+        second_envelope = await second.adapt(object())
+        assert first_envelope.parent_sandbox is not None
+        assert getattr(first_envelope.parent_sandbox, "id", None)
+        assert len(first_envelope.parent_sandbox.path_mappings) == 3
+        assert first_envelope.workspace_host_path.is_dir()
+        assert first_envelope.outer_thread_id != second_envelope.outer_thread_id
+        assert first_envelope.outer_run_id != second_envelope.outer_run_id
+    finally:
+        first.close()
+        second.close()

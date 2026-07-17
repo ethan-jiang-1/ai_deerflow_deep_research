@@ -51,6 +51,7 @@ _MIXED_WAVE1 = _FULL_FAKE | {
     "targeted_evidence": "real",
     "wave1": "real",
 }
+_ALL_REAL = {name: "real" for name in LOGICAL_NODES}
 
 
 class FakeAppConfig:
@@ -128,6 +129,13 @@ def test_recipe_detects_real_hitl1_and_requires_real_bootstrap() -> None:
         ResearchGraphRecipe.create(implementation_modes=_FULL_FAKE | {"hitl1": "real"})
 
 
+def test_all_real_recipe_compiles() -> None:
+    recipe = ResearchGraphRecipe.create(implementation_modes=_ALL_REAL)
+    assert recipe.requires_publication_bundle is True
+    graph = recipe.builder.compile()
+    assert graph is not None
+
+
 def test_recipe_detects_real_topic_planning_and_requires_real_hitl1() -> None:
     recipe = ResearchGraphRecipe.create(implementation_modes=_MIXED_TOPIC)
     assert recipe.requires_bootstrap_bundle is True
@@ -159,8 +167,35 @@ def test_wave0_worker_bridge_has_web_tool_policy() -> None:
     bridge = _build_wave0_capabilities(_envelope(), graph_context, None)
     assert isinstance(bridge, RuntimeNodeAgentBridge)
     assert bridge.policy.allowed_tool_names == WAVE0_WORKER_TOOL_NAMES
-    assert bridge.policy.budget.max_total_tool_calls == 30
+    assert bridge.policy.budget.max_total_tool_calls == 200
     assert bridge.policy.policy_name == "wave0-source-intake"
+
+
+def test_worker_policies_specify_every_allowed_tool() -> None:
+    from deerflow_deep_research.runtime.projection import project_research_scope
+    from deerflow_deep_research.runtime.research import _wave0_worker_policy, _wave1_worker_policy
+
+    graph_context = project_research_scope(_envelope(), research_scope_id=_RID)
+    for policy in (_wave0_worker_policy(graph_context), _wave1_worker_policy(graph_context)):
+        assert policy.allowed_tool_names
+        for tool_name in policy.allowed_tool_names:
+            spec = policy.spec_for(tool_name)
+            assert spec is not None, f"{policy.policy_name}: missing spec for {tool_name}"
+            assert spec.is_eligible, f"{policy.policy_name}: ineligible spec for {tool_name}"
+
+
+async def test_all_real_context_routes_distinct_worker_policies(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_stores(monkeypatch)
+    handler = StartResearchHandler(ResearchGraphRecipe.create(implementation_modes=_ALL_REAL))
+    context = await handler._context(_envelope(), _RID, include_work_units=True)
+    resolver = context.work_units.resolver._base_resolver
+
+    wave0 = resolver.resolve(logical_name="wave0", attempt_id="g0-wave0-a1", policy=ctx_builder_policy())
+    wave1 = resolver.resolve(logical_name="wave1", attempt_id="g0-wave1-a1", policy=ctx_builder_policy())
+
+    assert wave0.capabilities.policy.policy_name == "wave0-source-intake"
+    assert wave1.capabilities.policy.policy_name == "wave1-evidence-extraction"
+    assert wave0.capabilities is not wave1.capabilities
 
 
 async def test_real_topic_planning_context_constructs_zero_tool_bridge(

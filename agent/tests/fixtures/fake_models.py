@@ -77,6 +77,25 @@ class CapturingChatModel(BaseChatModel):
         return "capturing"
 
 
+class RaisingChatModel(BaseChatModel):
+    """Raise a scripted provider exception from sync and async model paths."""
+
+    error: Exception
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        raise self.error
+
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        raise self.error
+
+    def bind_tools(self, tools: Any, **kwargs: Any) -> BaseChatModel:
+        return self
+
+    @property
+    def _llm_type(self) -> str:
+        return "raising"
+
+
 def ai_message(
     content: str = "done",
     *,

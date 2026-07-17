@@ -61,6 +61,8 @@ def test_invocation_context_contains_only_reduced_context_and_resolver() -> None
         "work_units",
         "bootstrap_bundle",
         "request_bundle",
+        "synthesis_bundle",
+        "publication_bundle",
     }
     assert isinstance(context.dependency_resolver, NodeDependencyResolver)
     with pytest.raises(TypeError):

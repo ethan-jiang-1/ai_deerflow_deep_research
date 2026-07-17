@@ -44,6 +44,20 @@ def test_build_planner_prompt_carries_profile_constraints() -> None:
     assert "must_answer_bindings" in expected["topic_required_keys"]
 
 
+def test_very_quick_overview_limits_plan_to_one_topic() -> None:
+    request = build_planner_prompt(
+        replace(
+            _inputs(),
+            research_depth="quick_overview",
+            cost_tolerance="minimal",
+            time_budget="very_quick",
+        )
+    )
+
+    assert "exactly one scoped research topic" in request.objective.lower()
+    assert json.loads(request.expected_output)["bounds"]["topics"] == "exactly 1 entry"
+
+
 def test_build_planner_prompt_requires_request_text() -> None:
     with pytest.raises(ValueError, match="request_text_required"):
         build_planner_prompt(replace(_inputs(), request_text="   "))

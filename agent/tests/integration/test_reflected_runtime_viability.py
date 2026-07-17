@@ -1,4 +1,7 @@
-"""Hard viability gate for reflected async ToolRuntime injection."""
+"""Hard viability gate for reflected async ToolRuntime injection.
+
+@impl RUI-001
+"""
 
 from __future__ import annotations
 

@@ -1,13 +1,29 @@
 """Replay-based eval corpus — deterministic scenarios with FakeToolCallingModel.
 
 @impl EVH-001
+@impl EVH-002
 """
 
 from __future__ import annotations
 
-import pytest
-
 from tests.eval.metrics import compute_metrics
+from tests.scenarios.catalog import SCENARIOS
+
+
+def test_first_wave_scenario_catalog_is_complete_and_unique() -> None:
+    expected = {
+        "quick-factual",
+        "claim-verification",
+        "insufficient-evidence",
+        "prompt-injection",
+        "malformed-output",
+        "tool-unavailable-timeout",
+        "budget-exhaustion",
+        "partial-worker-success",
+        "checkpoint-control",
+        "sandbox-filesystem-failure",
+    }
+    assert {scenario.scenario_id for scenario in SCENARIOS} == expected
 
 
 class TestQuickFactual:

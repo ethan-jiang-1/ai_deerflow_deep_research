@@ -1,4 +1,7 @@
-"""Contracts for user-scoped Deep Research Agent provisioning."""
+"""Contracts for user-scoped Deep Research Agent provisioning.
+
+@impl DEC-004
+"""
 
 from __future__ import annotations
 

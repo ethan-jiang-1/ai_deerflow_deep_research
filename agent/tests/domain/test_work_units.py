@@ -1,3 +1,8 @@
+"""Immutable work-unit identity contracts.
+
+@impl WOU-001
+"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

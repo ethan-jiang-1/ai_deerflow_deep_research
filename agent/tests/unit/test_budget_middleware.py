@@ -161,3 +161,16 @@ async def test_tool_result_is_size_bounded() -> None:
     result = await mw.awrap_tool_call(object(), handler)
     assert len(result.content.encode("utf-8")) < len(big.encode("utf-8"))
     assert "[truncated" in result.content
+
+
+async def test_large_tool_result_history_uses_bounded_admission() -> None:
+    mw = BudgetMiddleware(_budget(total_token_budget=1_000, per_tool_result_bytes=32))
+
+    async def tool_handler(_request):
+        return ToolMessage(content="x" * 20_000, tool_call_id="c1")
+
+    bounded = await mw.awrap_tool_call(object(), tool_handler)
+    messages = [HumanMessage("question"), AIMessage(content="", tool_calls=[]), bounded]
+    await mw.awrap_model_call(FakeRequest(messages=messages), _handler_for(_ai(input_tokens=20, output_tokens=10)))
+    assert mw.model_calls == 1
+    assert len(bounded.content.encode()) < 200

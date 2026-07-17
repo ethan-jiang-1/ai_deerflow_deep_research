@@ -34,7 +34,12 @@ def build_real(dependencies: NodeBuildDependencies):
 
         if work_items:
             results = await dispatch_critic(
-                work_items, dependencies.capabilities, node_attempt_id, research_id, workspace_root
+                work_items,
+                dependencies.capabilities,
+                dependencies.agent_context,
+                node_attempt_id,
+                research_id,
+                workspace_root,
             )
             for entry in results:
                 result = entry["result"]

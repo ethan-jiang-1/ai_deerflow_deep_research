@@ -1,4 +1,7 @@
-"""RuntimeAdapter trusted-context and fail-closed contract (RUI-002)."""
+"""RuntimeAdapter trusted-context and fail-closed contract.
+
+@impl RUI-002
+"""
 
 from __future__ import annotations
 

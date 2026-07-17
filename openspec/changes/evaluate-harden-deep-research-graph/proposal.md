@@ -10,7 +10,7 @@ The Deep Research real-mode demo exposed thirteen failures only after expensive 
 - Exercise each real node and each high-risk real-prefix workflow through real graph, runtime bridge, middleware, policy, budget, parser, submission, gate, checkpoint, and artifact code while replacing only true external model/tool dependencies.
 - Add short `@requires_llm` live canaries and a full-real release-acceptance lane with explicit hard invariants, reported quality metrics, unique identities, observable retries, and deterministic-regression follow-up for every newly discovered failure.
 - Add requirement-to-test traceability and stable selection semantics so deterministic PR tests, live nightly evaluation, and release E2E cannot silently collapse into one ambiguous suite.
-- Keep `backend/` and `frontend/` unchanged. No production graph node, topology, checkpoint schema, sandbox artifact layout, runtime configuration, model/tool configuration, public/custom skill, per-user Agent/SOUL, MCP, ACP, DeerFlow task subagent, or downstream reflection path is added or changed. Existing test entrypoints under `agent/` and repository GitHub workflows are the only operational surfaces affected; no next-agent-build or Gateway restart is required.
+- Keep `backend/` and `frontend/` unchanged. No production topology, checkpoint schema, sandbox artifact layout, runtime configuration, model/tool configuration, public/custom skill, per-user Agent/SOUL, MCP, ACP, DeerFlow task subagent, or downstream reflection path is added or changed. A live/release defect may receive the smallest production fix already required by an existing capability spec after a red deterministic regression is added at the lowest stable seam; this exception does not authorize new product behavior or layout. Existing test entrypoints under `agent/` and repository GitHub workflows remain the only new operational surfaces; no next-agent-build or Gateway restart is required.
 
 ## Capabilities
 
@@ -28,4 +28,4 @@ None.
 - `agent/Makefile`, `agent/pyproject.toml`, `agent/README.md`, and `agent/AGENTS.md` for stable commands, markers, and development rules.
 - Agent-owned GitHub Actions workflows for deterministic PR, scheduled live, and manual/release execution.
 - OpenSpec evaluation-hardening requirements and governance registry/checker coverage.
-- No new runtime dependency, production API, graph node, state field, sandbox file, model/tool role, or deployment configuration.
+- No new runtime dependency, production API, graph node, state field, sandbox path, model/tool role, or deployment configuration. Narrow conformance fixes may make an existing production node materialize an artifact already required at its canonical path.

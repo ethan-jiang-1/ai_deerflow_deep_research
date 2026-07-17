@@ -46,7 +46,15 @@ ModelResolver = Callable[[TrustedRuntimeEnvelope], Any]
 ToolsResolver = Callable[[TrustedRuntimeEnvelope, ExecutionPolicy], Sequence[Any]]
 
 
+class NodeAgentConfigurationError(RuntimeError):
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(f"[{code}] {detail}")
+        self.code = code
+
+
 def _default_model_resolver(envelope: TrustedRuntimeEnvelope) -> Any:
+    if not getattr(envelope.app_config, "models", None):
+        raise NodeAgentConfigurationError("model_not_configured", "node-agent execution requires a configured model")
     from deerflow.models.factory import create_chat_model
 
     return create_chat_model(app_config=envelope.app_config, attach_tracing=False)
@@ -64,7 +72,11 @@ def _default_tools_resolver(envelope: TrustedRuntimeEnvelope, policy: ExecutionP
 
         app_config = get_app_config()
     loaded = get_available_tools(include_mcp=False, app_config=app_config)
-    return [tool for tool in loaded if tool.name in policy.allowed_tool_names]
+    eligible = [tool for tool in loaded if tool.name in policy.allowed_tool_names]
+    if policy.allowed_tool_names and not eligible:
+        names = ",".join(sorted(policy.allowed_tool_names))
+        raise NodeAgentConfigurationError("tools_unavailable", f"no configured tools satisfy policy: {names}")
+    return eligible
 
 
 @dataclass
@@ -89,9 +101,9 @@ class RuntimeNodeAgentBridge:
 
         self._emit(context, operation="run_agent", status="started")
         model = self.model_resolver(self.envelope)
-        tools = list(self.tools_resolver(self.envelope, self.policy))
+        tools = list(self.tools_resolver(self.envelope, self.policy)) if request.tools_enabled else []
         budget_middleware = BudgetMiddleware(self.policy.budget)
-        tool_policy_middleware = ToolPolicyMiddleware(self.policy)
+        tool_policy_middleware = ToolPolicyMiddleware(self.policy, tool_call_limit=request.tool_call_limit)
         agent = build_phase_agent(
             model=model,
             tools=tools,
@@ -117,7 +129,10 @@ class RuntimeNodeAgentBridge:
             # Never convert cancellation into success; the child runnable and its
             # tasks are torn down as the exception propagates.
             raise
-        node_result = self._project_result(result)
+        if tool_policy_middleware.tool_calls < request.minimum_tool_calls:
+            self._emit(context, operation="run_agent", status="required_tool_not_called")
+            return project_failure(NodeFinishReason.FAILED, error_code="required_tool_not_called")
+        node_result = self._project_result(result, untrusted_tool_results=tuple(tool_policy_middleware.tool_results))
         self._emit(context, operation="run_agent", status="completed")
         return node_result
 
@@ -143,9 +158,11 @@ class RuntimeNodeAgentBridge:
         if request.source_artifact_refs:
             listed = [f"- {ref.artifact_id}: {ref.virtual_path}" for ref in request.source_artifact_refs]
             prompt += f"\n{build_untrusted_data_block(listed)}\n"
+        sandbox = self.envelope.parent_sandbox
+        sandbox_id = getattr(sandbox, "id", None) or getattr(sandbox, "sandbox_id", None)
         return {
             "messages": [HumanMessage(prompt)],
-            "sandbox": {"sandbox_id": getattr(self.envelope.parent_sandbox, "sandbox_id", None)},
+            "sandbox": {"sandbox_id": sandbox_id},
             "thread_data": {"thread_id": self.envelope.outer_thread_id},
         }
 
@@ -157,13 +174,23 @@ class RuntimeNodeAgentBridge:
             "app_config": self.envelope.app_config,
         }
 
-    def _project_result(self, result: Any) -> NodeExecutionResult:
+    def _project_result(
+        self,
+        result: Any,
+        *,
+        untrusted_tool_results: tuple[str, ...] = (),
+    ) -> NodeExecutionResult:
         messages = result.get("messages") if isinstance(result, dict) else None
         summary = ""
         if messages:
             content = getattr(messages[-1], "content", "")
             summary = content if isinstance(content, str) else ""
-        return project_success(summary, (), policy=self.policy)
+        return project_success(
+            summary,
+            (),
+            policy=self.policy,
+            untrusted_tool_results=untrusted_tool_results,
+        )
 
 
-__all__ = ["RuntimeNodeAgentBridge"]
+__all__ = ["NodeAgentConfigurationError", "RuntimeNodeAgentBridge"]

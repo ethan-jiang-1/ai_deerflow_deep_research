@@ -1,4 +1,7 @@
-"""Deterministic contracts for the permanent project-structure governance gate."""
+"""Deterministic contracts for the permanent project-structure governance gate.
+
+@impl PRS-004
+"""
 
 from __future__ import annotations
 

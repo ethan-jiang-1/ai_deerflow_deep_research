@@ -84,9 +84,16 @@ class FakeUnavailableCapabilities:
 
 
 class RuntimeNodeDependencyResolver:
-    def __init__(self, graph_context, capabilities: Any | None = None) -> None:
+    def __init__(
+        self,
+        graph_context,
+        capabilities: Any | None = None,
+        *,
+        capabilities_by_node: Mapping[str, Any] | None = None,
+    ) -> None:
         self._graph_context = graph_context
         self._capabilities = capabilities if capabilities is not None else FakeUnavailableCapabilities()
+        self._capabilities_by_node = dict(capabilities_by_node or {})
 
     def resolve(self, *, logical_name: str, attempt_id: str, policy: PolicyRef) -> NodeBuildDependencies:
         agent_context = project_node_agent(
@@ -95,7 +102,8 @@ class RuntimeNodeDependencyResolver:
             attempt_id=attempt_id,
             policy_name=policy.name,
         )
-        return build_node_dependencies(self._graph_context, agent_context, self._capabilities)
+        capabilities = self._capabilities_by_node.get(logical_name, self._capabilities)
+        return build_node_dependencies(self._graph_context, agent_context, capabilities)
 
 
 @dataclass(frozen=True)
@@ -115,6 +123,7 @@ class ResearchGraphRecipe:
     requires_work_units: bool = False
     requires_bootstrap_bundle: bool = False
     requires_request_bundle: bool = False
+    requires_publication_bundle: bool = False
     requires_node_agent_bridge: bool = False
     requires_wave0_worker_bridge: bool = False
     requires_wave1_worker_bridge: bool = False
@@ -166,6 +175,7 @@ class ResearchGraphRecipe:
             requires_work_units=True,
             requires_bootstrap_bundle=bootstrap_real,
             requires_request_bundle=hitl1_real,
+            requires_publication_bundle=final_real,
             requires_node_agent_bridge=hitl1_real or topic_planning_real,
             requires_wave0_worker_bridge=wave0_real,
             requires_wave1_worker_bridge=wave1_real,
@@ -241,8 +251,7 @@ def _wave0_worker_policy(graph_context: Any) -> ExecutionPolicy:
         write_roots=(graph_context.workspace_root,),
         attempt_root=graph_context.workspace_root,
         tool_specs=tuple(
-            ToolPolicySpec(tool_name=name, effect="read", native_cancellable=True)
-            for name in WAVE0_WORKER_TOOL_NAMES
+            ToolPolicySpec(tool_name=name, effect="read", native_cancellable=True) for name in WAVE0_WORKER_TOOL_NAMES
         ),
         budget=ExecutionBudget(
             max_model_calls=50,
@@ -285,8 +294,7 @@ def _wave1_worker_policy(graph_context: Any) -> ExecutionPolicy:
         write_roots=(graph_context.workspace_root,),
         attempt_root=graph_context.workspace_root,
         tool_specs=tuple(
-            ToolPolicySpec(tool_name=name, effect="read", native_cancellable=True)
-            for name in WAVE1_WORKER_TOOL_NAMES
+            ToolPolicySpec(tool_name=name, effect="read", native_cancellable=True) for name in WAVE1_WORKER_TOOL_NAMES
         ),
         budget=ExecutionBudget(
             max_model_calls=50,
@@ -425,14 +433,28 @@ class ResearchActionHandler:
         wave1_capabilities = (
             _build_wave1_capabilities(envelope, graph_context, self._recipe.node_agent_bridge_factory)
             if include_work_units and self._recipe.requires_wave1_worker_bridge
-            else wave0_capabilities  # fall back to wave0 capabilities (same tool set)
+            else None
         )
         base_resolver = RuntimeNodeDependencyResolver(graph_context, capabilities)
-        worker_caps = wave1_capabilities or wave0_capabilities
-        worker_resolver = RuntimeNodeDependencyResolver(graph_context, worker_caps)
+        worker_capabilities_by_node = {
+            logical_name: node_capabilities
+            for logical_name, node_capabilities in {
+                "wave0": wave0_capabilities,
+                "targeted_evidence": wave0_capabilities,
+                "wave1": wave1_capabilities,
+            }.items()
+            if node_capabilities is not None
+        }
+        worker_resolver = RuntimeNodeDependencyResolver(
+            graph_context,
+            wave0_capabilities or wave1_capabilities,
+            capabilities_by_node=worker_capabilities_by_node,
+        )
         work_units = None
         bootstrap_bundle = None
         request_bundle = None
+        synthesis_bundle = None
+        publication_bundle = None
         if include_work_units and self._recipe.requires_work_units:
             store_factory = self._recipe.work_unit_store_factory or WorkUnitStore.create
             store = await store_factory(envelope, research_id=research_id)
@@ -445,12 +467,18 @@ class ResearchActionHandler:
             if self._recipe.requires_request_bundle:
                 request_factory = self._recipe.request_bundle_store_factory or RequestBundleStore.create
                 request_bundle = await request_factory(envelope, research_id=research_id)
+            if self._recipe.requires_work_units:
+                synthesis_bundle = store
+            if self._recipe.requires_publication_bundle:
+                publication_bundle = store
         return GraphInvocationContext(
             graph_context=graph_context,
             dependency_resolver=base_resolver,
             work_units=work_units,
             bootstrap_bundle=bootstrap_bundle,
             request_bundle=request_bundle,
+            synthesis_bundle=synthesis_bundle,
+            publication_bundle=publication_bundle,
         )
 
 

@@ -1,4 +1,7 @@
-"""Contracts for the committed Deep Research public entry skill."""
+"""Contracts for the committed Deep Research public entry skill.
+
+@impl DEC-003
+"""
 
 from __future__ import annotations
 

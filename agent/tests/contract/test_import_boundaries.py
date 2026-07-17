@@ -1,4 +1,8 @@
-"""Manifest-backed AST import and source-ownership contracts."""
+"""Manifest-backed AST import and source-ownership contracts.
+
+@impl PRS-001
+@impl PRS-002
+"""
 
 from __future__ import annotations
 

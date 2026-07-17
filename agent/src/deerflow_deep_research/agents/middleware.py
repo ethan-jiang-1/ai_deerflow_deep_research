@@ -149,14 +149,30 @@ class ToolPolicyMiddleware(AgentMiddleware):
     cannot prove containment, or a path escape is denied before execution.
     """
 
-    def __init__(self, policy: ExecutionPolicy) -> None:
+    def __init__(self, policy: ExecutionPolicy, *, tool_call_limit: int | None = None) -> None:
         super().__init__()
         self._policy = policy
+        if tool_call_limit is not None and not 1 <= tool_call_limit <= policy.budget.max_total_tool_calls:
+            raise ValueError("tool_call_limit_invalid")
+        self._tool_call_limit = tool_call_limit
+        self.tool_calls = 0
+        self.tool_results: list[str] = []
+
+    async def awrap_model_call(self, request: Any, handler: Any) -> Any:
+        if self._tool_call_limit is not None and self.tool_calls >= self._tool_call_limit:
+            request = request.override(tools=[], tool_choice=None)
+        return await handler(request)
 
     async def awrap_tool_call(self, request: Any, handler: Any) -> Any:
         name, args = self._extract(request)
         self._authorize(name, args)
-        return await handler(request)
+        result = await handler(request)
+        self.tool_calls += 1
+        content = getattr(result, "content", None)
+        if isinstance(content, str) and len(self.tool_results) < 8:
+            limit = self._policy.budget.per_tool_result_bytes
+            self.tool_results.append(content.encode("utf-8")[:limit].decode("utf-8", "ignore"))
+        return result
 
     def _authorize(self, name: str, args: dict[str, Any]) -> None:
         policy = self._policy

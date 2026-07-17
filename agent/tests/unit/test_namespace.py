@@ -1,4 +1,7 @@
-"""Nested checkpoint namespace derivation contract (RUI-003)."""
+"""Nested checkpoint namespace derivation contract.
+
+@impl RUI-003
+"""
 
 from __future__ import annotations
 

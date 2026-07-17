@@ -87,9 +87,9 @@ def test_explicit_registry_loads_package_root_only_specs() -> None:
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
             assert spec.capabilities == frozenset({NodeCapability.WORK_UNIT_CONTROLLER})
         elif name == "wave2_synthesis":
-            # Change 11 implements real Wave2 synthesis; it declares no capability.
+            # Change 11 implements real Wave2 synthesis through the synthesis bundle.
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
-            assert spec.capabilities == frozenset()
+            assert spec.capabilities == frozenset({NodeCapability.SYNTHESIS_BUNDLE})
         elif name == "hitl2":
             # Change 13 implements real HITL2 (human decision node).
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
@@ -104,7 +104,7 @@ def test_explicit_registry_loads_package_root_only_specs() -> None:
         elif name == "final_delivery":
             # Change 16 implements real final delivery (writer + gate + terminal lifecycle).
             assert spec.real_factory is not UNAVAILABLE_REAL_FACTORY
-            assert spec.capabilities == frozenset()
+            assert spec.capabilities == frozenset({NodeCapability.PUBLICATION_BUNDLE})
         else:
             assert spec.real_factory is UNAVAILABLE_REAL_FACTORY
         assert spec.logical_name == name

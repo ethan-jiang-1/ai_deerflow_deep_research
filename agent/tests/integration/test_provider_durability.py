@@ -1,4 +1,6 @@
-"""Real checkpoint provider durability contract (RUI-005).
+"""Real checkpoint provider durability contract.
+
+@impl RUI-005
 
 Distinguishes same-process (memory, in-memory SQLite) from restart-durable
 (file-backed SQLite) providers. The file-SQLite path is proven both across

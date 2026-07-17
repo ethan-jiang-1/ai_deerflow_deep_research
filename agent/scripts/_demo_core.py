@@ -18,6 +18,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from deerflow.sandbox.local.local_sandbox import LocalSandbox, PathMapping
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.types import Command
 
@@ -27,7 +28,6 @@ from deerflow_deep_research.runtime.node_agent_bridge import RuntimeNodeAgentBri
 from deerflow_deep_research.runtime.research import ResearchGraphRecipe
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
-from deerflow.sandbox.local.local_sandbox import LocalSandbox, PathMapping
 
 # ── adapter ──────────────────────────────────────────────────────────
 
@@ -40,9 +40,30 @@ _KNOWN_API_KEY_VARS = (
 
 # Each entry: (env_var, model_name, use_path, model_id, base_url, extra_kwargs)
 _MODEL_REGISTRY = (
-    ("DEEPSEEK_API_KEY", "deepseek-v4-pro", "deerflow.models.patched_deepseek:PatchedChatDeepSeek", "deepseek-v4-pro", "https://api.deepseek.com/v1", {}),
-    ("DEEPSEEK_API_KEY", "deepseek-v4-flash", "deerflow.models.patched_deepseek:PatchedChatDeepSeek", "deepseek-v4-flash", "https://api.deepseek.com/v1", {}),
-    ("ANTHROPIC_API_KEY", "anthropic-demo", "langchain_anthropic:ChatAnthropic", "claude-sonnet-4-5-20250901", None, {}),
+    (
+        "DEEPSEEK_API_KEY",
+        "deepseek-v4-pro",
+        "deerflow.models.patched_deepseek:PatchedChatDeepSeek",
+        "deepseek-v4-pro",
+        "https://api.deepseek.com/v1",
+        {},
+    ),
+    (
+        "DEEPSEEK_API_KEY",
+        "deepseek-v4-flash",
+        "deerflow.models.patched_deepseek:PatchedChatDeepSeek",
+        "deepseek-v4-flash",
+        "https://api.deepseek.com/v1",
+        {},
+    ),
+    (
+        "ANTHROPIC_API_KEY",
+        "anthropic-demo",
+        "langchain_anthropic:ChatAnthropic",
+        "claude-sonnet-4-5-20250901",
+        None,
+        {},
+    ),
     ("OPENAI_API_KEY", "openai-demo", "langchain_openai:ChatOpenAI", "gpt-4o", None, {}),
 )
 
@@ -54,7 +75,13 @@ def _resolve_demo_models():
     models = []
     for env_var, name, use_path, model_id, base_url, extra in _MODEL_REGISTRY:
         if env_var in os.environ:
-            cfg: dict[str, Any] = {"name": name, "use": use_path, "model": model_id, "api_key": os.environ[env_var], **extra}
+            cfg: dict[str, Any] = {
+                "name": name,
+                "use": use_path,
+                "model": model_id,
+                "api_key": os.environ[env_var],
+                **extra,
+            }
             if base_url is not None:
                 cfg["base_url"] = base_url
             models.append(ModelConfig(**cfg))
@@ -87,20 +114,6 @@ class DemoAppConfig:
             if model.name == name:
                 return model
         return None
-
-
-def _prime_demo_sandbox(sandbox: Any) -> None:
-    """Register *sandbox* as the generic singleton inside the global provider.
-
-    The work-unit storage verifier calls ``provider.get(parent.id)`` and
-    expects the same instance back.  For the demo we set the provider's
-    internal ``_generic_sandbox`` so the lookup succeeds.
-    """
-    from deerflow.sandbox import get_sandbox_provider
-
-    provider = get_sandbox_provider()
-    # LocalSandboxProvider stores the legacy "local" singleton here.
-    provider._generic_sandbox = sandbox
 
 
 async def _demo_storage_verifier(envelope: Any, *, research_id: str, provider: Any = None) -> Any:
@@ -146,6 +159,7 @@ def _install_demo_storage_patch() -> None:
                     provider=provider,
                     **kw,
                 )
+
             return _patched
 
         _cls.create = _make_patched(_orig_create, _demo_storage_verifier)
@@ -171,10 +185,6 @@ class DemoAdapter:
                 PathMapping(container_path="/mnt/user-data/outputs", local_path=str(outputs)),
             ],
         )
-        # Register with the global sandbox provider so provider.get("local")
-        # returns our sandbox (required by verify_runtime_work_unit_storage).
-        _prime_demo_sandbox(sandbox)
-
         _suffix = secrets.token_hex(4)
         self._envelope = TrustedRuntimeEnvelope(
             effective_user_id="demo-user",
@@ -329,8 +339,6 @@ def build_demo_host(*, recipe: ResearchGraphRecipe) -> Any:
         fingerprint_verifier=lambda _app_config: None,
         research_recipe=recipe,
     )
-
-
 
 
 def check_credentials_available() -> bool:

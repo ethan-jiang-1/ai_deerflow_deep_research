@@ -74,7 +74,8 @@ def build_real(dependencies: NodeBuildDependencies):
         non_interactive = state.get("non_interactive_policy")
         if isinstance(non_interactive, dict) and non_interactive.get("auto_proceed") is True:
             return node_update(
-                "hitl2", route="proceed",
+                "hitl2",
+                route="proceed",
                 consumed_request_ids=(*state.get("consumed_request_ids", ()), request_id),
                 consumed_message_ids=(*state.get("consumed_message_ids", ()), "auto-proceed"),
             )

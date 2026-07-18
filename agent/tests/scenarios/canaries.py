@@ -403,7 +403,11 @@ async def _execute_focused_wave2_core(
 
     artifact_ref = synthesis_findings_path(research_id)
     artifact = json.loads(await seed.store.read_canonical_bytes(artifact_ref, max_bytes=256 * 1024))
-    findings = tuple(artifact.get("findings") or ())
+    from deerflow_deep_research.domain.synthesis import SynthesisResult
+
+    canonical_synthesis = SynthesisResult.model_validate(artifact)
+    findings = tuple(finding.model_dump(mode="python") for finding in canonical_synthesis.findings)
+    gaps = tuple(gap.model_dump(mode="python") for gap in canonical_synthesis.gaps)
     if not findings:
         raise AssertionError("live_wave2_semantic_floor_missing")
     backing_refs = tuple(ref for finding in findings for ref in finding.get("backing_refs", ()))
@@ -427,7 +431,7 @@ async def _execute_focused_wave2_core(
         values={
             "accepted_submission_refs": tuple(f"ref:{value}" for value in accepted_refs),
             "synthesis_findings": findings,
-            "synthesis_gaps": tuple(artifact.get("gaps") or ()),
+            "synthesis_gaps": gaps,
             "topic_question_bindings": (
                 {
                     "question_id": "q:focused",

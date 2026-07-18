@@ -33,7 +33,8 @@ def build_wave1_worker_prompt(
     objective = (
         "Perform deep evidence extraction for this research topic. Search for new "
         "sources beyond the Wave0 baseline. You MUST call at least one available web "
-        "search or fetch tool before returning the final JSON. For each source, record "
+        "search tool before returning the final JSON. Make exactly one web search; use "
+        "the multiple candidate results returned by that search as the evidence set. For each source, record "
         "only its source id, canonical URL, and title; the runtime owns content refs, "
         "hashes, byte counts, and new-vs-Wave0 classification. Extract structured claims with support_refs and "
         "counter_refs. Record open questions with resolution states. "
@@ -59,7 +60,7 @@ def build_wave1_worker_prompt(
         objective=objective,
         expected_output=json.dumps(expected, sort_keys=True, separators=(",", ":")),
         minimum_tool_calls=1,
-        tool_call_limit=2,
+        tool_call_limit=1,
     )
 
 

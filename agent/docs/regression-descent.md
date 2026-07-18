@@ -41,6 +41,7 @@ misleading.
 | LIVE-20260718-01 | synthesis-gap-routing-authority | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_persists_searchable_gap_and_returns_typed_preview | n/a |
 | LIVE-20260718-02 | targeted-structured-output-repair | node-capability/runtime-store | deterministic-regression | tests/graph/test_targeted_evidence_real.py::test_targeted_invalid_first_response_repairs_once_without_tools[prose] | n/a |
 | LIVE-20260718-03 | wave1-tool-only-budget-exhaustion | live-real-dependencies | provider-only-live | n/a | The bounded live model emitted only tool calls with empty content across all three allowed turns. Scripted bridge and fail-closed budget tests prove mechanics, but cannot honestly reproduce this provider decision distribution. |
+| LIVE-20260718-05 | targeted-final-answer-timeout | live-real-dependencies | provider-only-live | n/a | After the request quota correctly denied a three-call parallel batch, a one-search targeted request reached the provider but did not return a final answer within the declared 180-second case deadline. Deterministic quota/repair coverage passes; this provider latency/convergence distribution is not replayed as a fake. |
 
 ## Current Evidence-V1 Findings Awaiting Closure
 

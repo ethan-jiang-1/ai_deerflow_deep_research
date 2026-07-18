@@ -41,7 +41,7 @@ This is an internal in-process seam, not a new public protocol or store interfac
 
 ### 2. Reserve a final-answer turn with a request-level tool window
 
-`build_targeted_worker_prompt` will set `minimum_tool_calls=1` and `tool_call_limit=2`. The production `_wave0_worker_policy` remains unchanged: request-level limits already exist specifically to narrow one invocation beneath the broader policy. With the observed behavior, two tool calls allow a third model turn to return the answer while keeping the existing focused-live ceiling of four model calls and three tool calls.
+`build_targeted_worker_prompt` will set `minimum_tool_calls=1` and `tool_call_limit=1`. One Tavily search returns multiple candidate sources, while later model turns remain available for the structured answer. The production `_wave0_worker_policy` remains unchanged: request-level limits already exist specifically to narrow one invocation beneath the broader policy.
 
 The alternative of lowering the global Wave0 policy or changing `RuntimeNodeAgentBridge` is rejected because it would affect unrelated Wave0/Wave1 workers. Allowing all three live tool calls is also rejected for this focused worker contract because it can consume the last permitted model interaction without producing a candidate result.
 
@@ -82,11 +82,27 @@ Because production behavior changes, the existing full-real rerun policy must be
 
 The adjacent HITL2 finding is recorded for that assessment. Closing it requires a separately reviewed content-access design (for example a bounded brief projection derived from the synthesis artifact or a read capability), because mapping `unresolved_gaps` directly to HITL2 would hide non-searchable gaps and conflate routing control with decision content. It does not block the six focused cases in this change, which stop at Wave2 and targeted worker authority, but it prevents this change from claiming that the complete Wave2-to-HITL2 public pipeline has been newly proven.
 
+After multiple bounded complete-lane attempts, the implementation and deterministic
+gates are green but one current-provider targeted case has not converged within its
+tool/deadline contract. Further retries are therefore deferred to
+`_backlog/plans/deep-research-six-case-live-closure.md`. This closes only the
+production-hardening change's validation handoff; it does not convert partial live
+evidence into a pass. The test-assets tasks remain open and nightly remains
+manual-only until the backlog plan's completion criteria are satisfied.
+
 ### 7. Close the second-run adjacent failures at their existing seams
 
-Wave1 will retain `minimum_tool_calls=1` but set `tool_call_limit=2`. This mirrors the targeted request-local convergence rule and leaves a third model turn for the structured response under the focused live ceiling. Its existing parse-failure repair remains separate and zero-tool; this change does not make budget/policy stops repairable, increase attempts, or change Wave0.
+Wave1 will set `minimum_tool_calls=1` and `tool_call_limit=1`. One Tavily search already returns multiple candidate sources, while later model turns remain available for the structured response. Its existing parse-failure repair remains separate and zero-tool; this change does not make budget/policy stops repairable, increase attempts, or change Wave0. The shared tool-policy middleware also enforces the request limit against the whole pending parallel-call batch before dispatch; otherwise a one-call response followed by two parallel calls can violate a declared limit of two.
 
 Wave2 semantic validation will require `output.findings` whenever `accepted_refs` is non-empty. Gaps may accompany findings and retain their routing authority, but cannot substitute for synthesis of accepted evidence. A zero-finding initial response enters the existing one-shot zero-tool repair; a zero-finding repair fails before artifact or preview publication. The narrower alternative of teaching the canary to accept gaps-only output is rejected because it would contradict the main requirement that accepted Wave1 evidence produces backed structured findings.
+
+The next complete lane confirmed that dot-qualified prose such as
+`finding.search_required` is unsafe in a JSON-generation prompt: the provider used
+that entire string as a literal key in both initial and repair outputs. The prompt
+will instead describe `search_required` as a key inside each finding/gap object and
+put the complete required object keys in `expected_output`. Production normalization
+continues to support the already-reviewed generic `id` alias, but will not accept
+dotted provider-specific keys or rewrite arbitrary malformed field names.
 
 ## Risks / Trade-offs
 
@@ -108,8 +124,8 @@ Wave2 semantic validation will require `output.findings` whenever `accepted_refs
 3. Implement the defaulted gap field, prompt/preview alignment, real gate rule, gate-owned id projection, targeted id consumption, and exact Wave2 exhausted terminal edge, then pass focused Wave2/domain/gate/topology tests.
 4. Implement the targeted request window and one zero-tool repair path, then pass focused targeted worker/store tests.
 5. Run Ruff, strict OpenSpec, requirement/architecture/asset governance, and the deterministic fast/integration/workflow/full suites.
-6. Run all six focused live cases with fresh identities. If the first post-remediation lane exposes an adjacent request/semantic-floor defect, add its focused red tests, apply only the reviewed request-local and semantic-floor corrections, and rerun deterministic gates.
-7. Run one new complete six-case lane. If green within the existing deadline margin, update the owning test-assets tasks and restore nightly scheduling there.
+6. Run all six focused live cases with fresh identities. If a post-remediation lane exposes an adjacent deterministic request/semantic-floor defect, add its focused red tests, apply only the reviewed request-local and semantic-floor corrections, and rerun deterministic gates.
+7. Preserve the bounded complete-lane result. If green within the existing deadline margin, update the owning test-assets tasks and restore nightly scheduling there; if provider-dependent convergence remains red after the responsible deterministic seams are green, record the risk and defer further retries through `_backlog/plans/deep-research-six-case-live-closure.md` without claiming live success.
 8. Assess the reviewed full-real rerun trigger. Do not run or modify the sole release E2E unless the trigger is met.
 
 Rollback reverts the production and focused-test commits together. Old schema-version-1 synthesis artifacts remain readable because missing gap flags default to false; no database, checkpoint, sandbox-layout, configuration, dependency, next-agent-build, or restart migration is introduced.

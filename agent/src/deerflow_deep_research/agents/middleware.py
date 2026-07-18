@@ -161,7 +161,14 @@ class ToolPolicyMiddleware(AgentMiddleware):
     async def awrap_model_call(self, request: Any, handler: Any) -> Any:
         if self._tool_call_limit is not None and self.tool_calls >= self._tool_call_limit:
             request = request.override(tools=[], tool_choice=None)
-        return await handler(request)
+        response = await handler(request)
+        if self._tool_call_limit is not None:
+            result = getattr(response, "result", None)
+            message = result[-1] if result else response
+            pending_calls = getattr(message, "tool_calls", None) or []
+            if self.tool_calls + len(pending_calls) > self._tool_call_limit:
+                raise AgentPolicyError("request tool-call limit exceeded")
+        return response
 
     async def awrap_tool_call(self, request: Any, handler: Any) -> Any:
         name, args = self._extract(request)

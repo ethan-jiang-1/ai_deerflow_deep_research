@@ -356,7 +356,8 @@ async def test_targeted_valid_first_response_does_not_repair(tmp_path: Path) -> 
     assert len(capabilities.requests) == 1
     request = capabilities.requests[0]
     assert request.minimum_tool_calls == 1
-    assert request.tool_call_limit == 2
+    assert request.tool_call_limit == 1
+    assert "exactly one web search" in request.objective
     assert request.tools_enabled is True
     assert len(update["accepted_submission_refs"]) == 1
     assert len(await store.load_records()) == 1
@@ -413,7 +414,7 @@ async def test_targeted_invalid_first_response_repairs_once_without_tools(
     assert len(capabilities.requests) == 2
     initial, repair = capabilities.requests
     assert initial.minimum_tool_calls == 1
-    assert initial.tool_call_limit == 2
+    assert initial.tool_call_limit == 1
     assert initial.tools_enabled is True
     assert repair.minimum_tool_calls == 0
     assert repair.tool_call_limit is None

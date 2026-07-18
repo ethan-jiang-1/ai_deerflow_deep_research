@@ -61,7 +61,17 @@ def _synthesis_output() -> str:
     return json.dumps(
         {
             "schema_version": 1,
-            "findings": [],
+            "findings": [
+                {
+                    "finding_id": "finding:scripted-evidence",
+                    "statement": "The scripted evidence supports the storage comparison.",
+                    "priority": 3,
+                    "affected_topics": ["topic:storage"],
+                    "backing_refs": ["source:w1a"],
+                    "confidence": "medium",
+                    "search_required": False,
+                }
+            ],
             "relations": [],
             "gaps": [
                 {
@@ -71,7 +81,7 @@ def _synthesis_output() -> str:
                     "affected_topics": ["topic:storage"],
                 }
             ],
-            "summary": "Evidence synthesized as an explicit gap without unsupported findings.",
+            "summary": "Evidence synthesized with one supported finding and an explicit gap.",
         }
     )
 

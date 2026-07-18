@@ -253,7 +253,33 @@ def test_wave2_prompts_distinguish_finding_and_gap_search_flags() -> None:
         combined = f"{prompt.objective}\n{prompt.expected_output}"
         assert "finding" in combined.lower()
         assert "gap" in combined.lower()
-        assert "gap.search_required" in combined
+        assert "finding.search_required" not in combined
+        assert "gap.search_required" not in combined
+        expected = json.loads(prompt.expected_output)
+        assert expected["finding_required_keys"] == [
+            "finding_id",
+            "statement",
+            "priority",
+            "affected_topics",
+            "backing_refs",
+            "confidence",
+            "search_required",
+        ]
+        assert expected["confidence_values"] == ["high", "medium", "low", "tentative"]
+        assert expected["relation_required_keys"] == [
+            "relation_id",
+            "source_finding",
+            "target_finding",
+            "relation_type",
+        ]
+        assert expected["relation_type_values"] == ["supports", "contradicts", "extends", "qualifies"]
+        assert expected["gap_required_keys"] == [
+            "gap_id",
+            "description",
+            "priority",
+            "affected_topics",
+            "search_required",
+        ]
 
 
 async def test_real_synthesis_persists_searchable_gap_and_returns_typed_preview(tmp_path: Path) -> None:

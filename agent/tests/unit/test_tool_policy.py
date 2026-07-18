@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import AIMessage, ToolMessage
 
 from deerflow_deep_research.agents.middleware import AgentPolicyError, ToolPolicyMiddleware
 from deerflow_deep_research.agents.policies import (
@@ -133,6 +133,25 @@ async def test_tool_window_removes_tools_from_the_final_model_round() -> None:
     await middleware.awrap_model_call(FakeModelRequest(tools=["read_file"], tool_choice="auto"), handler)
     assert seen.tools == []
     assert seen.tool_choice is None
+
+
+async def test_tool_window_rejects_parallel_calls_exceeding_remaining_request_quota() -> None:
+    middleware = ToolPolicyMiddleware(_policy(), tool_call_limit=2)
+    middleware.tool_calls = 1
+
+    async def handler(_request):
+        return AIMessage(
+            content="",
+            tool_calls=[
+                {"name": "read_file", "args": {"path": f"{WORKSPACE}/a"}, "id": "call-1"},
+                {"name": "read_file", "args": {"path": f"{WORKSPACE}/b"}, "id": "call-2"},
+            ],
+        )
+
+    with pytest.raises(AgentPolicyError, match="request tool-call limit exceeded"):
+        await middleware.awrap_model_call(FakeModelRequest(tools=["read_file"], tool_choice="auto"), handler)
+
+    assert middleware.tool_calls == 1
 
 
 # ── deny paths ──────────────────────────────────────────────────────────────

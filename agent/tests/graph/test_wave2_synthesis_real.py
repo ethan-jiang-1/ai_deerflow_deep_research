@@ -18,9 +18,14 @@ from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
 from deerflow_deep_research.domain.synthesis import SynthesisEvidence, SynthesisResult
 from deerflow_deep_research.graph.nodes.wave2_synthesis import NODE_SPEC
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
+from tests.assets.provider_shapes import load_provider_shape_cases, thaw_provider_shape_payload
 
 RESEARCH_ID = "r_" + "W" * 43
 SUBMISSION_REF = "h_" + "S" * 43
+SHAPE_CASES = {
+    case.case_id: case
+    for case in load_provider_shape_cases(Path(__file__).parents[1] / "fixtures/provider_shapes/wave2.json")
+}
 
 
 def _synthesis_json(*, backing_refs: tuple[str, ...] = (SUBMISSION_REF,)) -> str:
@@ -41,43 +46,6 @@ def _synthesis_json(*, backing_refs: tuple[str, ...] = (SUBMISSION_REF,)) -> str
             "relations": [],
             "gaps": [],
             "summary": "One supported cross-topic finding.",
-        }
-    )
-
-
-def _provider_synthesis_json() -> str:
-    return json.dumps(
-        {
-            "schema_version": 1,
-            "findings": [
-                {
-                    "id": "storage economics",
-                    "statement": "Storage duration changes project economics.",
-                    "priority": 1,
-                    "affected_topics": ["storage"],
-                    "backing_refs": [SUBMISSION_REF],
-                    "confidence": "high",
-                    "search_required": False,
-                }
-            ],
-            "relations": [
-                {
-                    "id": "duration supports economics",
-                    "source_finding": "storage economics",
-                    "target_finding": "storage economics",
-                    "relation_type": "supports",
-                    "description": "Provider commentary is not an authority field.",
-                }
-            ],
-            "gaps": [
-                {
-                    "id": "deployment data",
-                    "question": "Which deployments publish duration data?",
-                    "severity": "high",
-                    "affected_topics": ["storage"],
-                }
-            ],
-            "summary": "One supported finding with one gap.",
         }
     )
 
@@ -235,47 +203,15 @@ async def test_real_synthesis_rejects_empty_repair_when_accepted_evidence_exists
     assert not (tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json").exists()
 
 
-async def test_real_synthesis_normalizes_provider_field_aliases(tmp_path: Path) -> None:
-    capabilities = _Capabilities(
-        NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary=_provider_synthesis_json())
-    )
-
-    await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())
-
-    artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
-    payload = json.loads(artifact.read_text(encoding="utf-8"))
-    assert payload["findings"][0]["finding_id"] == "finding:storage_economics"
-    assert payload["relations"][0]["relation_id"] == "rel:duration_supports_economics"
-    assert "description" not in payload["relations"][0]
-    assert payload["relations"][0]["source_finding"] == "finding:storage_economics"
-    assert payload["gaps"][0]["gap_id"] == "gap:deployment_data"
-    assert payload["gaps"][0]["description"] == "Which deployments publish duration data?"
-    assert payload["gaps"][0]["priority"] == 1
-
-
-async def test_real_synthesis_normalizes_provider_description_and_string_gaps(tmp_path: Path) -> None:
-    payload = json.loads(_provider_synthesis_json())
-    payload["findings"][0].pop("statement")
-    payload["findings"][0]["description"] = "Storage duration changes project economics."
-    payload["gaps"] = ["Deployment data is not publicly available."]
-    capabilities = _Capabilities(
-        NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary=json.dumps(payload))
-    )
-
-    await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())
-
-    artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
-    result = json.loads(artifact.read_text(encoding="utf-8"))
-    assert result["findings"][0]["statement"] == "Storage duration changes project economics."
-    assert result["gaps"][0]["description"] == "Deployment data is not publicly available."
-    assert result["gaps"][0]["priority"] == 3
-
-
-async def test_real_synthesis_maps_source_aliases_to_accepted_record_refs(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "case",
+    [pytest.param(SHAPE_CASES["shape-wave2-evidence-alias-binding"], id="shape-wave2-evidence-alias-binding")],
+)
+async def test_real_synthesis_maps_source_aliases_to_accepted_record_refs(tmp_path: Path, case) -> None:
     capabilities = _Capabilities(
         NodeExecutionResult(
             finish_reason=NodeFinishReason.SUCCESS,
-            summary=_synthesis_json(backing_refs=("source:storage",)),
+            summary=json.dumps(thaw_provider_shape_payload(case.payload)),
         )
     )
 
@@ -283,116 +219,7 @@ async def test_real_synthesis_maps_source_aliases_to_accepted_record_refs(tmp_pa
 
     artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
     result = json.loads(artifact.read_text(encoding="utf-8"))
-    assert result["findings"][0]["backing_refs"] == [SUBMISSION_REF]
-
-
-async def test_real_synthesis_normalizes_sparse_provider_findings(tmp_path: Path) -> None:
-    sparse = {
-        "schema_version": 1,
-        "findings": [
-            {
-                "statement": "Storage duration changes project economics.",
-                "source_ids": ["source:storage"],
-                "evidence_refs": [],
-                "affected_topics": ["storage"],
-            }
-        ],
-        "relations": [],
-        "gaps": [],
-        "summary": "One supported finding.",
-    }
-    capabilities = _Capabilities(
-        NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary=json.dumps(sparse))
-    )
-
-    await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())
-
-    artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
-    result = json.loads(artifact.read_text(encoding="utf-8"))
-    assert result["findings"][0] == {
-        "affected_topics": ["storage"],
-        "backing_refs": [SUBMISSION_REF],
-        "confidence": "medium",
-        "finding_id": "finding:Storage_duration_changes_project_economics",
-        "priority": 3,
-        "search_required": False,
-        "statement": "Storage duration changes project economics.",
-    }
-
-
-async def test_real_synthesis_normalizes_provider_relation_endpoint_aliases(tmp_path: Path) -> None:
-    payload = json.loads(_provider_synthesis_json())
-    relation = payload["relations"][0]
-    relation["finding_id_a"] = relation.pop("source_finding")
-    relation["finding_id_b"] = relation.pop("target_finding")
-    capabilities = _Capabilities(
-        NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary=json.dumps(payload))
-    )
-
-    await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())
-
-    artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
-    result = json.loads(artifact.read_text(encoding="utf-8"))
-    assert result["relations"][0]["source_finding"] == "finding:storage_economics"
-    assert result["relations"][0]["target_finding"] == "finding:storage_economics"
-
-
-async def test_real_synthesis_normalizes_singular_affected_topic(tmp_path: Path) -> None:
-    payload = json.loads(_provider_synthesis_json())
-    payload["findings"] = []
-    payload["relations"] = []
-    payload["gaps"][0]["affected_topic"] = payload["gaps"][0].pop("affected_topics")[0]
-    capabilities = _Capabilities(
-        NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary=json.dumps(payload))
-    )
-
-    await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())
-
-    artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
-    result = json.loads(artifact.read_text(encoding="utf-8"))
-    assert result["gaps"][0]["affected_topics"] == ["storage"]
-
-
-async def test_real_synthesis_normalizes_alternate_relation_shape(tmp_path: Path) -> None:
-    payload = json.loads(_provider_synthesis_json())
-    relation = payload["relations"][0]
-    relation.pop("id")
-    relation["from_finding"] = relation.pop("source_finding")
-    relation["to_finding"] = relation.pop("target_finding")
-    relation["type"] = relation.pop("relation_type")
-    capabilities = _Capabilities(
-        NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary=json.dumps(payload))
-    )
-
-    await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())
-
-    artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
-    result = json.loads(artifact.read_text(encoding="utf-8"))
-    assert result["relations"][0] == {
-        "relation_id": "rel:storage_economics_supports_storage_economics",
-        "relation_type": "supports",
-        "source_finding": "finding:storage_economics",
-        "target_finding": "finding:storage_economics",
-    }
-
-
-async def test_real_synthesis_derives_missing_gap_id_and_priority(tmp_path: Path) -> None:
-    payload = json.loads(_provider_synthesis_json())
-    payload["findings"] = []
-    payload["relations"] = []
-    gap = payload["gaps"][0]
-    gap.pop("id")
-    gap.pop("severity")
-    capabilities = _Capabilities(
-        NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary=json.dumps(payload))
-    )
-
-    await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())
-
-    artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
-    result = json.loads(artifact.read_text(encoding="utf-8"))
-    assert result["gaps"][0]["gap_id"] == "gap:Which_deployments_publish_duration_data"
-    assert result["gaps"][0]["priority"] == 3
+    assert result["findings"][0]["backing_refs"] == thaw_provider_shape_payload(case.expected_payload)["backing_refs"]
 
 
 @pytest.mark.parametrize(

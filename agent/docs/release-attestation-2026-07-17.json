@@ -1,0 +1,42 @@
+{
+  "attestation_base_revision": "665ca33575b0d7eb3a408d68956d0ac7b2669d47",
+  "attestation_scan": {
+    "credential_values_absent": true,
+    "raw_host_paths_absent": true
+  },
+  "run_revision": "unknown",
+  "scenario_id": "release-full-real-acceptance",
+  "schema_version": 1,
+  "source_archive_scan": {
+    "credential_values_absent": true,
+    "raw_host_paths_absent": true,
+    "source_locator": "openspec/changes/archive/2026-07-17-evaluate-harden-deep-research-graph/tasks.md#task-6.6",
+    "target_scope": [
+      "agent/.reports/live",
+      "agent/.reports/release"
+    ]
+  },
+  "source_observation_date": "2026-07-17",
+  "source_report_sha256": "36f41ca7c631320d05205f26afba9fbddcc0652e8f8323a7832e7816b7828146",
+  "source_run": {
+    "accepted_count": 2,
+    "attempt_count": 1,
+    "citation_claim_count": 2,
+    "citation_ref_count": 2,
+    "hard_invariants": {
+      "accepted_evidence_present": true,
+      "checkpoint_isolated": true,
+      "citation_bindings_valid": true,
+      "cleanup_complete": true,
+      "lifecycle_trace_complete": true,
+      "paths_contained": true,
+      "report_artifacts_present": true,
+      "terminal_completed": true
+    },
+    "input_tokens": 37597,
+    "output_tokens": 18591,
+    "retry_count": 0,
+    "tool_calls": 12,
+    "wall_time_seconds": 286.1884355
+  }
+}

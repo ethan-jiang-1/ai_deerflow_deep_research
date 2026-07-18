@@ -54,6 +54,11 @@ path = "agent/tests"
 kind = "directory"
 owner = "PRS-001"
 
+[[required_paths]]
+path = "openspec/governance/test-evidence-policy.md"
+kind = "file"
+owner = "PRS-004"
+
 [imports]
 domain = ["stdlib", "pydantic"]
 engine = ["domain"]
@@ -105,6 +110,7 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/pyproject.toml` (file; `PRS-001`)
   - `agent/src/deerflow_deep_research/` (directory; `PRS-001`)
   - `agent/tests/` (directory; `PRS-001`)
+  - `openspec/governance/test-evidence-policy.md` (file; `PRS-004`)
 - Top-level node root: `agent/src/deerflow_deep_research/graph/nodes/`
 - Required node files: `__init__.py`, `node.py`, `fake.py`, `contracts.py`
 - Public node export: `NODE_SPEC`
@@ -129,6 +135,7 @@ class ArchitectureGovernanceContractTests(unittest.TestCase):
         self.root = Path(self._temporary.name)
         _write(self.root, MANIFEST_PATH, VALID_MANIFEST)
         _write(self.root, "openspec/governance/req-registry.yaml", REGISTRY_TEXT)
+        _write(self.root, "openspec/governance/test-evidence-policy.md", "# Test Evidence Governance Policy\n")
         _write(self.root, ACTIVE_SPEC_PATH, SPEC_TEXT)
         _write(self.root, GUIDE_PATH, f"# Agent Guide\n\n{VALID_GENERATED_BLOCK}\nOperational text.\n")
         _write(self.root, "agent/pyproject.toml", '[project]\nname = "fixture"\n')

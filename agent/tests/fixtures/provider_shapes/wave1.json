@@ -1,0 +1,78 @@
+[
+  {
+    "case_id": "shape-wave1-provider-identifiers",
+    "discovery_ids": ["RELEASE-20260717-07"],
+    "focused_node": "wave1",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "claims": [{"claim_id": "claim 1", "statement": "Synthetic claim", "support_refs": [], "counter_refs": []}],
+      "open_questions": [{"question_id": "question 1", "question": "Synthetic question?", "state": "needs_more_research"}]
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "source_ids": [],
+        "claim_ids": ["claim:w1_claim_1"],
+        "support_refs": [[]],
+        "question_ids": ["q:w1_question_1"],
+        "question_states": ["targeted_search"]
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave1-source-id-ref-rewrites",
+    "discovery_ids": ["RELEASE-20260717-18"],
+    "focused_node": "wave1",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "sources": [{"source_id": "Source 1 / official", "canonical_url": "HTTPS://Example.invalid:443/source-1/#fragment", "title": "Synthetic source"}],
+      "claims": [{"claim_id": "claim 1", "statement": "Synthetic supported claim", "support_refs": ["Source 1 / official"], "counter_refs": []}]
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "source_ids": ["source:w1_Source_1_official"],
+        "claim_ids": ["claim:w1_claim_1"],
+        "support_refs": [["source:w1_Source_1_official"]],
+        "question_ids": [],
+        "question_states": []
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave1-source-order",
+    "discovery_ids": ["RELEASE-20260717-21"],
+    "focused_node": "wave1",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "sources": [
+        {"source_id": "source:z", "canonical_url": "https://example.invalid/z", "title": "Synthetic Z"},
+        {"source_id": "source:a", "canonical_url": "https://example.invalid/a", "title": "Synthetic A"}
+      ],
+      "claims": [{"claim_id": "claim order", "statement": "Synthetic ordered claim", "support_refs": ["source:z", "source:a"], "counter_refs": []}]
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {"source_ids": ["source:a", "source:z"], "support_refs": ["source:a", "source:z"]}
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave1-malformed-submit",
+    "discovery_ids": ["RELEASE-20260717-18"],
+    "focused_node": "wave1",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "sources": [{"source_id": "source:declared", "canonical_url": "https://example.invalid/declared", "title": "Synthetic declared"}],
+      "source_ids": ["source:other"]
+    },
+    "expected": {"kind": "fail_closed", "error_code": "source_ids_mismatch"},
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": false}
+  }
+]

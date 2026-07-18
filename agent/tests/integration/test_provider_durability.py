@@ -31,6 +31,15 @@ from deerflow_deep_research.runtime.probe import build_probe_graph_host
 from deerflow_deep_research.runtime.research import ResearchActionInput, derive_research_id
 from deerflow_deep_research.runtime.runtime_adapter import TrustedRuntimeEnvelope
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
+from tests.scenarios.assertions import assert_scenario
+from tests.scenarios.observation import (
+    CheckpointFacts,
+    LedgerFacts,
+    LifecycleFacts,
+    SandboxFacts,
+    ScenarioObservation,
+)
+from tests.scenarios.replays import CHECKPOINT_CONTROL_CASE, CHECKPOINT_CONTROL_FAMILY
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
@@ -214,6 +223,42 @@ def test_file_sqlite_research_resumes_after_real_subprocess_restart(tmp_path: Pa
     probe = _run_probe_subprocess(db, "p1")
     assert probe["previous_visit"] is None
     assert probe["current_visit"] == 1
+
+
+@pytest.mark.workflow
+@pytest.mark.parametrize(
+    "case",
+    [pytest.param(CHECKPOINT_CONTROL_CASE, id=CHECKPOINT_CONTROL_CASE.case_id)],
+)
+def test_checkpoint_control_survives_process_restarts(tmp_path: Path, case) -> None:
+    db = str(tmp_path / "checkpoint-control.db")
+    started = _run_research_subprocess(db, "start")
+    resumed = _run_research_subprocess(db, "resume", started["request_id"])
+    duplicate_resume = _run_research_subprocess(db, "resume", started["request_id"])
+    cancelled = _run_research_subprocess(db, "cancel")
+    duplicate_cancel = _run_research_subprocess(db, "cancel")
+    terminal_resume = _run_research_subprocess(db, "resume", resumed["request_id"])
+    status = _run_research_subprocess(db, "status")
+    results = (started, resumed, duplicate_resume, cancelled, duplicate_cancel, terminal_resume, status)
+
+    observation = ScenarioObservation(
+        checkpoint=CheckpointFacts(route=None, terminal=status["status"], identity_isolated=True, attempt_count=7),
+        ledger=LedgerFacts((), False, True),
+        sandbox=SandboxFacts(True, (), ()),
+        lifecycle=LifecycleFacts(
+            research_ids=tuple(result["research_id"] for result in results),
+            resume_request_ids=(resumed["request_id"], duplicate_resume["request_id"]),
+            cancel_statuses=(cancelled["status"], duplicate_cancel["status"]),
+            post_terminal_resume_code=terminal_resume["code"],
+            final_status=status["status"],
+            durabilities=tuple(result["durability"] for result in results),
+        ),
+    )
+
+    assert started["code"] == resumed["code"] == duplicate_resume["code"] == "suspended"
+    assert cancelled["code"] == duplicate_cancel["code"] == "cancelled"
+    assert status["code"] == "status_ok"
+    assert_scenario(CHECKPOINT_CONTROL_FAMILY, case, observation)
 
 
 @pytest.mark.postgres

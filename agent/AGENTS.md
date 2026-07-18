@@ -123,6 +123,7 @@ Registry: `openspec/governance/project-structure.toml`
   - `agent/tests/e2e/` (directory; `PRS-001`)
   - `agent/tests/fixtures/` (directory; `PRS-001`)
   - `openspec/governance/architecture-policy.md` (file; `PRS-004`)
+  - `openspec/governance/test-evidence-policy.md` (file; `PRS-004`)
   - `openspec/governance/project-structure.toml` (file; `PRS-004`)
   - `openspec/governance/check_project_architecture.py` (file; `PRS-004`)
 - Top-level node root: `agent/src/deerflow_deep_research/graph/nodes/`
@@ -333,6 +334,13 @@ Use red-before-green deterministic tests. Model-facing tests use
 
 ## Test And Evaluation Policy
 
+Normative test-evidence semantics live in the active `evaluation-hardening`
+OpenSpec main spec and its one active owning delta. Authority, lifecycle, and
+synchronized-change routing are defined in
+`openspec/governance/test-evidence-policy.md`; exact evidence metadata and
+executable collection remain under `agent/tests/` and
+`agent/scripts/check_test_assets.py`.
+
 Classify every new asset as one of four classes: code correctness, deterministic
 agent-workflow conformance, live behavioral evaluation, or full-system release
 acceptance. Do not use unit/integration/E2E labels alone to claim authenticity.
@@ -365,13 +373,28 @@ host paths.
 
 Selection and cadence are fixed. Pull requests and pushes run
 `.github/workflows/agent-tests.yml`: lint, asset and requirement governance,
-`make test-fast`, and `make test-integration`, all without credentials or public
-network. Nightly/manual `.github/workflows/agent-live-evaluation.yml` runs
-`make test-live`. Manual/reusable `.github/workflows/agent-release-e2e.yml` runs
+`make test-fast`, `make test-integration`, and `make test-workflow`, all without
+credentials or public network; their exact union is `make test`. Central
+`TestEvidenceClaim` metadata, not prose or selector existence alone, binds each
+collected selector to its requirement, class, seam, and authenticity. The
+six-case live-evaluation workflow remains manual-only until a complete measured
+lane passes and keeps the reviewed aggregate job margin. Manual/reusable
+`.github/workflows/agent-release-e2e.yml` runs
 deterministic gates before `make test-release-e2e`. Explicit live/release
 selection must fail strict preflight rather than skip when credentials or
 confirmation are absent. Preserve bounded visible retries, unique identities,
 redacted reports, and archive scans.
+
+Keep three replay terms distinct. A scripted case is a short deterministic
+external model/tool sequence through the real production loop. A provider-shape
+fixture is a minimized redacted payload exercised through a normalization or
+validation seam. Persisted trace replay is reserved for a reviewed temporal or
+interleaving requirement; do not use it for ordinary provider shapes. New live
+reports use evidence-v1 typed metric statuses and evidence bases; missing or
+unlabeled authority is explicit, never a vacuous score. Gitignored raw reports
+are operational artifacts. Accepted full-real proof is preserved by the minimal
+committed attestation at `docs/release-attestation-2026-07-17.json`, and the
+release lane remains the sole `FULL_REAL_PIPELINE` evidence.
 
 Every live/release discovery must be recorded in
 `docs/regression-descent.md`. Add the smallest red-before-green deterministic

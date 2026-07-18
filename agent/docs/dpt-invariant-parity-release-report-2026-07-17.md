@@ -1,5 +1,12 @@
 # DPT Invariant Parity And Release Evidence: 2026-07-17
 
+Status: Superseded by `docs/release-attestation-2026-07-17.json`.
+
+This document is the pre-acceptance snapshot from the same evidence epoch. Its
+`NOT READY` and `full-real not executed` statements below are historical and
+must not be read as the current release-evidence verdict. The committed
+attestation records the later accepted full-real run and its provenance.
+
 Release verdict: NOT READY
 
 This report separates deterministic proof, live observation, and full-real

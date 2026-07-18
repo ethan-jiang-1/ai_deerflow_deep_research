@@ -36,6 +36,15 @@ from deerflow_deep_research.runtime.work_unit_store import (
     CommitDisposition,
     WorkUnitStore,
 )
+from tests.scenarios.assertions import assert_scenario
+from tests.scenarios.observation import (
+    CheckpointFacts,
+    FilesystemFaultOutcome,
+    LedgerFacts,
+    SandboxFacts,
+    ScenarioObservation,
+)
+from tests.scenarios.replays import SANDBOX_FILESYSTEM_FAILURE_CASE, SANDBOX_FILESYSTEM_FAILURE_FAMILY
 
 RESEARCH_ID = "r_" + "A" * 43
 NOW = datetime(2026, 7, 14, 1, 2, 3, 4, tzinfo=UTC)
@@ -252,6 +261,63 @@ async def test_atomic_publication_fault_boundaries_replay_from_last_parent_check
     expected = CommitDisposition.REPLAYED if ledger_committed else CommitDisposition.APPENDED
     assert replay.disposition is expected
     assert len(await restarted.load_records()) == 1
+
+
+@pytest.mark.parametrize(
+    "case",
+    [pytest.param(SANDBOX_FILESYSTEM_FAILURE_CASE, id=SANDBOX_FILESYSTEM_FAILURE_CASE.case_id)],
+)
+async def test_prior_authority_survives_atomic_publication_fault_matrix(tmp_path: Path, case) -> None:
+    outcomes: list[FilesystemFaultOutcome] = []
+    final_refs: tuple[str, ...] = ()
+    for index, fault_point in enumerate(
+        ("before_staging_write", "after_staging_fsync", "after_ledger_replace", "after_directory_fsync")
+    ):
+        workspace = tmp_path / f"fault-{index}"
+        workspace.mkdir()
+        prior_store = await _store(workspace)
+        prior = await prior_store.commit_candidate(_candidate(), scope=("topic:0",))
+
+        def fault(point: str, _evidence_fd: int, *, selected: str = fault_point) -> None:
+            if point == selected:
+                raise RuntimeError(selected)
+
+        faulting = await _store(workspace, fault_hook=fault, token_factory=lambda: "d" * 32)
+        with pytest.raises(RuntimeError, match=fault_point):
+            await faulting.commit_candidate(_candidate(work_ordinal=1), scope=("topic:1",))
+
+        restarted = await _store(workspace)
+        after_fault = await restarted.load_records()
+        assert after_fault[0].record_hash == prior.record.record_hash
+        assert len(after_fault) in {1, 2}
+        replay = await restarted.commit_candidate(_candidate(work_ordinal=1), scope=("topic:1",))
+        final = await restarted.load_records()
+        assert len(final) == 2
+        assert {record.work_id for record in final} == {"g0_wave0_w0000", "g0_wave0_w0001"}
+        evidence = workspace / "deep-research" / RESEARCH_ID / "evidence"
+        staging_residue = bool(tuple(evidence.glob(".submissions.*.tmp")))
+        paths_contained = all(
+            record.result_ref.startswith(f"workspace/deep-research/{RESEARCH_ID}/work/") for record in final
+        )
+        outcomes.append(
+            FilesystemFaultOutcome(
+                fault_point=fault_point,
+                records_after_fault=len(after_fault),
+                records_after_replay=len(final),
+                replay_disposition=replay.disposition.value,
+                paths_contained=paths_contained,
+                staging_residue=staging_residue,
+            )
+        )
+        final_refs = tuple(record.record_hash for record in final)
+
+    observation = ScenarioObservation(
+        checkpoint=CheckpointFacts(route=None, terminal=None, identity_isolated=True, attempt_count=4),
+        ledger=LedgerFacts(final_refs, conflict_detected=False, replay_idempotent=True),
+        sandbox=SandboxFacts(paths_contained=True, artifact_hashes=(), citation_bindings=()),
+        filesystem_faults=tuple(outcomes),
+    )
+    assert_scenario(SANDBOX_FILESYSTEM_FAILURE_FAMILY, case, observation)
 
 
 async def test_stale_staging_is_non_authoritative_and_symlink_lock_is_rejected(tmp_path: Path) -> None:

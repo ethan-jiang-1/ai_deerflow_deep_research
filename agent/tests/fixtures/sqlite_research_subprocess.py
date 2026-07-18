@@ -106,19 +106,31 @@ async def _main() -> None:
             tool_call_id="call-resume",
             messages=(HumanMessage(content="research question", id="human-start"), response),
         )
+    elif mode in {"cancel", "status"}:
+        action_input = ResearchActionInput(
+            action=LifecycleAction(mode),
+            research_id=research_id,
+            tool_call_id=f"call-{mode}",
+            messages=(),
+        )
     else:
-        raise SystemExit("usage: sqlite_research_subprocess.py <db> start|resume [request-id]")
+        raise SystemExit("usage: sqlite_research_subprocess.py <db> start|resume|cancel|status [request-id]")
 
     result = await host.run_action(action=mode, envelope=envelope, action_input=action_input)
-    control, request = _payload(result)
+    if isinstance(result, dict):
+        control = result
+        request: dict[str, object] = {}
+    else:
+        control, request = _payload(result)
     print(
         json.dumps(
             {
                 "research_id": control["research_id"],
-                "request_id": request["request_id"],
+                "request_id": request.get("request_id") or control.get("request_id"),
                 "code": control["code"],
                 "durability": control["durability"],
                 "implementation_mode": control["implementation_mode"],
+                "status": control.get("status"),
             },
             sort_keys=True,
         )

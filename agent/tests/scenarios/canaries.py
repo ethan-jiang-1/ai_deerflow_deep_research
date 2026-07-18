@@ -9,7 +9,8 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -17,23 +18,53 @@ from typing import Any
 from deerflow.config.app_config import AppConfig
 from deerflow.config.model_config import ModelConfig
 from deerflow.config.sandbox_config import SandboxConfig
-from deerflow.sandbox.sandbox_provider import set_sandbox_provider
+from deerflow.sandbox.sandbox_provider import reset_sandbox_provider, set_sandbox_provider
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import StructuredTool
 from langgraph.types import Command
 
+from deerflow_deep_research.domain.bundle import synthesis_findings_path
 from deerflow_deep_research.domain.context import NodeExecutionResult
 from deerflow_deep_research.domain.enums import NodeFinishReason
+from deerflow_deep_research.domain.invocation import WorkUnitControllerDependencies
+from deerflow_deep_research.domain.state import WORK_UNIT_GATE_PREVIEW_FIELDS, preview_work_unit_update
+from deerflow_deep_research.domain.work_units import (
+    WORK_UNIT_GATE_VIEW_KEY,
+    WorkUnitGateView,
+    validate_wrapper_gate_view,
+)
+from deerflow_deep_research.graph.nodes.gate_adapter import (
+    evaluate_gate_for_node,
+    real_wave1_gate_def,
+    real_wave2_gate_def,
+)
+from deerflow_deep_research.graph.nodes.targeted_evidence import NODE_SPEC as TARGETED_NODE_SPEC
+from deerflow_deep_research.graph.nodes.wave1 import NODE_SPEC as WAVE1_NODE_SPEC
+from deerflow_deep_research.graph.nodes.wave2_synthesis import NODE_SPEC as WAVE2_NODE_SPEC
 from deerflow_deep_research.graph.topology import LOGICAL_NODES
 from deerflow_deep_research.runtime.control import build_control_graph_host
 from deerflow_deep_research.runtime.node_agent_bridge import RuntimeNodeAgentBridge
-from deerflow_deep_research.runtime.research import ResearchGraphRecipe
+from deerflow_deep_research.runtime.projection import RuntimeWorkUnitDependencyResolver, project_research_scope
+from deerflow_deep_research.runtime.research import (
+    ResearchGraphRecipe,
+    RuntimeNodeDependencyResolver,
+    _build_hitl1_capabilities,
+    _build_wave0_capabilities,
+    _build_wave1_capabilities,
+)
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 from deerflow_deep_research.tool import run_deep_research
+from tests.fixtures.live_seeds import build_live_seed_bundle
 from tests.fixtures.runtime import local_runtime_envelope, unique_run_identity
-from tests.scenarios.live import LiveAttempt, LiveScenarioReport, LiveScenarioRunner, preflight_live_environment
-from tests.scenarios.model import AuthenticityLevel, Scenario, ScenarioOutcome
+from tests.scenarios.live import (
+    LiveAttempt,
+    LiveOutcome,
+    LiveScenario,
+    LiveScenarioReport,
+    LiveScenarioRunner,
+    preflight_live_environment,
+)
 
 _FAKE_MODES = {name: "fake" for name in LOGICAL_NODES}
 _MODEL_CONFIGS = {
@@ -85,29 +116,122 @@ _PLAN = json.dumps(
 )
 
 
-def _canary(scenario_id: str, focused_node: str, *, require_web: bool) -> Scenario:
-    return Scenario(
+def _canary(scenario_id: str, focused_node: str, *, require_web: bool) -> LiveScenario:
+    return LiveScenario(
         scenario_id=scenario_id,
-        risk_family="live-prefix",
         requirement_ids=("EVH-005", "EVH-009"),
-        regression_ids=(),
         entrypoint="deep_research.start/resume",
-        authenticity=AuthenticityLevel.LIVE_REAL_DEPENDENCIES,
         preconditions={
             "identity": "unique-per-invocation",
             "focused_node": focused_node,
             "require_web": require_web,
-            "timeout_seconds": 300,
+            "timeout_seconds": {
+                "live-start-to-hitl1": 90,
+                "live-hitl1-to-topic-planning": 120,
+                "live-one-topic-wave0": 210,
+            }[scenario_id],
             "max_attempts": 1,
             "max_total_tokens": 32_768,
             "max_model_calls": 4 if require_web else 1,
             "max_tool_calls": 3 if require_web else 0,
         },
-        scripted_inputs=(),
         live_requirements=("model", "web_search") if require_web else ("model",),
-        expected=ScenarioOutcome(route=scenario_id.removeprefix("live-")),
+        expected=LiveOutcome(route=scenario_id.removeprefix("live-")),
         hard_invariants=("identity_isolated", "bounded_attempts", "expected_prefix", "authority"),
-        metrics=("citation_precision", "must_answer_coverage"),
+        metrics=("citation-binding-rate", "must-answer-coverage"),
+    )
+
+
+def _focused_wave1_canary() -> LiveScenario:
+    return LiveScenario(
+        scenario_id="live-one-topic-wave1",
+        requirement_ids=("EVH-005", "EVH-009"),
+        entrypoint="wave1.NODE_SPEC",
+        preconditions={
+            "identity": "unique-per-invocation",
+            "focused_node": "wave1",
+            "require_web": True,
+            "seed_authority": "validated-wave0-ledger",
+            "capability_builder": "_build_wave1_capabilities",
+            "gate_contract": "preview-validate-evaluate",
+            "coverage_exclusions": (
+                "public-entry",
+                "predecessor-lifecycle",
+                "production-recipe",
+                "full-pipeline",
+            ),
+            "timeout_seconds": 180,
+            "max_attempts": 1,
+            "max_total_tokens": 32_768,
+            "max_model_calls": 4,
+            "max_tool_calls": 3,
+        },
+        live_requirements=("model", "web_search"),
+        expected=LiveOutcome(route="one-topic-wave1"),
+        hard_invariants=("identity_isolated", "bounded_attempts", "expected_prefix", "authority"),
+        metrics=("citation-binding-rate", "must-answer-coverage"),
+    )
+
+
+def _focused_wave2_canary() -> LiveScenario:
+    return LiveScenario(
+        scenario_id="live-wave2-synthesis",
+        requirement_ids=("EVH-005", "EVH-009"),
+        entrypoint="wave2_synthesis.NODE_SPEC",
+        preconditions={
+            "identity": "unique-per-invocation",
+            "focused_node": "wave2_synthesis",
+            "require_web": False,
+            "seed_authority": "validated-wave0-wave1-ledger",
+            "capability_builder": "_build_hitl1_capabilities",
+            "gate_contract": "node-then-evaluate",
+            "coverage_exclusions": (
+                "public-entry",
+                "predecessor-lifecycle",
+                "production-recipe",
+                "full-pipeline",
+            ),
+            "timeout_seconds": 120,
+            "max_attempts": 1,
+            "max_total_tokens": 32_768,
+            "max_model_calls": 2,
+            "max_tool_calls": 0,
+        },
+        live_requirements=("model",),
+        expected=LiveOutcome(route="wave2-synthesis"),
+        hard_invariants=("identity_isolated", "bounded_attempts", "expected_prefix", "authority"),
+        metrics=("citation-binding-rate", "must-answer-coverage"),
+    )
+
+
+def _focused_targeted_evidence_canary() -> LiveScenario:
+    return LiveScenario(
+        scenario_id="live-one-gap-targeted-evidence",
+        requirement_ids=("EVH-005", "EVH-009"),
+        entrypoint="targeted_evidence.NODE_SPEC",
+        preconditions={
+            "identity": "unique-per-invocation",
+            "focused_node": "targeted_evidence",
+            "require_web": True,
+            "seed_authority": "validated-synthesis-gap",
+            "capability_builder": "_build_wave0_capabilities",
+            "gate_contract": "none-submit-only",
+            "coverage_exclusions": (
+                "public-entry",
+                "predecessor-lifecycle",
+                "production-recipe",
+                "full-pipeline",
+            ),
+            "timeout_seconds": 180,
+            "max_attempts": 1,
+            "max_total_tokens": 32_768,
+            "max_model_calls": 4,
+            "max_tool_calls": 3,
+        },
+        live_requirements=("model", "web_search"),
+        expected=LiveOutcome(route="targeted-evidence"),
+        hard_invariants=("identity_isolated", "bounded_attempts", "expected_prefix", "authority"),
+        metrics=("citation-binding-rate", "must-answer-coverage"),
     )
 
 
@@ -115,7 +239,279 @@ LIVE_CANARIES = (
     _canary("live-start-to-hitl1", "hitl1", require_web=False),
     _canary("live-hitl1-to-topic-planning", "topic_planning", require_web=False),
     _canary("live-one-topic-wave0", "wave0", require_web=True),
+    _focused_wave1_canary(),
+    _focused_wave2_canary(),
+    _focused_targeted_evidence_canary(),
 )
+
+
+def validate_live_canary_deadlines(
+    scenarios: tuple[LiveScenario, ...],
+    *,
+    job_timeout_seconds: int,
+) -> dict[str, int]:
+    if not isinstance(scenarios, tuple) or len(scenarios) != 6:
+        raise ValueError("live_case_count_invalid")
+    if len({scenario.scenario_id for scenario in scenarios}) != 6:
+        raise ValueError("live_case_identity_invalid")
+    if job_timeout_seconds != 1200:
+        raise ValueError("live_job_timeout_changed")
+    declared_seconds = 0
+    for scenario in scenarios:
+        timeout = scenario.preconditions.get("timeout_seconds")
+        if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
+            raise ValueError("live_deadline_invalid")
+        if scenario.preconditions.get("require_web") is True:
+            if timeout > 240:
+                raise ValueError("live_web_deadline_invalid")
+        elif timeout > 120:
+            raise ValueError("live_zero_tool_deadline_invalid")
+        declared_seconds += timeout
+    if declared_seconds > 900:
+        raise ValueError("live_aggregate_deadline_invalid")
+    margin_seconds = job_timeout_seconds - declared_seconds
+    if margin_seconds < 300:
+        raise ValueError("live_job_margin_invalid")
+    return {
+        "case_count": len(scenarios),
+        "declared_seconds": declared_seconds,
+        "job_timeout_seconds": job_timeout_seconds,
+        "margin_seconds": margin_seconds,
+    }
+
+
+@dataclass(frozen=True)
+class _FocusedWave1Execution:
+    outcome: LiveOutcome
+    gate_route: str
+    record_phases: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _FocusedWave2Execution:
+    outcome: LiveOutcome
+    gate_route: str
+    record_phases: tuple[str, ...]
+    accepted_refs: tuple[str, ...]
+    backing_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _FocusedTargetedExecution:
+    outcome: LiveOutcome
+    record_phases: tuple[str, ...]
+    targeted_record_count: int
+
+
+async def _execute_focused_wave1_core(
+    *,
+    envelope: Any,
+    research_id: str,
+    bridge_factory: Any,
+) -> _FocusedWave1Execution:
+    seed = await build_live_seed_bundle(
+        envelope.workspace_host_path,
+        research_id=research_id,
+        include_wave1=False,
+        now=datetime.now(UTC),
+        clock=lambda: datetime.now(UTC),
+    )
+    graph_context = project_research_scope(envelope, research_scope_id=research_id)
+    capabilities = _build_wave1_capabilities(envelope, graph_context, bridge_factory)
+    base_resolver = RuntimeNodeDependencyResolver(
+        graph_context,
+        capabilities,
+        capabilities_by_node={"wave1": capabilities},
+    )
+    controller = WorkUnitControllerDependencies(
+        store=seed.store,
+        resolver=RuntimeWorkUnitDependencyResolver(graph_context, base_resolver, seed.store),
+    )
+    dependencies = base_resolver.resolve(
+        logical_name="wave1",
+        attempt_id="focused-wave1",
+        policy=WAVE1_NODE_SPEC.policy,
+    )
+    node = WAVE1_NODE_SPEC.real_factory(replace(dependencies, work_units=controller))
+    result = dict(await node(dict(seed.checkpoint)))
+
+    gate_view = result.pop(WORK_UNIT_GATE_VIEW_KEY, None)
+    if not isinstance(gate_view, WorkUnitGateView):
+        raise AssertionError("live_wave1_gate_view_missing")
+    preview_delta = {key: value for key, value in result.items() if key in WORK_UNIT_GATE_PREVIEW_FIELDS}
+    gate_state = preview_work_unit_update(seed.checkpoint, preview_delta)
+    validate_wrapper_gate_view(gate_view, gate_state, phase="wave1")
+    gate_update = evaluate_gate_for_node(
+        {**gate_state, WORK_UNIT_GATE_VIEW_KEY: gate_view},
+        "wave1",
+        real_wave1_gate_def(),
+    )
+
+    records = await seed.store.load_records()
+    wave1_records = tuple(record for record in records if record.phase.value == "wave1")
+    if len(records) != 2 or len(wave1_records) != 1 or gate_update.get("route") != "pass":
+        raise AssertionError("live_wave1_authority_missing")
+    wave1_record = wave1_records[0]
+    outcome = LiveOutcome(
+        route="one-topic-wave1",
+        artifacts=(wave1_record.result_ref,),
+        values={
+            "accepted_submission_refs": (f"ref:{wave1_record.record_hash}",),
+            "must_answer_questions": tuple(seed.checkpoint["must_answer_questions"]),
+            "identity": {
+                "thread_id": envelope.outer_thread_id,
+                "run_id": envelope.outer_run_id,
+                "research_id": research_id,
+            },
+        },
+    )
+    return _FocusedWave1Execution(
+        outcome=outcome,
+        gate_route=str(gate_update["route"]),
+        record_phases=tuple(record.phase.value for record in records),
+    )
+
+
+async def _execute_focused_wave2_core(
+    *,
+    envelope: Any,
+    research_id: str,
+    bridge_factory: Any,
+) -> _FocusedWave2Execution:
+    seed = await build_live_seed_bundle(
+        envelope.workspace_host_path,
+        research_id=research_id,
+        include_wave1=True,
+        now=datetime.now(UTC),
+        clock=lambda: datetime.now(UTC),
+    )
+    records = await seed.store.load_records()
+    accepted_refs = tuple(record.record_hash for record in records)
+    if tuple(record.phase.value for record in records) != ("wave0", "wave1"):
+        raise AssertionError("live_wave2_seed_authority_missing")
+
+    graph_context = project_research_scope(envelope, research_scope_id=research_id)
+    capabilities = _build_hitl1_capabilities(envelope, graph_context, bridge_factory)
+    base_resolver = RuntimeNodeDependencyResolver(graph_context, capabilities)
+    dependencies = base_resolver.resolve(
+        logical_name="wave2_synthesis",
+        attempt_id="focused-wave2-synthesis",
+        policy=WAVE2_NODE_SPEC.policy,
+    )
+    node = WAVE2_NODE_SPEC.real_factory(replace(dependencies, synthesis_bundle=seed.store))
+    node_update = dict(await node(dict(seed.checkpoint)))
+
+    artifact_ref = synthesis_findings_path(research_id)
+    artifact = json.loads(await seed.store.read_canonical_bytes(artifact_ref, max_bytes=256 * 1024))
+    findings = tuple(artifact.get("findings") or ())
+    if not findings:
+        raise AssertionError("live_wave2_semantic_floor_missing")
+    backing_refs = tuple(ref for finding in findings for ref in finding.get("backing_refs", ()))
+    if not backing_refs or not set(backing_refs) <= set(accepted_refs):
+        raise AssertionError("live_wave2_binding_authority_missing")
+
+    gate_state = {**seed.checkpoint, **node_update}
+    gate_update = evaluate_gate_for_node(gate_state, "wave2_synthesis", real_wave2_gate_def())
+    if gate_update.get("route") != "pass":
+        raise AssertionError("live_wave2_gate_authority_missing")
+    outcome = LiveOutcome(
+        route="wave2-synthesis",
+        artifacts=(artifact_ref,),
+        values={
+            "accepted_submission_refs": tuple(f"ref:{value}" for value in accepted_refs),
+            "synthesis_findings": findings,
+            "synthesis_gaps": tuple(artifact.get("gaps") or ()),
+            "topic_question_bindings": (
+                {
+                    "question_id": "q:focused",
+                    "topic_ids": tuple(entry["topic_id"] for entry in seed.checkpoint["topic_registry"]),
+                },
+            ),
+            "identity": {
+                "thread_id": envelope.outer_thread_id,
+                "run_id": envelope.outer_run_id,
+                "research_id": research_id,
+            },
+        },
+    )
+    return _FocusedWave2Execution(
+        outcome=outcome,
+        gate_route=str(gate_update["route"]),
+        record_phases=tuple(record.phase.value for record in records),
+        accepted_refs=accepted_refs,
+        backing_refs=backing_refs,
+    )
+
+
+async def _execute_focused_targeted_core(
+    *,
+    envelope: Any,
+    research_id: str,
+    bridge_factory: Any,
+) -> _FocusedTargetedExecution:
+    seed = await build_live_seed_bundle(
+        envelope.workspace_host_path,
+        research_id=research_id,
+        include_wave1=True,
+        include_synthesis_gap=True,
+        now=datetime.now(UTC),
+        clock=lambda: datetime.now(UTC),
+    )
+    if len(seed.synthesis_gaps) != 1 or seed.synthesis_gaps[0].get("search_required") is not True:
+        raise AssertionError("live_targeted_gap_authority_missing")
+
+    graph_context = project_research_scope(envelope, research_scope_id=research_id)
+    capabilities = _build_wave0_capabilities(envelope, graph_context, bridge_factory)
+    base_resolver = RuntimeNodeDependencyResolver(
+        graph_context,
+        capabilities,
+        capabilities_by_node={"targeted_evidence": capabilities},
+    )
+    controller = WorkUnitControllerDependencies(
+        store=seed.store,
+        resolver=RuntimeWorkUnitDependencyResolver(graph_context, base_resolver, seed.store),
+    )
+    dependencies = base_resolver.resolve(
+        logical_name="targeted_evidence",
+        attempt_id="focused-targeted-evidence",
+        policy=TARGETED_NODE_SPEC.policy,
+    )
+    node = TARGETED_NODE_SPEC.real_factory(replace(dependencies, work_units=controller))
+    update = dict(
+        await node(
+            {
+                **seed.checkpoint,
+                "synthesis_gaps": seed.synthesis_gaps,
+                "critic_work_items": (),
+            }
+        )
+    )
+
+    records = await seed.store.load_records()
+    targeted_records = tuple(record for record in records if record.phase.value == "targeted_evidence")
+    if update.get("route") != "next" or len(records) != 3 or len(targeted_records) != 1:
+        raise AssertionError("live_targeted_submit_authority_missing")
+    targeted_record = targeted_records[0]
+    if targeted_record.result_contract != "targeted.source-intake":
+        raise AssertionError("live_targeted_result_contract_missing")
+    outcome = LiveOutcome(
+        route="targeted-evidence",
+        artifacts=(targeted_record.result_ref,),
+        values={
+            "accepted_submission_refs": (f"ref:{targeted_record.record_hash}",),
+            "synthesis_gaps": seed.synthesis_gaps,
+            "identity": {
+                "thread_id": envelope.outer_thread_id,
+                "run_id": envelope.outer_run_id,
+                "research_id": research_id,
+            },
+        },
+    )
+    return _FocusedTargetedExecution(
+        outcome=outcome,
+        record_phases=tuple(record.phase.value for record in records),
+        targeted_record_count=len(targeted_records),
+    )
 
 
 class _UsageTracker(BaseCallbackHandler):
@@ -322,25 +718,47 @@ class _FocusedCapabilities:
 
 
 class _BridgeFactory:
-    def __init__(self, *, focused_node: str | None, tracker: _UsageTracker, web: _LiveWebSearch | None) -> None:
+    def __init__(
+        self,
+        *,
+        focused_node: str | None,
+        tracker: _UsageTracker,
+        web: _LiveWebSearch | None,
+        scenario: LiveScenario | None = None,
+    ) -> None:
         self._focused_node = focused_node
         self._tracker = tracker
         self._web = web
+        self._scenario = scenario
 
     def __call__(self, *, envelope, policy, tools_resolver=None):
         from deerflow.models.factory import create_chat_model
 
+        max_model_calls = (
+            int(self._scenario.preconditions["max_model_calls"])
+            if self._scenario is not None
+            else (4 if policy.allowed_tool_names else 1)
+        )
+        max_tool_calls = (
+            max(int(self._scenario.preconditions["max_tool_calls"]), 1)
+            if self._scenario is not None
+            else (3 if policy.allowed_tool_names else 1)
+        )
         bounded_budget = replace(
             policy.budget,
-            max_model_calls=4 if policy.allowed_tool_names else 1,
-            max_total_tool_calls=3 if policy.allowed_tool_names else 1,
-            max_tool_calls_per_response=3 if policy.allowed_tool_names else 1,
-            max_parallel_tool_calls=3 if policy.allowed_tool_names else 1,
-            total_token_budget=32_768,
+            max_model_calls=max_model_calls,
+            max_total_tool_calls=max_tool_calls,
+            max_tool_calls_per_response=max_tool_calls,
+            max_parallel_tool_calls=max_tool_calls,
+            total_token_budget=(
+                int(self._scenario.preconditions["max_total_tokens"]) if self._scenario is not None else 32_768
+            ),
             per_call_output_token_cap=4_096,
             per_tool_result_bytes=16_384 if policy.allowed_tool_names else 1,
             structured_result_bytes=8_192,
-            wall_time_seconds=180.0,
+            wall_time_seconds=(
+                float(self._scenario.preconditions["timeout_seconds"]) if self._scenario is not None else 180.0
+            ),
         )
         bounded_policy = replace(policy, budget=bounded_budget)
 
@@ -378,6 +796,12 @@ class _LiveAdapter:
         self.envelope = local_runtime_envelope(workspace, identity=self.identity, app_config=app_config)
         self.stores: dict[str, WorkUnitStore] = {}
         set_sandbox_provider(_RegisteredLocalProvider(self.envelope.parent_sandbox))
+
+    def __enter__(self) -> _LiveAdapter:
+        return self
+
+    def __exit__(self, _exc_type: object, _exc: object, _traceback: object) -> None:
+        reset_sandbox_provider()
 
     async def adapt(self, _runtime: Any, *, initialize_parent_sandbox: bool = True):
         if initialize_parent_sandbox:
@@ -466,7 +890,7 @@ def _app_config(provider: str, api_key: str) -> AppConfig:
 
 
 async def _execute_canary(
-    scenario: Scenario,
+    scenario: LiveScenario,
     *,
     environ: dict[str, str] | Any,
     workspace: Path,
@@ -488,8 +912,202 @@ async def _execute_canary(
     tracker = _UsageTracker(model_id=f"{environment.model_provider}/{model.model}")
     web = _LiveWebSearch(environ["TAVILY_API_KEY"]) if require_web else None
     focused_node = str(scenario.preconditions["focused_node"])
-    bridge_factory = _BridgeFactory(focused_node=focused_node, tracker=tracker, web=web)
+    bridge_factory = _BridgeFactory(focused_node=focused_node, tracker=tracker, web=web, scenario=scenario)
     adapter = _LiveAdapter(workspace / scenario.scenario_id, app_config)
+    try:
+        return await _execute_with_adapter(
+            scenario,
+            started_at=started_at,
+            tracker=tracker,
+            web=web,
+            focused_node=focused_node,
+            bridge_factory=bridge_factory,
+            adapter=adapter,
+        )
+    finally:
+        reset_sandbox_provider()
+
+
+async def _execute_focused_wave1_canary(
+    scenario: LiveScenario,
+    *,
+    environ: dict[str, str] | Any,
+    workspace: Path,
+) -> LiveAttempt:
+    started_at = time.monotonic()
+    environment = preflight_live_environment(environ=environ, require_web=True)
+    credential_name = next(
+        name
+        for name, provider in {
+            "ANTHROPIC_API_KEY": "anthropic",
+            "DEEPSEEK_API_KEY": "deepseek",
+            "OPENAI_API_KEY": "openai",
+        }.items()
+        if provider == environment.model_provider
+    )
+    app_config = _app_config(environment.model_provider, environ[credential_name])
+    model = app_config.models[0]
+    tracker = _UsageTracker(model_id=f"{environment.model_provider}/{model.model}")
+    web = _LiveWebSearch(environ["TAVILY_API_KEY"])
+    bridge_factory = _BridgeFactory(focused_node="wave1", tracker=tracker, web=web, scenario=scenario)
+    adapter = _LiveAdapter(workspace / scenario.scenario_id, app_config)
+    try:
+        execution = await _execute_focused_wave1_core(
+            envelope=adapter.envelope,
+            research_id=adapter.identity.research_id,
+            bridge_factory=bridge_factory,
+        )
+        if web.calls < 1 or not tracker.response_shapes:
+            raise AssertionError("live_wave1_real_dependency_authority_missing")
+        return LiveAttempt(
+            outcome=execution.outcome,
+            error_code=None,
+            model_id=tracker.model_id,
+            tool_ids=("tavily/web_search",),
+            input_tokens=tracker.input_tokens or None,
+            output_tokens=tracker.output_tokens or None,
+            cost_usd=None,
+            tool_calls=web.calls,
+            wall_time_seconds=time.monotonic() - started_at,
+            diagnostics="focused Wave1 node completed",
+            workflow_attempts=1,
+            workflow_retries=0,
+        )
+    except Exception as exc:
+        return _failed_attempt(
+            code=f"live_wave1_failed:{type(exc).__name__}",
+            tracker=tracker,
+            web=web,
+            started_at=started_at,
+            workflow_attempts=1,
+        )
+    finally:
+        reset_sandbox_provider()
+
+
+async def _execute_focused_wave2_canary(
+    scenario: LiveScenario,
+    *,
+    environ: dict[str, str] | Any,
+    workspace: Path,
+) -> LiveAttempt:
+    started_at = time.monotonic()
+    environment = preflight_live_environment(environ=environ, require_web=False)
+    credential_name = next(
+        name
+        for name, provider in {
+            "ANTHROPIC_API_KEY": "anthropic",
+            "DEEPSEEK_API_KEY": "deepseek",
+            "OPENAI_API_KEY": "openai",
+        }.items()
+        if provider == environment.model_provider
+    )
+    app_config = _app_config(environment.model_provider, environ[credential_name])
+    model = app_config.models[0]
+    tracker = _UsageTracker(model_id=f"{environment.model_provider}/{model.model}")
+    bridge_factory = _BridgeFactory(focused_node="wave2_synthesis", tracker=tracker, web=None, scenario=scenario)
+    adapter = _LiveAdapter(workspace / scenario.scenario_id, app_config)
+    try:
+        execution = await _execute_focused_wave2_core(
+            envelope=adapter.envelope,
+            research_id=adapter.identity.research_id,
+            bridge_factory=bridge_factory,
+        )
+        if not tracker.response_shapes:
+            raise AssertionError("live_wave2_model_authority_missing")
+        return LiveAttempt(
+            outcome=execution.outcome,
+            error_code=None,
+            model_id=tracker.model_id,
+            tool_ids=(),
+            input_tokens=tracker.input_tokens or None,
+            output_tokens=tracker.output_tokens or None,
+            cost_usd=None,
+            tool_calls=0,
+            wall_time_seconds=time.monotonic() - started_at,
+            diagnostics=f"focused Wave2 synthesis completed; response_shapes={tracker.diagnostic_summary()}",
+            workflow_attempts=1,
+            workflow_retries=0,
+        )
+    except Exception as exc:
+        return _failed_attempt(
+            code=f"live_wave2_failed:{type(exc).__name__}",
+            tracker=tracker,
+            web=None,
+            started_at=started_at,
+            workflow_attempts=1,
+        )
+    finally:
+        reset_sandbox_provider()
+
+
+async def _execute_focused_targeted_canary(
+    scenario: LiveScenario,
+    *,
+    environ: dict[str, str] | Any,
+    workspace: Path,
+) -> LiveAttempt:
+    started_at = time.monotonic()
+    environment = preflight_live_environment(environ=environ, require_web=True)
+    credential_name = next(
+        name
+        for name, provider in {
+            "ANTHROPIC_API_KEY": "anthropic",
+            "DEEPSEEK_API_KEY": "deepseek",
+            "OPENAI_API_KEY": "openai",
+        }.items()
+        if provider == environment.model_provider
+    )
+    app_config = _app_config(environment.model_provider, environ[credential_name])
+    model = app_config.models[0]
+    tracker = _UsageTracker(model_id=f"{environment.model_provider}/{model.model}")
+    web = _LiveWebSearch(environ["TAVILY_API_KEY"])
+    bridge_factory = _BridgeFactory(focused_node="targeted_evidence", tracker=tracker, web=web, scenario=scenario)
+    adapter = _LiveAdapter(workspace / scenario.scenario_id, app_config)
+    try:
+        execution = await _execute_focused_targeted_core(
+            envelope=adapter.envelope,
+            research_id=adapter.identity.research_id,
+            bridge_factory=bridge_factory,
+        )
+        if web.calls < 1 or not tracker.response_shapes:
+            raise AssertionError("live_targeted_real_dependency_authority_missing")
+        return LiveAttempt(
+            outcome=execution.outcome,
+            error_code=None,
+            model_id=tracker.model_id,
+            tool_ids=("tavily/web_search",),
+            input_tokens=tracker.input_tokens or None,
+            output_tokens=tracker.output_tokens or None,
+            cost_usd=None,
+            tool_calls=web.calls,
+            wall_time_seconds=time.monotonic() - started_at,
+            diagnostics="focused targeted evidence completed",
+            workflow_attempts=1,
+            workflow_retries=0,
+        )
+    except Exception as exc:
+        return _failed_attempt(
+            code=f"live_targeted_failed:{type(exc).__name__}",
+            tracker=tracker,
+            web=web,
+            started_at=started_at,
+            workflow_attempts=1,
+        )
+    finally:
+        reset_sandbox_provider()
+
+
+async def _execute_with_adapter(
+    scenario: LiveScenario,
+    *,
+    started_at: float,
+    tracker: _UsageTracker,
+    web: _LiveWebSearch | None,
+    focused_node: str,
+    bridge_factory: _BridgeFactory,
+    adapter: _LiveAdapter,
+) -> LiveAttempt:
     recipe = ResearchGraphRecipe.create(
         implementation_modes=_modes(focused_node),
         work_unit_store_factory=adapter.create_work_unit_store,
@@ -560,7 +1178,7 @@ async def _execute_canary(
             accepted_refs = tuple(f"ref:{record.record_hash}" for record in wave0_records)
             artifacts = tuple(record.result_ref for record in wave0_records)
 
-    outcome = ScenarioOutcome(
+    outcome = LiveOutcome(
         route=route,
         artifacts=artifacts,
         values={
@@ -614,12 +1232,18 @@ def _failed_attempt(
 
 
 async def run_live_canary(
-    scenario: Scenario,
+    scenario: LiveScenario,
     *,
     environ: dict[str, str] | Any,
     workspace: Path,
 ) -> LiveScenarioReport:
-    async def execute(selected: Scenario) -> LiveAttempt:
+    async def execute(selected: LiveScenario) -> LiveAttempt:
+        if selected.scenario_id == "live-one-topic-wave1":
+            return await _execute_focused_wave1_canary(selected, environ=environ, workspace=workspace)
+        if selected.scenario_id == "live-wave2-synthesis":
+            return await _execute_focused_wave2_canary(selected, environ=environ, workspace=workspace)
+        if selected.scenario_id == "live-one-gap-targeted-evidence":
+            return await _execute_focused_targeted_canary(selected, environ=environ, workspace=workspace)
         return await _execute_canary(selected, environ=environ, workspace=workspace)
 
     runner = LiveScenarioRunner(executor=execute, max_attempts=int(scenario.preconditions["max_attempts"]))

@@ -28,6 +28,10 @@ from deerflow_deep_research.runtime.request_bundle import RequestBundleStore
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 from tests.fixtures.fake_models import ScriptedChatModel, ai_message
 from tests.fixtures.runtime import local_runtime_envelope, unique_run_identity
+from tests.scenarios.assertions import assert_scenario
+from tests.scenarios.inputs import ScriptExecutionObservation, validate_script_observation
+from tests.scenarios.observation import CheckpointFacts, LedgerFacts, SandboxFacts, ScenarioObservation
+from tests.scenarios.replays import MALFORMED_OUTPUT_CASE, MALFORMED_OUTPUT_FAMILY
 
 
 class _ForbiddenModelCapability:
@@ -116,6 +120,7 @@ def _bridge(tmp_path: Path, node_name: str, response: str):
     return identity, envelope, bridge, graph, context
 
 
+@pytest.mark.workflow
 async def test_hitl1_brief_generation_crosses_real_zero_tool_bridge(monkeypatch, tmp_path: Path) -> None:
     identity, envelope, bridge, graph, context = _bridge(tmp_path, "hitl1", _brief())
     store = RequestBundleStore(workspace_host_path=envelope.workspace_host_path, research_id=identity.research_id)
@@ -134,6 +139,7 @@ async def test_hitl1_brief_generation_crosses_real_zero_tool_bridge(monkeypatch,
     assert bridge.agents_built == 1
 
 
+@pytest.mark.workflow
 async def test_topic_planning_crosses_real_zero_tool_bridge(tmp_path: Path) -> None:
     identity, _envelope, bridge, graph, context = _bridge(tmp_path, "topic_planning", _topic_plan())
     update = await TOPIC_SPEC.real_factory(NodeBuildDependencies(graph, context, bridge))(
@@ -154,6 +160,7 @@ async def test_topic_planning_crosses_real_zero_tool_bridge(tmp_path: Path) -> N
     assert bridge.agents_built == 1
 
 
+@pytest.mark.workflow
 async def test_wave2_crosses_real_zero_tool_bridge(tmp_path: Path) -> None:
     identity, envelope, bridge, graph, context = _bridge(tmp_path, "wave2_synthesis", _synthesis())
     store = WorkUnitStore(
@@ -173,6 +180,52 @@ async def test_wave2_crosses_real_zero_tool_bridge(tmp_path: Path) -> None:
     assert (
         envelope.workspace_host_path / "deep-research" / identity.research_id / "synthesis" / "findings.json"
     ).is_file()
+
+
+@pytest.mark.workflow
+@pytest.mark.parametrize("case_id", [pytest.param("malformed-output", id="malformed-output")])
+async def test_wave2_malformed_output_consumes_repair_and_leaves_no_partial_authority(
+    tmp_path: Path,
+    case_id: str,
+) -> None:
+    identity, envelope, bridge, graph, context = _bridge(tmp_path, "wave2_synthesis", "not-json")
+    store = WorkUnitStore(
+        workspace_host_path=envelope.workspace_host_path,
+        research_id=identity.research_id,
+        clock=lambda: datetime(2026, 7, 17, tzinfo=UTC),
+        monotonic=time.monotonic,
+        lock_sleep=time.sleep,
+        token_factory=lambda: "7" * 32,
+        fault_hook=None,
+    )
+
+    with pytest.raises(ValueError, match="synthesis_output_json_invalid"):
+        await WAVE2_SPEC.real_factory(NodeBuildDependencies(graph, context, bridge, synthesis_bundle=store))(
+            {"research_id": identity.research_id, "accepted_submission_refs": (), "execution_trace": ()}
+        )
+
+    assert case_id == MALFORMED_OUTPUT_CASE.case_id
+    assert bridge.agents_built == 2
+    assert not (
+        envelope.workspace_host_path / "deep-research" / identity.research_id / "synthesis" / "findings.json"
+    ).exists()
+    validate_script_observation(
+        MALFORMED_OUTPUT_CASE.inputs,
+        MALFORMED_OUTPUT_CASE.bounds,
+        ScriptExecutionObservation(model_calls=2, tool_calls=(), bound_tool_names=()),
+    )
+    assertion = assert_scenario(
+        MALFORMED_OUTPUT_FAMILY,
+        MALFORMED_OUTPUT_CASE,
+        ScenarioObservation(
+            checkpoint=CheckpointFacts(route=None, terminal=None, identity_isolated=True, attempt_count=1),
+            ledger=LedgerFacts((), False, True),
+            sandbox=SandboxFacts(True, (), ()),
+            diagnostic_codes=("synthesis-output-json-invalid",),
+            degradation="malformed-output",
+        ),
+    )
+    assert assertion.case_id == "malformed-output"
 
 
 def _deterministic_dependencies(node_name: str, *, publication_bundle=None) -> NodeBuildDependencies:

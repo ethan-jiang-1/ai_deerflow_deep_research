@@ -505,6 +505,11 @@ kind = "file"
 owner = "PRS-004"
 
 [[required_paths]]
+path = "openspec/governance/test-evidence-policy.md"
+kind = "file"
+owner = "PRS-004"
+
+[[required_paths]]
 path = "openspec/governance/project-structure.toml"
 kind = "file"
 owner = "PRS-004"

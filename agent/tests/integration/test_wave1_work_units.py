@@ -11,7 +11,10 @@ from __future__ import annotations
 import json
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext, NodeExecutionResult
 from deerflow_deep_research.domain.enums import NodeFinishReason
@@ -25,9 +28,14 @@ from deerflow_deep_research.graph.nodes.wave1 import NODE_SPEC
 from deerflow_deep_research.graph.nodes.wave1 import subgraph as wave1_subgraph
 from deerflow_deep_research.runtime.projection import RuntimeWorkUnitDependencyResolver
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
+from tests.assets.provider_shapes import load_provider_shape_cases, thaw_provider_shape_payload
 
 RESEARCH_ID = "r_" + "B" * 43
 NOW = datetime(2026, 7, 14, tzinfo=UTC)
+SHAPE_CASES = {
+    case.case_id: case
+    for case in load_provider_shape_cases(Path(__file__).parents[1] / "fixtures/provider_shapes/wave1.json")
+}
 
 
 class ForbiddenCapabilities:
@@ -42,18 +50,25 @@ class ScriptedWave1Capabilities:
         malformed: bool = False,
         malformed_once: bool = False,
         reverse_sources: bool = False,
+        provider_payload: dict | None = None,
     ) -> None:
         self.contexts: list[NodeAgentContext] = []
         self.requests: list[object] = []
         self.malformed = malformed
         self.malformed_once = malformed_once
         self.reverse_sources = reverse_sources
+        self.provider_payload = provider_payload
 
     async def run_agent(self, *, context, request):
         if not isinstance(context, NodeAgentContext):
             raise TypeError("node_agent_context_required")
         self.contexts.append(context)
         self.requests.append(request)
+        if self.provider_payload is not None:
+            return NodeExecutionResult(
+                finish_reason=NodeFinishReason.SUCCESS,
+                summary=json.dumps(self.provider_payload),
+            )
         if self.malformed or (self.malformed_once and len(self.contexts) == 1):
             return NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary="not-json")
         source_id = f"source:{context.attempt_id[-3:]}"
@@ -281,14 +296,18 @@ async def test_real_wave1_crosses_worker_context_artifact_validator_and_ledger(t
     assert json.loads(persisted)["claims"][0]["support_refs"] == [records[0].source_refs[0].source_id]
 
 
-async def test_real_wave1_canonicalizes_provider_source_order_before_candidate_validation(tmp_path) -> None:
+@pytest.mark.parametrize(
+    "case",
+    [pytest.param(SHAPE_CASES["shape-wave1-source-order"], id="shape-wave1-source-order")],
+)
+async def test_real_wave1_canonicalizes_provider_source_order_before_candidate_validation(tmp_path, case) -> None:
     graph_context = GraphContextView(
         research_scope_id=RESEARCH_ID,
         workspace_root=f"/mnt/user-data/workspace/deep-research/{RESEARCH_ID}",
         uploads_root="/mnt/user-data/uploads",
         outputs_root=f"/mnt/user-data/outputs/deep-research/{RESEARCH_ID}",
     )
-    capabilities = ScriptedWave1Capabilities(reverse_sources=True)
+    capabilities = ScriptedWave1Capabilities(provider_payload=thaw_provider_shape_payload(case.payload))
     store = WorkUnitStore(
         workspace_host_path=tmp_path,
         research_id=RESEARCH_ID,
@@ -321,18 +340,25 @@ async def test_real_wave1_canonicalizes_provider_source_order_before_candidate_v
     assert result.parent_update["accepted_submission_refs"] == (records[0].record_hash,)
     assert tuple(source.source_id for source in records[0].source_refs) == ("source:a", "source:z")
     persisted = json.loads(await store.read_canonical_bytes(records[0].result_ref, max_bytes=256 * 1024))
-    assert persisted["source_ids"] == ["source:a", "source:z"]
-    assert persisted["claims"][0]["support_refs"] == ["source:a", "source:z"]
+    observed = {
+        "source_ids": persisted["source_ids"],
+        "support_refs": persisted["claims"][0]["support_refs"],
+    }
+    assert observed == thaw_provider_shape_payload(case.expected_payload)
 
 
-async def test_real_wave1_malformed_output_becomes_typed_worker_failure_without_ledger(tmp_path) -> None:
+@pytest.mark.parametrize(
+    "case",
+    [pytest.param(SHAPE_CASES["shape-wave1-malformed-submit"], id="shape-wave1-malformed-submit")],
+)
+async def test_real_wave1_malformed_output_becomes_typed_worker_failure_without_ledger(tmp_path, case) -> None:
     graph_context = GraphContextView(
         research_scope_id=RESEARCH_ID,
         workspace_root=f"/mnt/user-data/workspace/deep-research/{RESEARCH_ID}",
         uploads_root="/mnt/user-data/uploads",
         outputs_root=f"/mnt/user-data/outputs/deep-research/{RESEARCH_ID}",
     )
-    capabilities = ScriptedWave1Capabilities(malformed=True)
+    capabilities = ScriptedWave1Capabilities(provider_payload=thaw_provider_shape_payload(case.payload))
     store = WorkUnitStore(
         workspace_host_path=tmp_path,
         research_id=RESEARCH_ID,
@@ -364,3 +390,4 @@ async def test_real_wave1_malformed_output_becomes_typed_worker_failure_without_
     assert result.parent_update["accepted_submission_refs"] == ()
     assert tuple(result.parent_update["work_status_by_id"].values()) == ("failed",)
     assert await store.load_records() == ()
+    assert case.expected_error_code == "source_ids_mismatch"

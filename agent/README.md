@@ -123,7 +123,8 @@ make format
 make lint
 make test              # complete network-free deterministic union
 make test-fast         # contract/domain/engine/unit/graph/eval tests
-make test-integration  # integration/workflow/blocking-I/O tests
+make test-integration  # deterministic integration/blocking-I/O correctness
+make test-workflow     # deterministic real-loop workflow conformance
 make test-viability
 make test-durability
 make test-blocking-io
@@ -162,7 +163,9 @@ from narrowest to broadest, are domain/engine interfaces; `NodeSpec` plus
 `NodeExecutionCapabilities`; runtime adapter/bridge/store protocols; lifecycle
 handlers plus mixed graphs; and the real public entry.
 
-Reusable manifests live in `tests/scenarios/`. Each scenario declares a stable
+Exact selectors and `TestEvidenceClaim` records live in the central test-owned registry and
+are checked against all five focused pytest selections; prose documentation is
+not the enumerable catalog. Reusable manifests live in `tests/scenarios/`. Each scenario declares a stable
 id, risk family, requirement and optional regression ids, entrypoint,
 authenticity, preconditions, scripted/live inputs, expected route and terminal
 outcome, artifacts/citations, hard invariants, metrics, and permitted
@@ -171,22 +174,42 @@ when a scenario claims workflow conformance; only true external model/tool,
 time, randomness, and supported fault boundaries may be replaced. Deterministic
 scenarios require no credential or public network.
 
-Selection is intentionally non-overlapping. `make test` is the complete
-network-free deterministic union and excludes `requires_llm`, `release_e2e`,
-and `postgres`. `make test-live` runs the three shortest real prefixes and
-writes redacted reports under `.reports/live`. `make test-release-e2e` requires
+Selection is intentionally non-overlapping. `make test` is the exact
+network-free union of `make test-fast`, `make test-integration`, and
+`make test-workflow`; it excludes `requires_llm`, `release_e2e`, and `postgres`.
+`make test-live` selects six bounded canaries: three short public-entry prefixes
+and three directly seeded late-node cases. The late-node cases prove only their
+focused node/provider/store/gate semantics and explicitly do not prove the
+public entry, predecessor lifecycle, production recipe, or full pipeline.
+Reports use `report_schema_version=1` / `metrics_schema=evidence-v1` with typed
+metric status and structural evidence basis. `make test-release-e2e` requires
 explicit confirmation plus model and Tavily credentials, uses fresh
 thread/run/research/checkpoint identity, and writes `.reports/release`. An
 explicitly selected live or release lane fails preflight when its environment is
 incomplete; it never silently skips.
 
+Use the terms precisely: a scripted case drives a real production loop with
+short deterministic external responses; a provider-shape fixture is a minimized
+redacted payload passed through the production normalization/validation seam; a
+persisted trace replay is reserved for a reviewed temporal/interleaving need and
+is not a synonym for either. Raw provider responses are not retained as test
+fixtures.
+
 CI follows the same authority split: `agent-tests.yml` runs deterministic gates
-on pull requests and pushes; `agent-live-evaluation.yml` runs short canaries on
-the nightly schedule or manual dispatch; `agent-release-e2e.yml` runs only on
+on pull requests and pushes. The six-case `agent-live-evaluation.yml` is
+manual-only while the current measured lane has open failures; schedule is
+restored only after all six pass and preserve the aggregate margin.
+`agent-release-e2e.yml` remains the single full-pipeline
+lane and runs only on
 manual/reusable release invocation after deterministic gates. Hard lifecycle,
 authority, containment, artifact, citation, and cleanup invariants are blocking.
 Subjective quality thresholds remain reported until a reviewed later change
 promotes a stable baseline.
+
+The accepted 2026-07-17 full-real proof survives cleanup of gitignored raw
+reports as the minimal redacted committed attestation in
+`docs/release-attestation-2026-07-17.json`. It proves one isolated accepted run,
+not current provider distribution or a general quality threshold.
 
 Every live or release defect follows the regression-descent policy in
 `docs/regression-descent.md`: record a redacted discovery, classify its risk and

@@ -297,8 +297,10 @@ context: |
 
   - Execute changes strictly in numbered order `00 -> 01 -> ... -> 18`.
   - TDD is mandatory. Infrastructure and policy behavior uses deterministic fakes;
-    model-facing behavior uses `FakeToolCallingModel` or `ReplayChatModel`; real-LLM
-    coverage is optional and must be marked `@requires_llm`.
+    model-facing behavior normally uses short scripted external adapters through the
+    real production interface. Persisted trace replay requires a concrete interleaving
+    or stable-shape justification. Real-LLM coverage is supplemental, must be marked
+    `@requires_llm`, and remains outside the deterministic PR path.
   - Tests live under `agent/tests/` and mirror package ownership. Change 00 creates
     project-owned `agent/Makefile` format, lint, test, configure, doctor, and launch
     commands. Do not run or require frontend checks when frontend is untouched.
@@ -321,10 +323,15 @@ context: |
   - States: alive in a main spec, pending in an active delta, retired with
     `[DEPRECATED]` in the registry. IDs are never deleted or reused.
 
-  Before archive, both governance checks MUST pass:
+  Test-evidence authority and synchronization are defined by
+  `openspec/governance/test-evidence-policy.md`; normative behavior remains in the
+  active `evaluation-hardening` spec/delta and executable collection remains agent-owned.
+
+  Before archive, all three root governance checks MUST pass:
 
   - `python3 openspec/governance/check_project_reqs.py`
   - `python3 openspec/governance/check_project_specs.py`
+  - `python3 openspec/governance/check_project_architecture.py`
 
 rules:
   proposal:
@@ -334,9 +341,10 @@ rules:
     - "State next-agent-build versus Gateway-restart impact for every runtime configuration or mount change. Use reload_boundary.STARTUP_ONLY_FIELDS as the restart authority."
     - "For each new capability, allocate and register requirement IDs, then list them in the proposal."
     - "Describe approved future behavior as scope, not as behavior already present in the repository."
+    - "For test-bearing changes, identify the evidence class and lowest responsible production seam, and justify any escalation to persisted trace replay, live dependencies, or full-system acceptance. Follow openspec/governance/test-evidence-policy.md."
   specs:
     - "Requirements describe observable or mechanically verifiable behavior of the downstream Deep Research package, runtime integration, configuration, and user entry surfaces; they do not redefine DeerFlow internals."
-    - "Every scenario MUST be zero-API and deterministic. Use FakeToolCallingModel or ReplayChatModel when a model interaction is involved; use focused fakes/fixtures for non-model infrastructure. Include at least one failure, denial, or fail-closed scenario per capability."
+    - "Every capability MUST retain zero-API deterministic evidence at its lowest responsible seam; credentialed live/release scenarios are supplemental and require explicit bounds and scope. Behavioral workflow proof uses the real production loop with scripted external adapters; a patch-only wiring test cannot claim workflow behavior. Include at least one failure, denial, or fail-closed scenario per capability."
     - "Each active delta spec and each main spec MUST declare its owned IDs in a `> req: XXX-001, ...` line before the first `##` heading. Main specs additionally require `## Purpose` and `## Requirements`; delta operation headers are legal only under openspec/changes/<name>/specs/."
     - "Requirement titles are stable semantic anchors and never include requirement IDs."
   design:
@@ -344,12 +352,15 @@ rules:
     - "New code lives under agent/, may import public deerflow.* APIs, and MUST NOT be imported by or modify backend/ or frontend/. Keep blocking IO off the async event loop."
     - "Pin only directly used dependency floors compatible with the verified stack. Mark each changed field as next-agent-build or restart-required, citing reload_boundary.STARTUP_ONLY_FIELDS."
     - "Define ownership for typed state, sandbox artifacts, checkpoints, and submission authority; do not create two controllers or two persistent business-state authorities."
+    - "For test design, distinguish short scripted cases, minimized provider-shape fixtures, and persisted trace replay; justify replay/live/E2E escalation and name every mutable process-global state a fixture must restore."
   tasks:
-    - "TDD: pair each behavior implementation with a red-before-green deterministic test. Use Fake/Replay only for model behavior and gate any real-LLM test with @requires_llm."
+    - "TDD: pair each behavior implementation with a red-before-green deterministic test. Use the real workflow with scripted external adapters for model behavior, reserve persisted replay for a reviewed trace need, and gate any real-LLM test with @requires_llm."
     - "Implementation is additive under agent/, skills/public/deep-research-controller/, OpenSpec/docs, and structured runtime materialization. NEVER edit backend/ or frontend/."
     - "Reference requirement IDs in task text and annotate the owning implementation surface with `@impl XXX-001`."
     - "Include agent-owned format/lint/test, documentation sync, config/doctor checks, and an environment-appropriate end-to-end infra probe. Do not require frontend checks when frontend is unchanged."
+    - "Directly test every changed validator rule with minimal invalid fixtures; add a known-violation smoke case when a collector, discovery/archive scan, or runtime detector could pass on empty or mis-scoped input. Restore only the mutable global state the fixture actually changes."
     - |
       Every change MUST end with these hard done-conditions before archive:
         1. `python3 openspec/governance/check_project_reqs.py` PASS with no duplicate, unregistered, orphan, or reused-retired IDs.
         2. `python3 openspec/governance/check_project_specs.py` PASS with no delta headers in main specs and no missing purpose, requirements, or requirement-ID header.
+        3. `python3 openspec/governance/check_project_architecture.py` PASS with valid structure authority, registry, generated guide block, paths, imports, and node packages.

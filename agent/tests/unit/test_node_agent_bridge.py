@@ -25,6 +25,10 @@ from tests.fixtures.fake_models import (
     ai_message,
 )
 from tests.fixtures.scripted_tools import ScriptedTool
+from tests.scenarios.assertions import assert_scenario
+from tests.scenarios.inputs import ObservedToolCall, ScriptExecutionObservation, validate_script_observation
+from tests.scenarios.observation import CheckpointFacts, LedgerFacts, SandboxFacts, ScenarioObservation
+from tests.scenarios.replays import BUDGET_EXHAUSTION_CASE, BUDGET_EXHAUSTION_FAMILY
 
 WORKSPACE = "/mnt/user-data/workspace/deep-research/r1"
 ATTEMPT = f"{WORKSPACE}/attempts/a1"
@@ -275,6 +279,73 @@ async def test_per_call_output_cap_exceeded_is_budget_exhausted() -> None:
     )
     result = await bridge.run_agent(context=_context(), request=_request())
     assert result.finish_reason == NodeFinishReason.BUDGET_EXHAUSTED
+
+
+@pytest.mark.workflow
+@pytest.mark.parametrize("case_id", [pytest.param("budget-exhaustion", id="budget-exhaustion")])
+async def test_real_bridge_enforces_exact_model_tool_budget_without_publication(case_id: str) -> None:
+    model = ScriptedChatModel(
+        responses=[
+            ai_message(tool_calls=[{"name": "web_search", "args": {"query": "storage"}, "id": "search-1"}]),
+        ]
+    )
+    tool = ScriptedTool.create("web_search", "fixed source result")
+    policy = ExecutionPolicy(
+        policy_name="budget-exhaustion-replay",
+        allowed_tool_names=frozenset({"web_search"}),
+        read_roots=(WORKSPACE,),
+        write_roots=(),
+        attempt_root=ATTEMPT,
+        budget=_budget(
+            max_model_calls=1,
+            max_total_tool_calls=1,
+            max_tool_calls_per_response=1,
+            max_parallel_tool_calls=1,
+        ),
+        tool_specs=(ToolPolicySpec("web_search", "read", native_cancellable=True),),
+    )
+    bridge = _bridge(
+        lambda: model,
+        policy=policy,
+        tools_resolver=lambda _envelope, _policy: (tool.as_langchain_tool(),),
+    )
+    result = await bridge.run_agent(
+        context=_context(),
+        request=NodeExecutionRequest(
+            objective="collect one source",
+            expected_output="one result",
+            minimum_tool_calls=1,
+            tool_call_limit=1,
+        ),
+    )
+
+    assert result.finish_reason is NodeFinishReason.BUDGET_EXHAUSTED
+    assert result.error_code == "policy"
+    assert model.calls == 1
+    assert len(tool.calls) == 1
+    assert bridge.agents_built == 1
+    validate_script_observation(
+        BUDGET_EXHAUSTION_CASE.inputs,
+        BUDGET_EXHAUSTION_CASE.bounds,
+        ScriptExecutionObservation(
+            model_calls=model.calls,
+            tool_calls=(ObservedToolCall("web_search", (("query", "storage"),)),),
+            bound_tool_names=("web_search",),
+        ),
+    )
+    assertion = assert_scenario(
+        BUDGET_EXHAUSTION_FAMILY,
+        BUDGET_EXHAUSTION_CASE,
+        ScenarioObservation(
+            checkpoint=CheckpointFacts(route=None, terminal=None, identity_isolated=True, attempt_count=1),
+            ledger=LedgerFacts((), False, True),
+            sandbox=SandboxFacts(True, (), ()),
+            diagnostic_codes=("budget-exhausted",),
+            degradation="budget-exhaustion",
+        ),
+    )
+    assert not (Path(HOST_MARKER) / "workspace" / "deep-research").exists()
+    assert case_id == assertion.case_id
 
 
 async def test_result_leaks_no_raw_identity_host_or_appconfig() -> None:

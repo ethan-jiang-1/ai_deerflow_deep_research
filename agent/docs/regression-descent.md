@@ -21,9 +21,9 @@ misleading.
 | RELEASE-20260717-06 | wave1-authority-boundary | node-capability | deterministic-regression | tests/integration/test_wave1_work_units.py::test_real_wave1_crosses_worker_context_artifact_validator_and_ledger | n/a |
 | RELEASE-20260717-07 | wave1-provider-identifiers | domain-contract | deterministic-regression | tests/unit/test_wave1_contracts.py::TestWave1WorkerOutput::test_provider_ids_and_question_state_are_normalized | n/a |
 | RELEASE-20260717-08 | synthesis-structured-repair | node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_repairs_malformed_output_once_without_tools | n/a |
-| RELEASE-20260717-09 | synthesis-provider-shape | domain-contract | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_normalizes_provider_field_aliases | n/a |
+| RELEASE-20260717-09 | synthesis-provider-shape | domain-contract | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-provider-field-aliases] | n/a |
 | RELEASE-20260717-10 | profile-topic-bound-enforcement | node-contract | deterministic-regression | tests/graph/test_topic_planning_node.py::test_minimal_quick_profile_repairs_multi_topic_plan_to_exactly_one | n/a |
-| RELEASE-20260717-11 | synthesis-gap-priority-alias | domain-contract | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_normalizes_provider_field_aliases | n/a |
+| RELEASE-20260717-11 | synthesis-gap-priority-alias | domain-contract | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-gap-priority-alias] | n/a |
 | RELEASE-20260717-12 | wave0-partial-source-degradation | domain-contract | deterministic-regression | tests/graph/test_wave0_worker.py::test_wave0_worker_output_keeps_valid_sources_and_records_dropped_items | n/a |
 | RELEASE-20260717-13 | synthesis-evidence-and-semantic-floor | runtime-store/node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_rejects_empty_repair_when_accepted_evidence_exists | n/a |
 | RELEASE-20260717-14 | readiness-ledger-provenance | domain-contract | deterministic-regression | tests/unit/test_readiness_real.py::TestRealReadiness::test_canonical_ledger_hash_passes_provenance | n/a |
@@ -31,13 +31,24 @@ misleading.
 | RELEASE-20260717-16 | release-dotenv-handoff | release-control | deterministic-regression | tests/unit/test_release_control_plane.py::test_release_make_target_shares_optional_dotenv_with_preflight_and_pytest | n/a |
 | RELEASE-20260717-17 | redacted-schema-diagnostics | live-reporting | deterministic-regression | tests/unit/test_live_evaluation.py::test_live_usage_tracker_reports_synthesis_schema_errors_without_values | n/a |
 | RELEASE-20260717-18 | wave1-provider-source-identifiers | domain-contract/node-capability | deterministic-regression | tests/unit/test_wave1_contracts.py::TestWave1WorkerOutput::test_provider_source_ids_and_claim_refs_are_normalized_together | n/a |
-| RELEASE-20260717-19 | synthesis-provider-description-and-gap-shape | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_normalizes_provider_description_and_string_gaps | n/a |
-| RELEASE-20260717-20 | synthesis-sparse-finding-shape | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_normalizes_sparse_provider_findings | n/a |
-| RELEASE-20260717-21 | wave1-source-order-canonicalization | runtime-materializer/submit-validator | deterministic-regression | tests/integration/test_wave1_work_units.py::test_real_wave1_canonicalizes_provider_source_order_before_candidate_validation | n/a |
-| RELEASE-20260717-22 | synthesis-relation-endpoint-aliases | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_normalizes_provider_relation_endpoint_aliases | n/a |
-| RELEASE-20260717-23 | synthesis-singular-affected-topic | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_normalizes_singular_affected_topic | n/a |
-| RELEASE-20260717-24 | synthesis-alternate-relation-shape | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_normalizes_alternate_relation_shape | n/a |
-| RELEASE-20260717-25 | synthesis-missing-gap-identity | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_derives_missing_gap_id_and_priority | n/a |
+| RELEASE-20260717-19 | synthesis-provider-description-and-gap-shape | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-description-string-gaps] | n/a |
+| RELEASE-20260717-20 | synthesis-sparse-finding-shape | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-sparse-findings] | n/a |
+| RELEASE-20260717-21 | wave1-source-order-canonicalization | runtime-materializer/submit-validator | deterministic-regression | tests/integration/test_wave1_work_units.py::test_real_wave1_canonicalizes_provider_source_order_before_candidate_validation[shape-wave1-source-order] | n/a |
+| RELEASE-20260717-22 | synthesis-relation-endpoint-aliases | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-relation-endpoints] | n/a |
+| RELEASE-20260717-23 | synthesis-singular-affected-topic | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-singular-affected-topic] | n/a |
+| RELEASE-20260717-24 | synthesis-alternate-relation-shape | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-alternate-relation] | n/a |
+| RELEASE-20260717-25 | synthesis-missing-gap-identity | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-missing-gap-identity] | n/a |
+
+## Current Evidence-V1 Open Findings
+
+The 2026-07-18 six-case run exposed two unclosed production-boundary findings.
+Focused Wave2 repeated a gap-level `search_required` field because the production
+prompt does not limit that flag to findings while `GapRecord` forbids it. Focused
+targeted evidence used its bounded web calls but returned prose instead of final
+JSON, and the production worker has no structured-output repair. Both cases
+failed closed without fabricated authority. They require a separately reviewed
+production change before a fresh live pass; this test-asset change does not
+normalize or repair them on the test side.
 
 ## Workflow
 

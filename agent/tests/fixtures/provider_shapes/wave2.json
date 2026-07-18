@@ -1,0 +1,213 @@
+[
+  {
+    "case_id": "shape-wave2-provider-field-aliases",
+    "discovery_ids": ["RELEASE-20260717-09"],
+    "focused_node": "wave2_synthesis",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "findings": [{"id": "finding alias", "statement": "Synthetic finding.", "priority": 2, "affected_topics": ["topic:a"], "backing_refs": ["ref:synthetic"], "confidence": "high"}],
+      "relations": [],
+      "gaps": [{"id": "gap alias", "question": "Synthetic gap?", "priority": 4, "affected_topics": ["topic:a"]}],
+      "summary": "Synthetic aliases."
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "findings": [{"finding_id": "finding:finding_alias", "statement": "Synthetic finding.", "priority": 2, "affected_topics": ["topic:a"], "backing_refs": ["ref:synthetic"], "confidence": "high", "search_required": false}],
+        "relations": [],
+        "gaps": [{"gap_id": "gap:gap_alias", "description": "Synthetic gap?", "priority": 4, "affected_topics": ["topic:a"]}],
+        "summary": "Synthetic aliases."
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave2-gap-priority-alias",
+    "discovery_ids": ["RELEASE-20260717-11"],
+    "focused_node": "wave2_synthesis",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "findings": [],
+      "relations": [],
+      "gaps": [{"id": "priority gap", "description": "Synthetic priority gap.", "severity": "high"}],
+      "summary": "Synthetic priority alias."
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "findings": [],
+        "relations": [],
+        "gaps": [{"gap_id": "gap:priority_gap", "description": "Synthetic priority gap.", "priority": 1, "affected_topics": []}],
+        "summary": "Synthetic priority alias."
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave2-description-string-gaps",
+    "discovery_ids": ["RELEASE-20260717-19"],
+    "focused_node": "wave2_synthesis",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "findings": [{"id": "description finding", "description": "Synthetic description finding.", "backing_refs": ["ref:synthetic"]}],
+      "relations": [],
+      "gaps": ["Synthetic gap remains."],
+      "summary": "Synthetic descriptions."
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "findings": [{"finding_id": "finding:description_finding", "statement": "Synthetic description finding.", "priority": 3, "affected_topics": [], "backing_refs": ["ref:synthetic"], "confidence": "medium", "search_required": false}],
+        "relations": [],
+        "gaps": [{"gap_id": "gap:Synthetic_gap_remains", "description": "Synthetic gap remains.", "priority": 3, "affected_topics": []}],
+        "summary": "Synthetic descriptions."
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave2-sparse-findings",
+    "discovery_ids": ["RELEASE-20260717-20"],
+    "focused_node": "wave2_synthesis",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "findings": [{"statement": "Synthetic sparse finding.", "evidence_refs": ["record:synthetic", "source:synthetic"], "source_ids": ["source:synthetic"], "affected_topics": ["topic:a"]}],
+      "relations": [],
+      "gaps": [],
+      "summary": "Synthetic sparse output."
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "findings": [{"finding_id": "finding:Synthetic_sparse_finding", "statement": "Synthetic sparse finding.", "priority": 3, "affected_topics": ["topic:a"], "backing_refs": ["record:synthetic", "source:synthetic"], "confidence": "medium", "search_required": false}],
+        "relations": [],
+        "gaps": [],
+        "summary": "Synthetic sparse output."
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave2-relation-endpoints",
+    "discovery_ids": ["RELEASE-20260717-22"],
+    "focused_node": "wave2_synthesis",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "findings": [
+        {"id": "left", "statement": "Synthetic left finding.", "backing_refs": ["ref:left"]},
+        {"id": "right", "statement": "Synthetic right finding.", "backing_refs": ["ref:right"]}
+      ],
+      "relations": [{"id": "left supports right", "finding_id_a": "left", "finding_id_b": "right", "relation_type": "supports"}],
+      "gaps": [],
+      "summary": "Synthetic endpoint aliases."
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "findings": [
+          {"finding_id": "finding:left", "statement": "Synthetic left finding.", "priority": 3, "affected_topics": [], "backing_refs": ["ref:left"], "confidence": "medium", "search_required": false},
+          {"finding_id": "finding:right", "statement": "Synthetic right finding.", "priority": 3, "affected_topics": [], "backing_refs": ["ref:right"], "confidence": "medium", "search_required": false}
+        ],
+        "relations": [{"relation_id": "rel:left_supports_right", "source_finding": "finding:left", "target_finding": "finding:right", "relation_type": "supports"}],
+        "gaps": [],
+        "summary": "Synthetic endpoint aliases."
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave2-singular-affected-topic",
+    "discovery_ids": ["RELEASE-20260717-23"],
+    "focused_node": "wave2_synthesis",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "findings": [],
+      "relations": [],
+      "gaps": [{"id": "topic gap", "description": "Synthetic topic gap.", "priority": 2, "affected_topic": "topic:a"}],
+      "summary": "Synthetic topic alias."
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "findings": [],
+        "relations": [],
+        "gaps": [{"gap_id": "gap:topic_gap", "description": "Synthetic topic gap.", "priority": 2, "affected_topics": ["topic:a"]}],
+        "summary": "Synthetic topic alias."
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave2-alternate-relation",
+    "discovery_ids": ["RELEASE-20260717-24"],
+    "focused_node": "wave2_synthesis",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "findings": [
+        {"id": "left", "statement": "Synthetic left finding.", "backing_refs": ["ref:left"]},
+        {"id": "right", "statement": "Synthetic right finding.", "backing_refs": ["ref:right"]}
+      ],
+      "relations": [{"from_finding": "left", "to_finding": "right", "type": "qualifies"}],
+      "gaps": [],
+      "summary": "Synthetic alternate relation."
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "findings": [
+          {"finding_id": "finding:left", "statement": "Synthetic left finding.", "priority": 3, "affected_topics": [], "backing_refs": ["ref:left"], "confidence": "medium", "search_required": false},
+          {"finding_id": "finding:right", "statement": "Synthetic right finding.", "priority": 3, "affected_topics": [], "backing_refs": ["ref:right"], "confidence": "medium", "search_required": false}
+        ],
+        "relations": [{"relation_id": "rel:left_qualifies_right", "source_finding": "finding:left", "target_finding": "finding:right", "relation_type": "qualifies"}],
+        "gaps": [],
+        "summary": "Synthetic alternate relation."
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave2-missing-gap-identity",
+    "discovery_ids": ["RELEASE-20260717-25"],
+    "focused_node": "wave2_synthesis",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "findings": [],
+      "relations": [],
+      "gaps": [{"question": "Synthetic identity gap?"}],
+      "summary": "Synthetic derived identity."
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "findings": [],
+        "relations": [],
+        "gaps": [{"gap_id": "gap:Synthetic_identity_gap", "description": "Synthetic identity gap?", "priority": 3, "affected_topics": []}],
+        "summary": "Synthetic derived identity."
+      }
+    },
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  },
+  {
+    "case_id": "shape-wave2-evidence-alias-binding",
+    "discovery_ids": ["RELEASE-20260717-20"],
+    "focused_node": "wave2_synthesis",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "findings": [{"statement": "Synthetic bound finding.", "source_ids": ["source:storage"]}],
+      "relations": [],
+      "gaps": [],
+      "summary": "Synthetic evidence alias."
+    },
+    "expected": {"kind": "normalized", "payload": {"backing_refs": ["h_SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"]}},
+    "sensitivity": {"synthetic_domain": "example.invalid", "minimized_reviewed": true, "contains_free_text": true}
+  }
+]

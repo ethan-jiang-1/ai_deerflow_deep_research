@@ -68,8 +68,8 @@ def test_release_make_target_shares_optional_dotenv_with_preflight_and_pytest() 
     assert "LOCAL_ENV_ARG := $(if $(wildcard .env),--env-file .env,)" in makefile
     assert "uv run $(LOCAL_ENV_ARG) --extra operations python scripts/release_preflight.py" in makefile
     assert (
-        "RELEASE_REPORT_DIR=.reports/release uv run $(LOCAL_ENV_ARG) --extra operations pytest -m release_e2e"
-        in makefile
+        "RELEASE_REPORT_DIR=.reports/release uv run $(LOCAL_ENV_ARG) --extra operations "
+        'pytest -m "requires_llm and release_e2e"' in makefile
     )
 
 

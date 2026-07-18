@@ -6,7 +6,7 @@
 > 定位：让"我们在 DeerFlow 之上构建的智能体"的每条需求都有永久身份、全程可追溯，
 > 并用小巧的确定性脚本在归档前机器强制纪律——纪律从"自觉"变"门禁"。
 
-## 四根支柱
+## 五个治理关注点
 
 1. **需求身份系统** —— 每条 capability 需求一个全局唯一、只增不删、永不复用的 ID
    `{PREFIX}-{NNN}`（如 `CUT-001`）。ID 贯穿全链路：
@@ -28,6 +28,11 @@
      `deltaHeaderInMain` / `missingPurpose` / `missingRequirements` / `missingReqHeader`。
    - [`check_project_architecture.py`](check_project_architecture.py) —— 结构治理检查：
      manifest schema/path、spec 生命周期引用、`agent/AGENTS.md` 受控区块和实际目录一致性。
+
+5. **测试证据权威链** —— [`test-evidence-policy.md`](test-evidence-policy.md) 只定义
+   authority、lifecycle 和 synchronized-change protocol。`evaluation-hardening` main spec
+   负责已批准的规范语义，唯一 active owning delta 负责待批准修改；精确证据 metadata 与
+   pytest collection/checker 仍由 `agent/` 测试资产拥有，归档 change 只作历史记录。
 
 ## 怎么用
 

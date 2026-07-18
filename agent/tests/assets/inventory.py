@@ -10,25 +10,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
-
-class StableSeam(StrEnum):
-    CONTRACT = "contract"
-    DOMAIN_ENGINE = "domain-engine"
-    NODE_CAPABILITY = "node-capability"
-    RUNTIME_STORE = "runtime-store"
-    LIFECYCLE_GRAPH = "lifecycle-graph"
-    PUBLIC_ENTRY = "public-entry"
-
-
-class Authenticity(StrEnum):
-    MODULE = "module"
-    REAL_NODE_FAKE_CAPABILITIES = "real-node-fake-capabilities"
-    SCRIPTED_REAL_WORKFLOW = "scripted-real-workflow"
+from tests.assets.evidence import TestEvidenceClaim
 
 
 class HistoricalStatus(StrEnum):
     COVERED = "covered"
     REPLACED = "replaced"
+    DUPLICATE = "duplicate"
     NEW_REGRESSION = "new-regression"
 
 
@@ -37,9 +25,7 @@ class IncidentCoverage:
     incident_id: str
     title: str
     risk_family: str
-    seam: StableSeam
-    authenticity: Authenticity
-    selectors: tuple[str, ...]
+    claim_ids: tuple[str, ...]
     invariant: str
     historical_status: HistoricalStatus
 
@@ -70,9 +56,7 @@ INCIDENTS = (
         "RM-01",
         "all-real builder import and compilation",
         "compile-and-registration",
-        StableSeam.CONTRACT,
-        Authenticity.MODULE,
-        ("tests/unit/test_research_runtime_capabilities.py::test_all_real_recipe_compiles",),
+        ("real-recipe-compiles",),
         "every registered real implementation compiles without a deferred NameError",
         HistoricalStatus.NEW_REGRESSION,
     ),
@@ -80,9 +64,7 @@ INCIDENTS = (
         "RM-02",
         "non-interactive policy forwarding",
         "context-forwarding",
-        StableSeam.PUBLIC_ENTRY,
-        Authenticity.REAL_NODE_FAKE_CAPABILITIES,
-        ("tests/unit/test_non_interactive.py::test_tool_forwards_non_interactive_policy_to_action_input",),
+        ("non-interactive-policy-forwarding",),
         "trusted non-interactive policy reaches ResearchActionInput",
         HistoricalStatus.NEW_REGRESSION,
     ),
@@ -90,9 +72,7 @@ INCIDENTS = (
         "RM-03",
         "missing demo model configuration",
         "model-readiness",
-        StableSeam.RUNTIME_STORE,
-        Authenticity.MODULE,
-        ("tests/unit/test_node_agent_bridge.py::test_default_model_resolver_rejects_empty_model_config",),
+        ("model-resolver-empty-config",),
         "empty model configuration fails with a stable readiness diagnostic",
         HistoricalStatus.NEW_REGRESSION,
     ),
@@ -100,9 +80,7 @@ INCIDENTS = (
         "RM-04",
         "invalid demo parent sandbox",
         "sandbox-readiness",
-        StableSeam.RUNTIME_STORE,
-        Authenticity.MODULE,
-        ("tests/unit/test_demo_core.py::test_demo_adapter_provides_legal_unique_sandbox",),
+        ("demo-adapter-unique-sandbox",),
         "demo parent sandbox has provider identity and unique run identity",
         HistoricalStatus.NEW_REGRESSION,
     ),
@@ -110,9 +88,7 @@ INCIDENTS = (
         "RM-05",
         "mounted workspace storage probe",
         "filesystem-readiness",
-        StableSeam.RUNTIME_STORE,
-        Authenticity.MODULE,
-        ("tests/unit/test_work_unit_store.py::test_store_factory_accepts_verified_temp_workspace",),
+        ("store-verified-temp-workspace",),
         "verified local mounted workspace creates the runtime store",
         HistoricalStatus.COVERED,
     ),
@@ -120,9 +96,7 @@ INCIDENTS = (
         "RM-06",
         "empty tool resolver configuration",
         "tool-readiness",
-        StableSeam.RUNTIME_STORE,
-        Authenticity.MODULE,
-        ("tests/unit/test_node_agent_bridge.py::test_default_tools_resolver_rejects_missing_allowed_tools",),
+        ("tool-resolver-missing-allowed-tools",),
         "configured policy tools cannot silently resolve to an empty set",
         HistoricalStatus.NEW_REGRESSION,
     ),
@@ -130,9 +104,7 @@ INCIDENTS = (
         "RM-07",
         "missing typed tool policy specs",
         "tool-policy",
-        StableSeam.NODE_CAPABILITY,
-        Authenticity.MODULE,
-        ("tests/unit/test_research_runtime_capabilities.py::test_worker_policies_specify_every_allowed_tool",),
+        ("worker-policy-tool-specs",),
         "every allowed worker tool has an eligible typed policy spec",
         HistoricalStatus.NEW_REGRESSION,
     ),
@@ -140,9 +112,7 @@ INCIDENTS = (
         "RM-08",
         "wave-specific worker capability routing",
         "capability-routing",
-        StableSeam.LIFECYCLE_GRAPH,
-        Authenticity.REAL_NODE_FAKE_CAPABILITIES,
-        ("tests/unit/test_research_runtime_capabilities.py::test_all_real_context_routes_distinct_worker_policies",),
+        ("distinct-worker-policy-routing",),
         "Wave0 and Wave1 resolve their own bridge and policy",
         HistoricalStatus.NEW_REGRESSION,
     ),
@@ -150,9 +120,7 @@ INCIDENTS = (
         "RM-09",
         "token admission with large tool history",
         "budget-admission",
-        StableSeam.NODE_CAPABILITY,
-        Authenticity.SCRIPTED_REAL_WORKFLOW,
-        ("tests/unit/test_budget_middleware.py::test_large_tool_result_history_uses_bounded_admission",),
+        ("budget-large-history-admission",),
         "bounded tool results do not make a valid next model call impossible",
         HistoricalStatus.NEW_REGRESSION,
     ),
@@ -160,12 +128,7 @@ INCIDENTS = (
         "RM-10",
         "model and parallel tool call limits",
         "budget-boundaries",
-        StableSeam.NODE_CAPABILITY,
-        Authenticity.MODULE,
-        (
-            "tests/unit/test_budget_middleware.py::test_max_model_calls_refused_before_handler",
-            "tests/unit/test_budget_middleware.py::test_parallel_tool_call_limit",
-        ),
+        ("budget-max-model-calls", "budget-parallel-tool-calls"),
         "configured call boundaries accept N and reject N plus one",
         HistoricalStatus.COVERED,
     ),
@@ -173,9 +136,7 @@ INCIDENTS = (
         "RM-11",
         "topic planner malformed output",
         "structured-output-repair",
-        StableSeam.NODE_CAPABILITY,
-        Authenticity.REAL_NODE_FAKE_CAPABILITIES,
-        ("tests/graph/test_topic_planning_node.py::test_repeated_invalid_plan_exhausts_without_topic_state",),
+        ("topic-planning-invalid-output",),
         "repeated malformed output fails closed without fabricated planner state",
         HistoricalStatus.REPLACED,
     ),
@@ -183,9 +144,7 @@ INCIDENTS = (
         "RM-12",
         "gate fatigue after mixed worker outcomes",
         "gate-fatigue",
-        StableSeam.DOMAIN_ENGINE,
-        Authenticity.MODULE,
-        ("tests/engine/test_gate_kernel.py::TestFatigue::test_successful_evaluation_resets_prior_failure_fatigue",),
+        ("gate-fatigue-reset",),
         "a successful or changed evaluation breaks a prior consecutive failure chain",
         HistoricalStatus.NEW_REGRESSION,
     ),
@@ -193,17 +152,16 @@ INCIDENTS = (
         "RM-13",
         "demo checkpoint identity reuse",
         "checkpoint-isolation",
-        StableSeam.PUBLIC_ENTRY,
-        Authenticity.MODULE,
-        ("tests/unit/test_demo_core.py::test_demo_adapter_provides_legal_unique_sandbox",),
+        ("demo-adapter-unique-sandbox",),
         "each demo adapter receives unique thread and run identity",
-        HistoricalStatus.NEW_REGRESSION,
+        HistoricalStatus.DUPLICATE,
     ),
 )
 
 
 def validate_incident_coverage(
     incidents: Iterable[IncidentCoverage],
+    claims: dict[str, TestEvidenceClaim],
     collected_selectors: set[str],
     *,
     excluded_selectors: set[str],
@@ -214,9 +172,14 @@ def validate_incident_coverage(
         if incident.incident_id in seen:
             errors.append(f"{incident.incident_id}: duplicate incident id")
         seen.add(incident.incident_id)
-        for selector in incident.selectors:
+        for claim_id in incident.claim_ids:
+            claim = claims.get(claim_id)
+            if claim is None:
+                errors.append(f"{incident.incident_id}: unknown claim {claim_id}")
+                continue
+            selector = claim.selector
             if selector not in collected_selectors:
-                errors.append(f"{incident.incident_id}: stale selector {selector}")
+                errors.append(f"{incident.incident_id}: {claim_id}: stale selector {selector}")
             if selector in excluded_selectors:
                 errors.append(f"{incident.incident_id}: {selector} excluded from deterministic lane")
     if errors:
@@ -225,12 +188,10 @@ def validate_incident_coverage(
 
 __all__ = [
     "INCIDENTS",
-    "Authenticity",
     "BATCH1_VERIFIED_LANES",
     "CoverageError",
     "HistoricalStatus",
     "IncidentCoverage",
-    "StableSeam",
     "VerifiedLane",
     "validate_incident_coverage",
 ]

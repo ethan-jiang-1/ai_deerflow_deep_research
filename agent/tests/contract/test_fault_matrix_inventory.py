@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from tests.assets.evidence import EVIDENCE_CLAIMS, claim_index, validate_inventory_claim_references
 from tests.assets.fault_matrix import (
     CRITICAL_FAULTS,
     CriticalFault,
@@ -28,20 +29,25 @@ def test_fault_matrix_covers_every_required_fault_once() -> None:
     }
     assert {entry.fault for entry in CRITICAL_FAULTS} == expected
     assert len(CRITICAL_FAULTS) == len(expected)
+    claims = claim_index(EVIDENCE_CLAIMS)
     for entry in CRITICAL_FAULTS:
-        assert "::test_" in entry.selector
-        assert entry.seam
+        assert entry.claim_id in claims
         assert entry.expected_outcome
+    validate_inventory_claim_references(
+        ((entry.fault.value, (entry.claim_id,)) for entry in CRITICAL_FAULTS),
+        claims=claims,
+    )
 
 
 def test_stale_fault_selector_reports_fault_identity() -> None:
-    collected = {entry.selector for entry in CRITICAL_FAULTS}
+    claims = claim_index(EVIDENCE_CLAIMS)
+    collected = {claims[entry.claim_id].selector for entry in CRITICAL_FAULTS}
     stale = CRITICAL_FAULTS[0]
-    collected.remove(stale.selector)
+    collected.remove(claims[stale.claim_id].selector)
 
     with pytest.raises(FaultMatrixError) as exc_info:
-        validate_fault_matrix(CRITICAL_FAULTS, collected)
+        validate_fault_matrix(CRITICAL_FAULTS, claims, collected)
 
     detail = str(exc_info.value)
     assert stale.fault.value in detail
-    assert stale.selector in detail
+    assert claims[stale.claim_id].selector in detail

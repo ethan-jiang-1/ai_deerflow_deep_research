@@ -38,3 +38,4 @@ jobs:
       - run: make test-req-coverage
       - run: make test-fast
       - run: make test-integration
+      - run: make test-workflow

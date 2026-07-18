@@ -1,0 +1,166 @@
+[
+  {
+    "case_id": "shape-wave0-url-canonicalization",
+    "discovery_ids": ["RELEASE-20260717-03"],
+    "focused_node": "wave0",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "sources": [
+        {
+          "source_id": "source:url-alias",
+          "canonical_url": "HTTPS://Example.invalid:443/research/#fragment",
+          "title": "Synthetic source",
+          "fetch_status": "fetched"
+        }
+      ]
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "source_ids": ["source:url-alias"],
+        "canonical_urls": ["https://example.invalid/research"],
+        "fetch_statuses": ["fetched"],
+        "limitations": ""
+      }
+    },
+    "sensitivity": {
+      "synthetic_domain": "example.invalid",
+      "minimized_reviewed": true,
+      "contains_free_text": false
+    }
+  },
+  {
+    "case_id": "shape-wave0-fetch-status-alias",
+    "discovery_ids": ["RELEASE-20260717-04"],
+    "focused_node": "wave0",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "sources": [
+        {
+          "source_id": "source:status-alias",
+          "canonical_url": "https://example.invalid/status",
+          "title": "Synthetic source",
+          "fetch_status": "available_via_search"
+        }
+      ]
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "source_ids": ["source:status-alias"],
+        "canonical_urls": ["https://example.invalid/status"],
+        "fetch_statuses": ["fetched"],
+        "limitations": ""
+      }
+    },
+    "sensitivity": {
+      "synthetic_domain": "example.invalid",
+      "minimized_reviewed": true,
+      "contains_free_text": false
+    }
+  },
+  {
+    "case_id": "shape-wave0-limitations-list",
+    "discovery_ids": ["RELEASE-20260717-05"],
+    "focused_node": "wave0",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "sources": [
+        {
+          "source_id": "source:limitations",
+          "canonical_url": "https://example.invalid/limitations",
+          "title": "Synthetic source",
+          "fetch_status": "fetched"
+        }
+      ],
+      "limitations": ["Synthetic search snippet", "Synthetic fetch unavailable"]
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "source_ids": ["source:limitations"],
+        "canonical_urls": ["https://example.invalid/limitations"],
+        "fetch_statuses": ["fetched"],
+        "limitations": "Synthetic search snippet; Synthetic fetch unavailable"
+      }
+    },
+    "sensitivity": {
+      "synthetic_domain": "example.invalid",
+      "minimized_reviewed": true,
+      "contains_free_text": true
+    }
+  },
+  {
+    "case_id": "shape-wave0-partial-source-degradation",
+    "discovery_ids": ["RELEASE-20260717-12"],
+    "focused_node": "wave0",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "sources": [
+        {
+          "source_id": "source:valid",
+          "canonical_url": "https://example.invalid/valid",
+          "title": "Synthetic valid source",
+          "fetch_status": "fetched"
+        },
+        {
+          "source_id": "source:invalid",
+          "canonical_url": "not-a-url",
+          "title": "Synthetic invalid source",
+          "fetch_status": "fetched"
+        }
+      ],
+      "limitations": "Synthetic partial result"
+    },
+    "expected": {
+      "kind": "normalized",
+      "payload": {
+        "source_ids": ["source:valid"],
+        "canonical_urls": ["https://example.invalid/valid"],
+        "fetch_statuses": ["fetched"],
+        "limitations": "Synthetic partial result; Dropped 1 invalid source records."
+      }
+    },
+    "sensitivity": {
+      "synthetic_domain": "example.invalid",
+      "minimized_reviewed": true,
+      "contains_free_text": true
+    }
+  },
+  {
+    "case_id": "shape-wave0-duplicate-source-fail-closed",
+    "discovery_ids": ["RELEASE-20260717-12"],
+    "focused_node": "wave0",
+    "input_schema_version": 1,
+    "payload": {
+      "schema_version": 1,
+      "sources": [
+        {
+          "source_id": "source:duplicate-a",
+          "canonical_url": "https://example.invalid/duplicate",
+          "title": "Synthetic source A",
+          "fetch_status": "fetched"
+        },
+        {
+          "source_id": "source:duplicate-b",
+          "canonical_url": "HTTPS://EXAMPLE.INVALID:443/duplicate/#fragment",
+          "title": "Synthetic source B",
+          "fetch_status": "fetched"
+        }
+      ]
+    },
+    "expected": {
+      "kind": "fail_closed",
+      "error_code": "sources_not_independent"
+    },
+    "sensitivity": {
+      "synthetic_domain": "example.invalid",
+      "minimized_reviewed": true,
+      "contains_free_text": false
+    }
+  }
+]

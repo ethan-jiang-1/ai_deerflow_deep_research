@@ -1,5 +1,9 @@
 # Live Evaluation Baseline: 2026-07-17
 
+> Classification: legacy report schema. These observations predate
+> `report_schema_version=1` and `metrics_schema=evidence-v1`; their historical
+> quality values are not comparable to evidence-v1 typed metrics.
+
 This is the first non-blocking live baseline for the Deep Research short-prefix
 canaries. It is observational evidence, not a release pass and not a quality
 threshold. All runs used unique thread, run, and research identities with the
@@ -44,3 +48,27 @@ as deterministic coverage.
 
 The next credentialed live run should retain the same scenario and bounds. A
 release gate remains blocked until all three canaries pass their hard invariants.
+
+## Evidence-V1 Non-Blocking Baseline
+
+The evidence-v1 observation window starts with this change. It is non-blocking:
+no metric threshold is active. Existing local reports are classified `legacy`
+because they lack both schema fields and contain superseded proxy metrics.
+
+A credentialed evidence-v1 observation was recorded on 2026-07-18 after the six
+case expansion. Four cases passed: start-to-HITL1, HITL1-to-topic-planning,
+one-topic Wave0, and one-topic Wave1. Wave2 synthesis failed closed because the
+provider repeated a gap-level `search_required` field forbidden by the canonical
+gap contract; targeted evidence failed closed after tool-only turns followed by
+prose instead of its required JSON result. Both failures retained schema-valid,
+redacted reports and published no false authority. They require a separately
+reviewed production prompt/repair change; the test-asset change does not coerce
+the outputs.
+
+The evidence-v1 window remains non-blocking and has no promoted metric threshold.
+Each selected metric serializes `not_applicable`, `insufficient_authority`, or
+`measured` with a null or numeric value and structural evidence basis. Missing
+late-node authority remains `insufficient_authority`; it is not replaced by a
+vacuous score. The historical full-real acceptance proof is separately preserved
+in `release-attestation-2026-07-17.json` and does not turn this partial current
+provider observation into a six-case pass.

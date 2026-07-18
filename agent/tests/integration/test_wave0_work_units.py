@@ -12,15 +12,26 @@ from deerflow_deep_research.domain.lifecycle import WorkUnitStorageReason
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies, NodeCapability
 from deerflow_deep_research.domain.state import WORK_UNIT_GATE_PREVIEW_FIELDS, merge_trace, preview_work_unit_update
 from deerflow_deep_research.domain.work_units import WORK_UNIT_GATE_VIEW_KEY, WorkSpecRef, canonical_json_bytes
+from deerflow_deep_research.engine.gate_kernel import evaluate_gate, gate_result_to_state_update
 from deerflow_deep_research.engine.work_units.kernel import allocate_attempt, materialize_work_spec, transition_attempt
 from deerflow_deep_research.graph.builder import _node_wrapper
 from deerflow_deep_research.graph.components.work_units import reconcile_parent_ledger_authority
-from deerflow_deep_research.graph.nodes.gate_adapter import default_gate_defs
+from deerflow_deep_research.graph.nodes.gate_adapter import default_gate_defs, real_wave0_gate_def
 from deerflow_deep_research.graph.nodes.wave0 import NODE_SPEC
 from deerflow_deep_research.graph.nodes.wave0.subgraph import WAVE0_FIXTURE_INTENTS, run_wave0_work_units
 from deerflow_deep_research.runtime.projection import RuntimeWorkUnitDependencyResolver
 from deerflow_deep_research.runtime.work_unit_storage import WorkUnitStoreError
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
+from tests.scenarios.assertions import assert_scenario
+from tests.scenarios.observation import (
+    CheckpointFacts,
+    LedgerFacts,
+    SandboxFacts,
+    ScenarioObservation,
+    WorkGateOutcome,
+    WorkStateFacts,
+)
+from tests.scenarios.replays import PARTIAL_WORKER_SUCCESS_CASE, PARTIAL_WORKER_SUCCESS_FAMILY
 
 RESEARCH_ID = "r_" + "A" * 43
 NOW = datetime(2026, 7, 14, tzinfo=UTC)
@@ -57,6 +68,18 @@ class BaseResolver:
             ),
             capabilities=ForbiddenCapabilities(),
         )
+
+
+class FailOneWorkerResolver:
+    def __init__(self, delegate, *, work_ordinal: int) -> None:
+        self._delegate = delegate
+        self._work_ordinal = work_ordinal
+
+    async def resolve_worker(self, **kwargs):
+        resolved = await self._delegate.resolve_worker(**kwargs)
+        if kwargs["work_spec"].work_ordinal == self._work_ordinal:
+            raise RuntimeError("scripted worker failure")
+        return resolved
 
 
 def _store(tmp_path) -> WorkUnitStore:
@@ -156,6 +179,79 @@ async def test_wave0_shared_component_replays_and_quality_repair_allocates_new_w
     )
     assert second["next_work_ordinal"] == 6
     assert len(await store.load_records()) == 6
+
+
+@pytest.mark.workflow
+@pytest.mark.parametrize(
+    "case",
+    [pytest.param(PARTIAL_WORKER_SUCCESS_CASE, id=PARTIAL_WORKER_SUCCESS_CASE.case_id)],
+)
+async def test_partial_worker_success_projects_distinct_gate_outcomes_from_authoritative_state(tmp_path, case) -> None:
+    context, store = _context(tmp_path)
+    assert context.work_units is not None
+    controller = WorkUnitControllerDependencies(
+        store=store,
+        resolver=FailOneWorkerResolver(context.work_units.resolver, work_ordinal=1),
+    )
+
+    component = await run_wave0_work_units(
+        _state(),
+        controller=controller,
+        clock=lambda: NOW,
+    )
+    projected = _apply_result(_state(), component.parent_update)
+    gate_state = {**projected, WORK_UNIT_GATE_VIEW_KEY: component.gate_view}
+    gate_def = real_wave0_gate_def()
+
+    repair = evaluate_gate(gate_state, "wave0", gate_def)
+    after_repair = {**gate_state, **gate_result_to_state_update(repair, "wave0", gate_state)}
+    second_repair = evaluate_gate(after_repair, "wave0", gate_def)
+    after_second = {**after_repair, **gate_result_to_state_update(second_repair, "wave0", after_repair)}
+    fatigue = evaluate_gate(after_second, "wave0", gate_def)
+    exhausted = evaluate_gate(
+        {**gate_state, "repair_budget_by_phase": {"wave0": 0}},
+        "wave0",
+        gate_def,
+    )
+
+    records = await store.load_records()
+    accepted_work_ids = tuple(sorted(component.gate_view.accepted_record_by_work_id))
+    failed_attempt_ids = tuple(failure.attempt_id for failure in component.gate_view.failure_summaries)
+    artifact_hashes = tuple((output.path, output.content_hash) for record in records for output in record.output_refs)
+    outcomes = tuple(
+        WorkGateOutcome(
+            route=result.route,
+            failure_codes=tuple(failure.code.value for failure in result.failures),
+        )
+        for result in (repair, fatigue, exhausted)
+    )
+    observation = ScenarioObservation(
+        checkpoint=CheckpointFacts(route=fatigue.route, terminal="blocked", identity_isolated=True, attempt_count=3),
+        ledger=LedgerFacts(
+            accepted_refs=tuple(record.record_hash for record in records),
+            conflict_detected=False,
+            replay_idempotent=True,
+        ),
+        sandbox=SandboxFacts(
+            paths_contained=all(
+                path.startswith(f"workspace/deep-research/{RESEARCH_ID}/") for path, _ in artifact_hashes
+            ),
+            artifact_hashes=artifact_hashes,
+            citation_bindings=(),
+        ),
+        work_state=WorkStateFacts(
+            accepted_work_ids=accepted_work_ids,
+            failed_attempt_ids=failed_attempt_ids,
+            gate_outcomes=outcomes,
+        ),
+    )
+
+    assert len(component.gate_view.planned_work_ids) == 3
+    assert len(accepted_work_ids) == len(records) == 2
+    assert len(failed_attempt_ids) == 1
+    assert repair.route == second_repair.route == "repair"
+    assert fatigue.route == exhausted.route == "exhausted"
+    assert_scenario(PARTIAL_WORKER_SUCCESS_FAMILY, case, observation)
 
 
 async def test_fault_before_submit_node_return_replays_ledger_ahead_of_parent_checkpoint(tmp_path) -> None:

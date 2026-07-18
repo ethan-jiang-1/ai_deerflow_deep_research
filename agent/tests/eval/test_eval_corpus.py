@@ -6,11 +6,10 @@
 
 from __future__ import annotations
 
-from tests.eval.metrics import compute_metrics
-from tests.scenarios.catalog import SCENARIOS
+from tests.scenarios.replays import FIRST_WAVE_CASES, FIRST_WAVE_FAMILIES
 
 
-def test_first_wave_scenario_catalog_is_complete_and_unique() -> None:
+def test_first_wave_scenario_registry_is_complete_and_unique() -> None:
     expected = {
         "quick-factual",
         "claim-verification",
@@ -23,58 +22,5 @@ def test_first_wave_scenario_catalog_is_complete_and_unique() -> None:
         "checkpoint-control",
         "sandbox-filesystem-failure",
     }
-    assert {scenario.scenario_id for scenario in SCENARIOS} == expected
-
-
-class TestQuickFactual:
-    """Quick factual: answer is clear, sources are easy to verify."""
-
-    def test_citation_precision_with_valid_refs(self) -> None:
-        state = {
-            "accepted_submission_refs": ("ref:1", "ref:2", "ref:3"),
-            "must_answer_questions": ("What is X?",),
-        }
-        metrics = compute_metrics(state)
-        assert metrics["citation_precision"] == 1.0
-
-    def test_citation_precision_with_mixed_refs(self) -> None:
-        state = {
-            "accepted_submission_refs": ("ref:1", "bad-format", "ref:3"),
-            "must_answer_questions": ("Q1",),
-        }
-        metrics = compute_metrics(state)
-        assert metrics["citation_precision"] == 2.0 / 3.0
-
-
-class TestClaimVerification:
-    """Claim verification: evidence supports, refutes, or is uncertain."""
-
-    def test_source_diversity_counts_unique_refs(self) -> None:
-        state = {
-            "accepted_submission_refs": ("ref:1", "ref:2", "ref:2", "ref:3"),
-        }
-        assert compute_metrics(state)["source_diversity"] == 3
-
-    def test_empty_refs_zero_diversity(self) -> None:
-        state: dict = {"accepted_submission_refs": ()}
-        assert compute_metrics(state)["source_diversity"] == 0
-
-
-class TestInsufficientEvidence:
-    """Insufficient evidence: correctly reports inability to answer."""
-
-    def test_no_evidence_zero_coverage(self) -> None:
-        state = {
-            "accepted_submission_refs": (),
-            "must_answer_questions": ("Q1", "Q2"),
-        }
-        metrics = compute_metrics(state)
-        assert metrics["must_answer_coverage"] == 0.0
-
-    def test_no_questions_full_coverage(self) -> None:
-        state = {
-            "accepted_submission_refs": ("ref:1",),
-            "must_answer_questions": (),
-        }
-        metrics = compute_metrics(state)
-        assert metrics["must_answer_coverage"] == 1.0
+    assert {family.family_id for family in FIRST_WAVE_FAMILIES} == expected
+    assert {case.case_id for case in FIRST_WAVE_CASES} == expected

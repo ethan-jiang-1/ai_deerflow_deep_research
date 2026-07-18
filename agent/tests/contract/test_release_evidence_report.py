@@ -15,6 +15,8 @@ def test_release_evidence_report_keeps_achieved_and_outstanding_proof_explicit()
     path = Path("docs/dpt-invariant-parity-release-report-2026-07-17.md")
     text = path.read_text(encoding="utf-8")
 
+    assert "Status: Superseded by `docs/release-attestation-2026-07-17.json`." in text
+    assert "`NOT READY` and `full-real not executed` statements below are historical" in text
     assert "Release verdict: NOT READY" in text
     assert "2 of 3" in text
     assert "Full-real acceptance: not executed" in text

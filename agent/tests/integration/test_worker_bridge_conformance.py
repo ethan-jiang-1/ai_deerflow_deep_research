@@ -27,6 +27,22 @@ from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 from tests.fixtures.fake_models import ScriptedChatModel, ai_message
 from tests.fixtures.runtime import local_runtime_envelope, unique_run_identity
 from tests.fixtures.scripted_tools import ScriptedTool
+from tests.scenarios.assertions import assert_scenario
+from tests.scenarios.inputs import ObservedToolCall, ScriptExecutionObservation, validate_script_observation
+from tests.scenarios.observation import (
+    CheckpointFacts,
+    EvidenceState,
+    LabeledEvidenceFact,
+    LedgerFacts,
+    SandboxFacts,
+    ScenarioObservation,
+)
+from tests.scenarios.replays import (
+    CLAIM_VERIFICATION_CASE,
+    CLAIM_VERIFICATION_FAMILY,
+    QUICK_FACTUAL_CASE,
+    QUICK_FACTUAL_FAMILY,
+)
 
 NOW = datetime(2026, 7, 17, tzinfo=UTC)
 
@@ -62,12 +78,30 @@ def _structured_output(phase: str, attempt_id: str) -> str:
                 "claims": [
                     {
                         "claim_id": "claim:w1_supported",
-                        "statement": "The evidence supports the claim.",
+                        "statement": "The evidence supports this claim.",
                         "support_refs": ["source:w1"],
                         "counter_refs": [],
+                    },
+                    {
+                        "claim_id": "claim:w1_contradicted",
+                        "statement": "The evidence contradicts this claim.",
+                        "support_refs": [],
+                        "counter_refs": ["source:w1"],
+                    },
+                    {
+                        "claim_id": "claim:w1_uncertain",
+                        "statement": "The available evidence is uncertain.",
+                        "support_refs": [],
+                        "counter_refs": [],
+                    },
+                ],
+                "open_questions": [
+                    {
+                        "question_id": "q:w1_uncertain",
+                        "question": "What additional evidence would resolve uncertainty?",
+                        "state": "targeted_search",
                     }
                 ],
-                "open_questions": [],
             }
         )
     return json.dumps(
@@ -125,7 +159,15 @@ def _state(research_id: str) -> dict:
     }
 
 
-@pytest.mark.parametrize("phase", ["wave0", "targeted_evidence", "wave1"])
+@pytest.mark.workflow
+@pytest.mark.parametrize(
+    "phase",
+    [
+        pytest.param("wave0", id="quick-factual"),
+        pytest.param("targeted_evidence", id="targeted_evidence"),
+        pytest.param("wave1", id="claim-verification"),
+    ],
+)
 async def test_scripted_worker_traverses_real_bridge_tool_policy_artifacts_and_ledger(
     tmp_path: Path,
     phase: str,
@@ -225,3 +267,80 @@ async def test_scripted_worker_traverses_real_bridge_tool_policy_artifacts_and_l
     assert len(accepted) == 1
     assert len(records) == 1
     assert records[0].source_refs[0].content_ref.endswith("/cache/source-0.json")
+    if phase == "wave0":
+        record = records[0]
+        validate_script_observation(
+            QUICK_FACTUAL_CASE.inputs,
+            QUICK_FACTUAL_CASE.bounds,
+            ScriptExecutionObservation(
+                model_calls=model.calls,
+                tool_calls=(ObservedToolCall("web_search", (("query", "wave0"),)),),
+                bound_tool_names=("web_search",),
+            ),
+        )
+        assertion = assert_scenario(
+            QUICK_FACTUAL_FAMILY,
+            QUICK_FACTUAL_CASE,
+            ScenarioObservation(
+                checkpoint=CheckpointFacts(route=None, terminal=None, identity_isolated=True, attempt_count=1),
+                ledger=LedgerFacts(
+                    accepted_refs=(record.record_hash,),
+                    conflict_detected=False,
+                    replay_idempotent=True,
+                ),
+                sandbox=SandboxFacts(
+                    paths_contained=True,
+                    artifact_hashes=((record.result_ref, record.result_hash),),
+                    citation_bindings=(("quick-factual-answer", (record.record_hash,)),),
+                ),
+                diagnostic_codes=("accepted",),
+            ),
+        )
+        assert assertion.case_id == "quick-factual"
+    elif phase == "wave1":
+        record = records[0]
+        persisted = json.loads(await store.read_canonical_bytes(record.result_ref, max_bytes=256 * 1024))
+        claims = {claim["claim_id"]: claim for claim in persisted["claims"]}
+        assert persisted["open_questions"] == [
+            {
+                "question": "What additional evidence would resolve uncertainty?",
+                "question_id": "q:w1_uncertain",
+                "state": "targeted_search",
+            }
+        ]
+        validate_script_observation(
+            CLAIM_VERIFICATION_CASE.inputs,
+            CLAIM_VERIFICATION_CASE.bounds,
+            ScriptExecutionObservation(
+                model_calls=model.calls,
+                tool_calls=(ObservedToolCall("web_search", (("query", "wave1"),)),),
+                bound_tool_names=("web_search",),
+            ),
+        )
+        source_id = record.source_refs[0].source_id
+        assertion = assert_scenario(
+            CLAIM_VERIFICATION_FAMILY,
+            CLAIM_VERIFICATION_CASE,
+            ScenarioObservation(
+                checkpoint=CheckpointFacts(route=None, terminal=None, identity_isolated=True, attempt_count=1),
+                ledger=LedgerFacts((record.record_hash,), False, True),
+                sandbox=SandboxFacts(True, ((record.result_ref, record.result_hash),), ()),
+                diagnostic_codes=("accepted",),
+                evidence_facts=(
+                    LabeledEvidenceFact(
+                        "claim:w1_supported",
+                        EvidenceState.SUPPORTED,
+                        tuple(claims["claim:w1_supported"]["support_refs"]),
+                    ),
+                    LabeledEvidenceFact(
+                        "claim:w1_contradicted",
+                        EvidenceState.CONTRADICTED,
+                        tuple(claims["claim:w1_contradicted"]["counter_refs"]),
+                    ),
+                    LabeledEvidenceFact("claim:w1_uncertain", EvidenceState.UNCERTAIN, ()),
+                ),
+            ),
+        )
+        assert source_id in claims["claim:w1_supported"]["support_refs"]
+        assert source_id in claims["claim:w1_contradicted"]["counter_refs"]
+        assert assertion.case_id == "claim-verification"

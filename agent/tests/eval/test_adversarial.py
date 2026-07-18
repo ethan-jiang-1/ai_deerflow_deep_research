@@ -18,13 +18,13 @@ from deerflow_deep_research.domain.context import GraphContextView, NodeAgentCon
 from deerflow_deep_research.domain.enums import NodeFinishReason
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
 from deerflow_deep_research.graph.nodes.targeted_evidence import NODE_SPEC
-from tests.scenarios.catalog import SCENARIOS
+from tests.scenarios.replays import FIRST_WAVE_FAMILIES
 
 RESEARCH_ID = "r_" + "E" * 43
 
 
 def _scenario(scenario_id: str):
-    return next(scenario for scenario in SCENARIOS if scenario.scenario_id == scenario_id)
+    return next(scenario for scenario in FIRST_WAVE_FAMILIES if scenario.family_id == scenario_id)
 
 
 class _AdversarialCapabilities:
@@ -92,7 +92,7 @@ async def test_route_and_ledger_instructions_remain_untrusted_through_real_node(
         }
     )
 
-    assert scenario.risk_family == "untrusted-source"
+    assert "untrusted source" in scenario.risk_intent.lower()
     assert update["route"] == "next"
     assert "accepted_submission_refs" not in update
     assert capabilities.objective.count("<untrusted-source-data>") == 1

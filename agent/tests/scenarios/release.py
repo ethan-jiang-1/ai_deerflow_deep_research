@@ -26,6 +26,7 @@ from deerflow_deep_research.runtime.checkpoint import derive_research_thread_key
 from deerflow_deep_research.runtime.control import build_control_graph_host
 from deerflow_deep_research.runtime.research import ResearchGraphRecipe, derive_research_id
 from deerflow_deep_research.tool import run_deep_research
+from tests.assets.evidence import AuthenticityLevel
 from tests.fixtures.runtime import RunIdentity
 from tests.scenarios.canaries import (
     _app_config,
@@ -35,7 +36,6 @@ from tests.scenarios.canaries import (
     _UsageTracker,
 )
 from tests.scenarios.live import LiveEnvironment, LivePreflightError, preflight_live_environment
-from tests.scenarios.model import AuthenticityLevel
 
 
 class ReleasePreflightError(RuntimeError):

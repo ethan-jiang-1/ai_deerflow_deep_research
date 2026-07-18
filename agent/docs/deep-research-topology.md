@@ -64,5 +64,6 @@ wave1 --exhausted--> blocked
 wave1 --pass--> wave2_synthesis
 wave1 --repair--> wave1
 wave2_synthesis --evidence_needed--> targeted_evidence
+wave2_synthesis --exhausted--> blocked
 wave2_synthesis --pass--> hitl2
 ```

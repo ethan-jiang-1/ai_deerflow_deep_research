@@ -7,10 +7,14 @@ etc.). These tests focus on gate-specific behaviors at the unit level.
 
 from __future__ import annotations
 
+import pytest
+
 from deerflow_deep_research.domain.state import FakeFixturePlan, fixture_plan_to_checkpoint
+from deerflow_deep_research.domain.synthesis import WAVE2_GATE_PREVIEW_KEY, Wave2GatePreview
 from deerflow_deep_research.domain.work_units import WORK_UNIT_GATE_VIEW_KEY, WorkUnitGateView
-from deerflow_deep_research.engine.gate_fixtures import build_fixture_gate_defs
+from deerflow_deep_research.engine.gate_fixtures import build_fixture_gate_defs, build_wave2_real_gate_def
 from deerflow_deep_research.engine.gate_kernel import evaluate_gate
+from deerflow_deep_research.graph.nodes.gate_adapter import evaluate_gate_for_node
 
 
 def _state(plan: FakeFixturePlan | None = None, **overrides):
@@ -73,6 +77,56 @@ class TestFixtureGateOutcomes:
         r = evaluate_gate(s, "wave2_synthesis", gd)
         assert r.verdict.value == "repair"
         assert r.route == "evidence_needed"
+
+
+class TestRealWave2GateOutcomes:
+    def test_searchable_gap_routes_evidence_needed_and_projects_only_ids(self) -> None:
+        state = _state() | {
+            "unresolved_gaps": ("gap:forged-prior",),
+            WAVE2_GATE_PREVIEW_KEY: Wave2GatePreview(searchable_gap_ids=("gap:needed", "gap:also-needed")),
+        }
+
+        update = evaluate_gate_for_node(state, "wave2_synthesis", build_wave2_real_gate_def())
+
+        assert update["route"] == "evidence_needed"
+        assert update["unresolved_gaps"] == ("gap:needed", "gap:also-needed")
+        assert WAVE2_GATE_PREVIEW_KEY not in update
+
+    def test_empty_current_preview_clears_fabricated_prior_gap_and_passes(self) -> None:
+        state = _state() | {
+            "unresolved_gaps": ("gap:forged-prior",),
+            WAVE2_GATE_PREVIEW_KEY: Wave2GatePreview(searchable_gap_ids=()),
+        }
+
+        update = evaluate_gate_for_node(state, "wave2_synthesis", build_wave2_real_gate_def())
+
+        assert update["route"] == "pass"
+        assert update["unresolved_gaps"] == ()
+
+    def test_repeated_searchable_gap_exhausts_to_blocked(self) -> None:
+        state = _state() | {
+            "repair_budget_by_phase": {"wave2_synthesis": 0},
+            WAVE2_GATE_PREVIEW_KEY: Wave2GatePreview(searchable_gap_ids=("gap:needed",)),
+        }
+
+        update = evaluate_gate_for_node(state, "wave2_synthesis", build_wave2_real_gate_def())
+
+        assert update["route"] == "exhausted"
+        assert update["terminal_status"] == "blocked"
+        assert update["unresolved_gaps"] == ("gap:needed",)
+
+    def test_missing_current_preview_fails_closed(self) -> None:
+        with pytest.raises(ValueError, match="wave2_gate_preview_missing"):
+            evaluate_gate_for_node(_state(), "wave2_synthesis", build_wave2_real_gate_def())
+
+    def test_wave2_preview_cannot_write_other_phase_projection(self) -> None:
+        state = _state() | {
+            WAVE2_GATE_PREVIEW_KEY: Wave2GatePreview(searchable_gap_ids=("gap:forged",)),
+        }
+
+        update = evaluate_gate_for_node(state, "wave0", build_fixture_gate_defs()["wave0"])
+
+        assert "unresolved_gaps" not in update
 
     def test_readiness_repair_targeted(self) -> None:
         gd = build_fixture_gate_defs()["readiness"]

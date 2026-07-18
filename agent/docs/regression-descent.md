@@ -38,17 +38,27 @@ misleading.
 | RELEASE-20260717-23 | synthesis-singular-affected-topic | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-singular-affected-topic] | n/a |
 | RELEASE-20260717-24 | synthesis-alternate-relation-shape | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-alternate-relation] | n/a |
 | RELEASE-20260717-25 | synthesis-missing-gap-identity | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_provider_shapes.py::test_wave2_provider_shape[shape-wave2-missing-gap-identity] | n/a |
+| LIVE-20260718-01 | synthesis-gap-routing-authority | domain-contract/node-capability | deterministic-regression | tests/graph/test_wave2_synthesis_real.py::test_real_synthesis_persists_searchable_gap_and_returns_typed_preview | n/a |
+| LIVE-20260718-02 | targeted-structured-output-repair | node-capability/runtime-store | deterministic-regression | tests/graph/test_targeted_evidence_real.py::test_targeted_invalid_first_response_repairs_once_without_tools[prose] | n/a |
+| LIVE-20260718-03 | wave1-tool-only-budget-exhaustion | live-real-dependencies | provider-only-live | n/a | The bounded live model emitted only tool calls with empty content across all three allowed turns. Scripted bridge and fail-closed budget tests prove mechanics, but cannot honestly reproduce this provider decision distribution. |
 
-## Current Evidence-V1 Open Findings
+## Current Evidence-V1 Findings Awaiting Closure
 
-The 2026-07-18 six-case run exposed two unclosed production-boundary findings.
-Focused Wave2 repeated a gap-level `search_required` field because the production
-prompt does not limit that flag to findings while `GapRecord` forbids it. Focused
-targeted evidence used its bounded web calls but returned prose instead of final
-JSON, and the production worker has no structured-output repair. Both cases
-failed closed without fabricated authority. They require a separately reviewed
-production change before a fresh live pass; this test-asset change does not
-normalize or repair them on the test side.
+The reviewed `harden-late-node-structured-output` change deterministically fixed
+the original gap-routing and targeted-repair findings. In the fresh complete
+lane, targeted evidence passed with two real Tavily calls and validated ledger
+authority, while Wave2 accepted the canonical gap field. The complete lane did
+not close: Wave1 exhausted its bounded turns with tool-only responses, and
+Wave2 exposed the distinct zero-findings/non-empty-gaps semantic-floor gap.
+Both failed closed without fabricated authority. Nightly remains disabled until
+a newly reviewed remediation is followed by another complete fresh lane; the
+passing targeted case is not used to hide the two failures.
+
+The zero-findings/non-empty-gaps discovery is not yet added to the closed table:
+it has no reviewed collected deterministic selector, and recording a pending
+selector as a deterministic regression would fabricate evidence. Its proposed
+lowest seam is the Wave2 node semantic-floor boundary; proposal/design review
+must define the rule and red selector before it receives a discovery row.
 
 ## Workflow
 

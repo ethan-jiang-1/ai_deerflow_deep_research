@@ -210,7 +210,8 @@ invocation. The real nodes declare only the capabilities they consume (HITL1:
 constructs a real `RuntimeNodeAgentBridge` with web tools and attempt-scoped
 policy, distinct from the zero-tool HITL1/topic-planning bridges. The
 normalized topology adds only `hitl1 --needs_followup--> hitl1`,
-`hitl1 --exhausted--> blocked`, and `topic_planning --exhausted--> blocked`;
+`hitl1 --exhausted--> blocked`, `topic_planning --exhausted--> blocked`, and
+`wave2_synthesis --exhausted--> blocked`;
 the Wave0 topology (`repair`/`pass`/`exhausted`) is unchanged from the fixture.
 Full-fake HITL1, topic planning, and Wave0 remain deterministic and do not
 construct the node-agent bridge or request-bundle writer. `backend/`,

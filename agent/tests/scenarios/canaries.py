@@ -412,7 +412,14 @@ async def _execute_focused_wave2_core(
 
     gate_state = {**seed.checkpoint, **node_update}
     gate_update = evaluate_gate_for_node(gate_state, "wave2_synthesis", real_wave2_gate_def())
-    if gate_update.get("route") != "pass":
+    from deerflow_deep_research.domain.synthesis import WAVE2_GATE_PREVIEW_KEY, Wave2GatePreview
+
+    preview = node_update.get(WAVE2_GATE_PREVIEW_KEY)
+    if not isinstance(preview, Wave2GatePreview):
+        raise AssertionError("live_wave2_gate_preview_missing")
+    expected_route = "evidence_needed" if preview.searchable_gap_ids else "pass"
+    projected_gap_ids = tuple(gate_update.get("unresolved_gaps") or ())
+    if gate_update.get("route") != expected_route or projected_gap_ids != preview.searchable_gap_ids:
         raise AssertionError("live_wave2_gate_authority_missing")
     outcome = LiveOutcome(
         route="wave2-synthesis",
@@ -457,8 +464,22 @@ async def _execute_focused_targeted_core(
         now=datetime.now(UTC),
         clock=lambda: datetime.now(UTC),
     )
-    if len(seed.synthesis_gaps) != 1 or seed.synthesis_gaps[0].get("search_required") is not True:
+    if (
+        seed.synthesis_result is None
+        or len(seed.synthesis_gaps) != 1
+        or seed.synthesis_gaps[0].get("search_required") is not True
+    ):
         raise AssertionError("live_targeted_gap_authority_missing")
+
+    from deerflow_deep_research.domain.synthesis import WAVE2_GATE_PREVIEW_KEY, build_wave2_gate_preview
+
+    gate_state = {
+        **seed.checkpoint,
+        WAVE2_GATE_PREVIEW_KEY: build_wave2_gate_preview(seed.synthesis_result),
+    }
+    gate_update = evaluate_gate_for_node(gate_state, "wave2_synthesis", real_wave2_gate_def())
+    if gate_update.get("route") != "evidence_needed" or gate_update.get("unresolved_gaps") != ("gap:focused-targeted",):
+        raise AssertionError("live_targeted_gate_authority_missing")
 
     graph_context = project_research_scope(envelope, research_scope_id=research_id)
     capabilities = _build_wave0_capabilities(envelope, graph_context, bridge_factory)
@@ -481,7 +502,7 @@ async def _execute_focused_targeted_core(
         await node(
             {
                 **seed.checkpoint,
-                "synthesis_gaps": seed.synthesis_gaps,
+                "unresolved_gaps": gate_update["unresolved_gaps"],
                 "critic_work_items": (),
             }
         )

@@ -21,8 +21,8 @@ from .subgraph import dispatch_critic, materialize_gap_intents, run_gap_workers
 def build_real(dependencies: NodeBuildDependencies):
     async def run(state: dict[str, Any]) -> dict[str, Any]:
         work_items = state.get("critic_work_items") or ()
-        gaps = state.get("synthesis_gaps") or ()
-        gap_intents = materialize_gap_intents(gaps)
+        gap_ids = state.get("unresolved_gaps") or ()
+        gap_intents = materialize_gap_intents(gap_ids)
         workspace_root = dependencies.graph_context.workspace_root
         node_attempt_id = make_attempt_id(state, "targeted_evidence")
         research_id = state["research_id"]

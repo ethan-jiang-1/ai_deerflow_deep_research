@@ -11,6 +11,8 @@ from collections.abc import Mapping
 from typing import Any
 
 from deerflow_deep_research.domain.gate import GateDefinition
+from deerflow_deep_research.domain.state import WriterRole, apply_research_update
+from deerflow_deep_research.domain.synthesis import WAVE2_GATE_PREVIEW_KEY, Wave2GatePreview
 from deerflow_deep_research.engine.gate_fixtures import (
     build_final_delivery_real_gate_def,
     build_fixture_gate_defs,
@@ -31,7 +33,16 @@ def evaluate_gate_for_node(
 ) -> dict[str, Any]:
     """Run gate evaluation for *logical_name* and return a state update dict."""
     gate_result = evaluate_gate(state, logical_name, gate_def)
-    return gate_result_to_state_update(gate_result, logical_name, state)
+    update = gate_result_to_state_update(gate_result, logical_name, state)
+    preview = state.get(WAVE2_GATE_PREVIEW_KEY)
+    if logical_name == "wave2_synthesis" and isinstance(preview, Wave2GatePreview):
+        gap_update = apply_research_update(
+            state,
+            {"unresolved_gaps": preview.searchable_gap_ids},
+            writer=WriterRole.GATE,
+        )
+        update = {**update, **gap_update}
+    return update
 
 
 def default_gate_defs() -> dict[str, GateDefinition]:
@@ -50,7 +61,7 @@ def real_wave1_gate_def() -> GateDefinition:
 
 
 def real_wave2_gate_def() -> GateDefinition:
-    """Return the real Wave2 ``GateDefinition`` (pass-through)."""
+    """Return the real Wave2 ``GateDefinition`` (searchable-gap routing)."""
     return build_wave2_real_gate_def()
 
 

@@ -11,7 +11,11 @@ from typing import Any
 from deerflow_deep_research.domain.context import NodeExecutionResult
 from deerflow_deep_research.domain.enums import NodeFinishReason
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
-from deerflow_deep_research.domain.synthesis import SynthesisEvidence
+from deerflow_deep_research.domain.synthesis import (
+    WAVE2_GATE_PREVIEW_KEY,
+    SynthesisEvidence,
+    build_wave2_gate_preview,
+)
 from deerflow_deep_research.engine.fake_control import node_update
 
 from .prompts import build_synthesis_prompt, build_synthesis_repair_prompt, parse_synthesis_output
@@ -51,8 +55,8 @@ def _validate_synthesis_semantics(
 ):
     accepted = set(accepted_refs)
     aliases = _evidence_aliases(evidence)
-    if accepted and not output.findings and not output.gaps:
-        raise ValueError("synthesis_findings_or_gaps_required")
+    if accepted and not output.findings:
+        raise ValueError("synthesis_findings_required")
     for finding in output.findings:
         normalized_refs = tuple(aliases.get(ref, ref) for ref in finding.backing_refs)
         finding = finding.model_copy(update={"backing_refs": normalized_refs})
@@ -97,6 +101,9 @@ def build_real(dependencies: NodeBuildDependencies):
                 raise ValueError("synthesis_repair_failed") from parse_error
             output = _validate_synthesis_semantics(parse_synthesis_output(repaired.summary), wave0_refs, evidence)
         await dependencies.synthesis_bundle.write_synthesis(output)
-        return node_update("wave2_synthesis")
+        return node_update(
+            "wave2_synthesis",
+            **{WAVE2_GATE_PREVIEW_KEY: build_wave2_gate_preview(output)},
+        )
 
     return run

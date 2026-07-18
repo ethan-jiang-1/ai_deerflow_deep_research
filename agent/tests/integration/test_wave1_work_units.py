@@ -280,7 +280,7 @@ async def test_real_wave1_crosses_worker_context_artifact_validator_and_ledger(t
     assert len(capabilities.contexts) == 2
     request = capabilities.requests[0]
     assert request.minimum_tool_calls == 1
-    assert request.tool_call_limit == 3
+    assert request.tool_call_limit == 2
     assert "content_ref" not in request.expected_output
     assert "content_hash" not in request.expected_output
     assert "byte_count" not in request.expected_output

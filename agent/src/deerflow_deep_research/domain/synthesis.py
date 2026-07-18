@@ -14,12 +14,14 @@ from pydantic import Field, model_validator
 from deerflow_deep_research.domain.work_units import CONTENT_HASH_RE, _FrozenModel
 
 FINDING_ID_RE = re.compile(r"^finding:[a-zA-Z0-9_-]{1,64}$")
+GAP_ID_RE = re.compile(r"^gap:[a-zA-Z0-9_-]{1,64}$")
 MAX_FINDINGS = 128
 MAX_RELATIONS = 64
 MAX_SYNTHESIS_EVIDENCE_ENTRY_BYTES = 24 * 1024
 MAX_SYNTHESIS_EVIDENCE_TOTAL_BYTES = 96 * 1024
 
 SYNTHESIS_SCHEMA_VERSION = 1
+WAVE2_GATE_PREVIEW_KEY = "__wave2_gate_preview__"
 
 
 def _scoped_id(value: Any, *, prefix: str) -> str:
@@ -61,10 +63,26 @@ class CrossTopicRelation(_FrozenModel):
 
 
 class GapRecord(_FrozenModel):
-    gap_id: str = Field(pattern=re.compile(r"^gap:[a-zA-Z0-9_-]{1,64}$"))
+    gap_id: str = Field(pattern=GAP_ID_RE.pattern)
     description: str = Field(min_length=1, max_length=2000)
     priority: int = Field(ge=1, le=5)
     affected_topics: Annotated[tuple[str, ...], Field(max_length=16)] = ()
+    search_required: bool = False
+
+
+class Wave2GatePreview(_FrozenModel):
+    searchable_gap_ids: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_searchable_gap_ids(self) -> Wave2GatePreview:
+        values = self.searchable_gap_ids
+        if (
+            len(values) > 32
+            or len(values) != len(set(values))
+            or any(not GAP_ID_RE.fullmatch(value) for value in values)
+        ):
+            raise ValueError("wave2_gate_preview_invalid")
+        return self
 
 
 class SynthesisEvidence(_FrozenModel):
@@ -215,6 +233,14 @@ class SynthesisResult(_FrozenModel):
             normalized_gaps.append(gap)
         payload["gaps"] = normalized_gaps
         return payload
+
+
+def build_wave2_gate_preview(result: SynthesisResult) -> Wave2GatePreview:
+    if not isinstance(result, SynthesisResult):
+        raise TypeError("synthesis_result_required")
+    return Wave2GatePreview(
+        searchable_gap_ids=tuple(gap.gap_id for gap in result.gaps if gap.search_required),
+    )
 
 
 @runtime_checkable

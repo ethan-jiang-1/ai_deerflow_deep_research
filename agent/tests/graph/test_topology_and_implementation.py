@@ -96,6 +96,14 @@ def test_hitl1_route_contract_and_topology_include_followup_and_exhausted() -> N
     assert TopologyEdge("hitl1", "exhausted", "blocked") in NORMALIZED_EDGES
 
 
+def test_wave2_topology_includes_bounded_exhausted_terminal() -> None:
+    assert TopologyEdge("wave2_synthesis", "evidence_needed", "targeted_evidence") in NORMALIZED_EDGES
+    assert TopologyEdge("wave2_synthesis", "pass", "hitl2") in NORMALIZED_EDGES
+    assert TopologyEdge("wave2_synthesis", "exhausted", "blocked") in NORMALIZED_EDGES
+    compiled = build_research_graph().compile()
+    assert any(edge.source == "wave2_synthesis" and edge.target == "__end__" for edge in compiled.get_graph().edges)
+
+
 def test_route_remains_a_typed_direct_read_of_state_route() -> None:
     assert _route({"route": "pass"}) == "pass"
     assert _route({"route": "repair"}) == "repair"

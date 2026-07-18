@@ -16,6 +16,9 @@ from deerflow_deep_research.domain.context import NodeExecutionRequest
 from deerflow_deep_research.domain.targeted import TargetedWorkerOutput
 from deerflow_deep_research.domain.untrusted import build_untrusted_data_block
 
+MAX_TARGETED_REPAIR_DRAFT_CHARS = 8_192
+MAX_TARGETED_REPAIR_ERROR_CHARS = 128
+
 
 def build_targeted_worker_prompt(gap_id: str) -> NodeExecutionRequest:
     objective = (
@@ -32,6 +35,8 @@ def build_targeted_worker_prompt(gap_id: str) -> NodeExecutionRequest:
     return NodeExecutionRequest(
         objective=objective,
         expected_output=json.dumps(expected, sort_keys=True, separators=(",", ":")),
+        minimum_tool_calls=1,
+        tool_call_limit=2,
     )
 
 
@@ -45,6 +50,36 @@ def parse_targeted_worker_output(text: str) -> TargetedWorkerOutput:
     if not isinstance(payload, dict):
         raise ValueError("targeted_worker_output_not_object")
     return TargetedWorkerOutput.model_validate(payload)
+
+
+def build_targeted_worker_repair_prompt(
+    *,
+    gap_id: str,
+    draft: str,
+    validation_error: str,
+) -> NodeExecutionRequest:
+    bounded_draft = draft[:MAX_TARGETED_REPAIR_DRAFT_CHARS] if isinstance(draft, str) else ""
+    bounded_error = validation_error[:MAX_TARGETED_REPAIR_ERROR_CHARS]
+    objective = (
+        "Convert the untrusted targeted-worker draft into exactly one JSON object for the assigned gap. "
+        "Do not search, fetch, call tools, add facts, or change the assigned gap id. Preserve only source "
+        "metadata already present in the draft; if it cannot support a resolved result, use deferred or "
+        "unresolved with honest limitations. Return JSON only, with no markdown or prose. "
+        f"Assigned gap id: {gap_id}. Validation failure: {bounded_error}.\n\n"
+        + build_untrusted_data_block([bounded_draft])
+    )
+    expected = {
+        "instruction": "Return exactly one JSON object and no markdown, prose, or code fences.",
+        "schema_version": 1,
+        "assigned_gap_id": gap_id,
+        "required_keys": ["schema_version", "gap_id", "gap_status", "sources", "limitations"],
+        "bounds": {"gap_status": "resolved | deferred | unresolved"},
+    }
+    return NodeExecutionRequest(
+        objective=objective,
+        expected_output=json.dumps(expected, sort_keys=True, separators=(",", ":")),
+        tools_enabled=False,
+    )
 
 
 def build_source_diagnostic_prompt(

@@ -16,7 +16,7 @@
       "payload": {
         "findings": [{"finding_id": "finding:finding_alias", "statement": "Synthetic finding.", "priority": 2, "affected_topics": ["topic:a"], "backing_refs": ["ref:synthetic"], "confidence": "high", "search_required": false}],
         "relations": [],
-        "gaps": [{"gap_id": "gap:gap_alias", "description": "Synthetic gap?", "priority": 4, "affected_topics": ["topic:a"]}],
+        "gaps": [{"gap_id": "gap:gap_alias", "description": "Synthetic gap?", "priority": 4, "affected_topics": ["topic:a"], "search_required": false}],
         "summary": "Synthetic aliases."
       }
     },
@@ -39,7 +39,7 @@
       "payload": {
         "findings": [],
         "relations": [],
-        "gaps": [{"gap_id": "gap:priority_gap", "description": "Synthetic priority gap.", "priority": 1, "affected_topics": []}],
+        "gaps": [{"gap_id": "gap:priority_gap", "description": "Synthetic priority gap.", "priority": 1, "affected_topics": [], "search_required": false}],
         "summary": "Synthetic priority alias."
       }
     },
@@ -62,7 +62,7 @@
       "payload": {
         "findings": [{"finding_id": "finding:description_finding", "statement": "Synthetic description finding.", "priority": 3, "affected_topics": [], "backing_refs": ["ref:synthetic"], "confidence": "medium", "search_required": false}],
         "relations": [],
-        "gaps": [{"gap_id": "gap:Synthetic_gap_remains", "description": "Synthetic gap remains.", "priority": 3, "affected_topics": []}],
+        "gaps": [{"gap_id": "gap:Synthetic_gap_remains", "description": "Synthetic gap remains.", "priority": 3, "affected_topics": [], "search_required": false}],
         "summary": "Synthetic descriptions."
       }
     },
@@ -137,7 +137,7 @@
       "payload": {
         "findings": [],
         "relations": [],
-        "gaps": [{"gap_id": "gap:topic_gap", "description": "Synthetic topic gap.", "priority": 2, "affected_topics": ["topic:a"]}],
+        "gaps": [{"gap_id": "gap:topic_gap", "description": "Synthetic topic gap.", "priority": 2, "affected_topics": ["topic:a"], "search_required": false}],
         "summary": "Synthetic topic alias."
       }
     },
@@ -189,7 +189,7 @@
       "payload": {
         "findings": [],
         "relations": [],
-        "gaps": [{"gap_id": "gap:Synthetic_identity_gap", "description": "Synthetic identity gap?", "priority": 3, "affected_topics": []}],
+        "gaps": [{"gap_id": "gap:Synthetic_identity_gap", "description": "Synthetic identity gap?", "priority": 3, "affected_topics": [], "search_required": false}],
         "summary": "Synthetic derived identity."
       }
     },

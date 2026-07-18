@@ -84,6 +84,7 @@ class LiveSeedBundle:
     checkpoint: dict[str, object]
     store: WorkUnitStore
     synthesis_gaps: tuple[dict[str, object], ...] = ()
+    synthesis_result: SynthesisResult | None = None
 
 
 async def build_live_seed_bundle(
@@ -119,22 +120,24 @@ async def build_live_seed_bundle(
     if include_wave1:
         await _publish_wave1(controller, research_id, now=now)
     synthesis_gaps: tuple[dict[str, object], ...] = ()
+    synthesis_result: SynthesisResult | None = None
     if include_synthesis_gap:
         gap = GapRecord(
             gap_id="gap:focused-targeted",
             description="Focused targeted evidence gap.",
             priority=1,
             affected_topics=("storage",),
+            search_required=True,
         )
-        await store.write_synthesis(
-            SynthesisResult(schema_version=1, findings=(), relations=(), gaps=(gap,), summary="One focused gap.")
+        synthesis_result = SynthesisResult(
+            schema_version=1,
+            findings=(),
+            relations=(),
+            gaps=(gap,),
+            summary="One focused gap.",
         )
-        synthesis_gaps = (
-            {
-                **gap.model_dump(mode="python"),
-                "search_required": True,
-            },
-        )
+        await store.write_synthesis(synthesis_result)
+        synthesis_gaps = tuple(item.model_dump(mode="python") for item in synthesis_result.gaps)
     records = await store.load_records()
     checkpoint: dict[str, object] = {
         "schema_version": RESEARCH_STATE_SCHEMA_VERSION,
@@ -151,6 +154,7 @@ async def build_live_seed_bundle(
         checkpoint=checkpoint,
         store=store,
         synthesis_gaps=synthesis_gaps,
+        synthesis_result=synthesis_result,
     )
 
 

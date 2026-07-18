@@ -15,8 +15,18 @@ import pytest
 from deerflow_deep_research.domain.context import GraphContextView, NodeAgentContext, NodeExecutionResult
 from deerflow_deep_research.domain.enums import NodeFinishReason
 from deerflow_deep_research.domain.node_spec import NodeBuildDependencies
-from deerflow_deep_research.domain.synthesis import SynthesisEvidence, SynthesisResult
+from deerflow_deep_research.domain.synthesis import (
+    WAVE2_GATE_PREVIEW_KEY,
+    GapRecord,
+    SynthesisEvidence,
+    SynthesisResult,
+    Wave2GatePreview,
+)
 from deerflow_deep_research.graph.nodes.wave2_synthesis import NODE_SPEC
+from deerflow_deep_research.graph.nodes.wave2_synthesis.prompts import (
+    build_synthesis_prompt,
+    build_synthesis_repair_prompt,
+)
 from deerflow_deep_research.runtime.work_unit_store import WorkUnitStore
 from tests.assets.provider_shapes import load_provider_shape_cases, thaw_provider_shape_payload
 
@@ -28,7 +38,11 @@ SHAPE_CASES = {
 }
 
 
-def _synthesis_json(*, backing_refs: tuple[str, ...] = (SUBMISSION_REF,)) -> str:
+def _synthesis_json(
+    *,
+    backing_refs: tuple[str, ...] = (SUBMISSION_REF,),
+    gaps: tuple[dict[str, object], ...] = (),
+) -> str:
     return json.dumps(
         {
             "schema_version": 1,
@@ -44,7 +58,7 @@ def _synthesis_json(*, backing_refs: tuple[str, ...] = (SUBMISSION_REF,)) -> str
                 }
             ],
             "relations": [],
-            "gaps": [],
+            "gaps": gaps,
             "summary": "One supported cross-topic finding.",
         }
     )
@@ -95,6 +109,35 @@ class _EmptyRepairCapabilities:
                 }
             )
         )
+        return NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary=summary)
+
+
+class _GapsOnlyRepairCapabilities:
+    def __init__(self, *, valid_repair: bool) -> None:
+        self.valid_repair = valid_repair
+        self.requests: list[object] = []
+
+    async def run_agent(self, *, context: NodeAgentContext, request: object) -> NodeExecutionResult:
+        self.requests.append(request)
+        gap = {
+            "gap_id": "gap:storage-cost",
+            "description": "Storage cost needs targeted evidence.",
+            "priority": 1,
+            "affected_topics": ["storage"],
+            "search_required": True,
+        }
+        if len(self.requests) == 2 and self.valid_repair:
+            summary = _synthesis_json(gaps=(gap,))
+        else:
+            summary = json.dumps(
+                {
+                    "schema_version": 1,
+                    "findings": [],
+                    "relations": [],
+                    "gaps": [gap],
+                    "summary": "A searchable gap remains.",
+                }
+            )
         return NodeExecutionResult(finish_reason=NodeFinishReason.SUCCESS, summary=summary)
 
 
@@ -178,7 +221,75 @@ async def test_real_synthesis_uses_node_context_and_materializes_canonical_findi
     artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
     payload = json.loads(artifact.read_text(encoding="utf-8"))
     assert payload["findings"][0]["backing_refs"] == [SUBMISSION_REF]
+    assert update[WAVE2_GATE_PREVIEW_KEY] == Wave2GatePreview(searchable_gap_ids=())
     assert artifact.read_bytes().endswith(b"\n") is False
+
+
+def test_gap_search_required_is_canonical_and_defaults_false() -> None:
+    legacy = GapRecord(
+        gap_id="gap:legacy",
+        description="Legacy gap",
+        priority=3,
+        affected_topics=("storage",),
+    )
+    searchable = GapRecord(
+        gap_id="gap:searchable",
+        description="Needs targeted evidence",
+        priority=1,
+        affected_topics=("storage",),
+        search_required=True,
+    )
+
+    assert legacy.search_required is False
+    assert searchable.search_required is True
+    assert searchable.model_dump(mode="json")["search_required"] is True
+
+
+def test_wave2_prompts_distinguish_finding_and_gap_search_flags() -> None:
+    request = build_synthesis_prompt()
+    repair = build_synthesis_repair_prompt("draft")
+
+    for prompt in (request, repair):
+        combined = f"{prompt.objective}\n{prompt.expected_output}"
+        assert "finding" in combined.lower()
+        assert "gap" in combined.lower()
+        assert "gap.search_required" in combined
+
+
+async def test_real_synthesis_persists_searchable_gap_and_returns_typed_preview(tmp_path: Path) -> None:
+    gap = {
+        "gap_id": "gap:storage-cost",
+        "description": "Storage cost needs targeted evidence.",
+        "priority": 1,
+        "affected_topics": ["storage"],
+        "search_required": True,
+    }
+    capabilities = _Capabilities(
+        NodeExecutionResult(
+            finish_reason=NodeFinishReason.SUCCESS,
+            summary=_synthesis_json(gaps=(gap,)),
+        )
+    )
+
+    update = await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())
+
+    assert update[WAVE2_GATE_PREVIEW_KEY] == Wave2GatePreview(searchable_gap_ids=("gap:storage-cost",))
+    artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+    assert payload["gaps"] == [gap]
+
+
+@pytest.mark.parametrize(
+    "gap_ids",
+    [
+        ("gap:duplicate", "gap:duplicate"),
+        ("forged",),
+        tuple(f"gap:g{index}" for index in range(33)),
+    ],
+)
+def test_wave2_gate_preview_rejects_noncanonical_or_oversize_ids(gap_ids: tuple[str, ...]) -> None:
+    with pytest.raises(ValueError, match="wave2_gate_preview_invalid"):
+        Wave2GatePreview(searchable_gap_ids=gap_ids)
 
 
 async def test_real_synthesis_repairs_malformed_output_once_without_tools(tmp_path: Path) -> None:
@@ -196,10 +307,33 @@ async def test_real_synthesis_repairs_malformed_output_once_without_tools(tmp_pa
 async def test_real_synthesis_rejects_empty_repair_when_accepted_evidence_exists(tmp_path: Path) -> None:
     capabilities = _EmptyRepairCapabilities()
 
-    with pytest.raises(ValueError, match="synthesis_findings_or_gaps_required"):
+    with pytest.raises(ValueError, match="synthesis_findings_required"):
         await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())  # type: ignore[arg-type]
 
     assert len(capabilities.requests) == 2
+    assert not (tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json").exists()
+
+
+async def test_real_synthesis_repairs_gaps_only_output_when_accepted_evidence_exists(tmp_path: Path) -> None:
+    capabilities = _GapsOnlyRepairCapabilities(valid_repair=True)
+
+    update = await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())  # type: ignore[arg-type]
+
+    assert len(capabilities.requests) == 2
+    assert capabilities.requests[1].tools_enabled is False
+    assert update[WAVE2_GATE_PREVIEW_KEY] == Wave2GatePreview(searchable_gap_ids=("gap:storage-cost",))
+    artifact = tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json"
+    assert len(json.loads(artifact.read_text(encoding="utf-8"))["findings"]) == 1
+
+
+async def test_real_synthesis_rejects_gaps_only_repair_without_publishing(tmp_path: Path) -> None:
+    capabilities = _GapsOnlyRepairCapabilities(valid_repair=False)
+
+    with pytest.raises(ValueError, match="synthesis_findings_required"):
+        await NODE_SPEC.real_factory(_dependencies(tmp_path, capabilities))(_state())  # type: ignore[arg-type]
+
+    assert len(capabilities.requests) == 2
+    assert capabilities.requests[1].tools_enabled is False
     assert not (tmp_path / "deep-research" / RESEARCH_ID / "synthesis" / "findings.json").exists()
 
 

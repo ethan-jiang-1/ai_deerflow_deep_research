@@ -97,6 +97,29 @@ def _work_unit_completion_rule() -> GateRule:
     )
 
 
+def _wave2_searchable_gap_rule() -> GateRule:
+    from deerflow_deep_research.domain.synthesis import WAVE2_GATE_PREVIEW_KEY, Wave2GatePreview
+
+    def evaluate(state: Mapping[str, Any]) -> Failure | None:
+        preview = state.get(WAVE2_GATE_PREVIEW_KEY)
+        if not isinstance(preview, Wave2GatePreview):
+            raise ValueError("wave2_gate_preview_missing")
+        if not preview.searchable_gap_ids:
+            return None
+        return Failure(
+            code=FailureCode.MISSING_EVIDENCE,
+            rule_name="wave2_searchable_gaps",
+            description=f"{len(preview.searchable_gap_ids)} searchable synthesis gap(s) remain",
+            ref=preview.searchable_gap_ids[0],
+        )
+
+    return GateRule(
+        name="wave2_searchable_gaps",
+        evaluate=evaluate,
+        failure_code=FailureCode.MISSING_EVIDENCE,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Per-phase GateDefinitions
 # ---------------------------------------------------------------------------
@@ -177,14 +200,18 @@ def _final_delivery_fixture_map() -> dict[str, FailureCode]:
 
 
 def build_wave2_real_gate_def() -> GateDefinition:
-    """Real Wave2 gate: pure pass-through rule."""
+    """Real Wave2 gate: route validated searchable gaps through targeted evidence."""
     from deerflow_deep_research.domain.gate import PhaseVerdict
 
     return GateDefinition(
         phase="wave2_synthesis",
-        rules=(_make_fixture_rule("wave2_synthesis", frozenset({PhaseVerdict.PASS, PhaseVerdict.REPAIR}), {}),),
+        rules=(_wave2_searchable_gap_rule(),),
         default_budget=1,
-        route_map={PhaseVerdict.PASS: "pass", PhaseVerdict.REPAIR: "evidence_needed"},
+        route_map={
+            PhaseVerdict.PASS: "pass",
+            PhaseVerdict.REPAIR: "evidence_needed",
+            PhaseVerdict.BLOCKED: "exhausted",
+        },
     )
 
 

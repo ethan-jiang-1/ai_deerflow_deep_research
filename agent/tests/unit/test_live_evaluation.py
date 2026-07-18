@@ -442,11 +442,14 @@ async def test_focused_targeted_setup_publishes_one_gap_without_phase_gate(monke
         policies.append(policy)
         return ScriptedTargetedCapabilities()
 
-    monkeypatch.setattr(
-        canaries,
-        "evaluate_gate_for_node",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("targeted_gate_must_not_run")),
-    )
+    gate_calls = []
+    real_evaluate = canaries.evaluate_gate_for_node
+
+    def recording_evaluate(state, logical_name, gate_def):
+        gate_calls.append(logical_name)
+        return real_evaluate(state, logical_name, gate_def)
+
+    monkeypatch.setattr(canaries, "evaluate_gate_for_node", recording_evaluate)
     identity = unique_run_identity()
     envelope = local_runtime_envelope(tmp_path, identity=identity)
 
@@ -457,6 +460,7 @@ async def test_focused_targeted_setup_publishes_one_gap_without_phase_gate(monke
     )
 
     assert len(policies) == 1
+    assert gate_calls == ["wave2_synthesis"]
     assert policies[0].policy_name == "wave0-source-intake"
     assert {"web_search", "web_fetch"} <= policies[0].allowed_tool_names
     assert execution.record_phases == ("wave0", "wave1", "targeted_evidence")

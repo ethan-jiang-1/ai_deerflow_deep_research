@@ -22,6 +22,7 @@ from deerflow_deep_research.domain.invocation import GraphInvocationContext
 from deerflow_deep_research.domain.lifecycle import make_attempt_id
 from deerflow_deep_research.domain.node_spec import NodeCapability, NodeSpec
 from deerflow_deep_research.domain.state import WORK_UNIT_GATE_PREVIEW_FIELDS, ResearchState, preview_work_unit_update
+from deerflow_deep_research.domain.synthesis import WAVE2_GATE_PREVIEW_KEY, Wave2GatePreview
 from deerflow_deep_research.domain.work_units import (
     WORK_UNIT_GATE_VIEW_KEY,
     WorkUnitGateView,
@@ -110,6 +111,14 @@ def _node_wrapper(
         elif gate_view is not None:
             raise ValueError("work_unit_gate_view_undeclared")
 
+        wave2_gate_preview = result.pop(WAVE2_GATE_PREVIEW_KEY, None)
+        declares_wave2_preview = logical_name == "wave2_synthesis" and factory is spec.real_factory
+        if declares_wave2_preview:
+            if not isinstance(wave2_gate_preview, Wave2GatePreview):
+                raise ValueError("wave2_gate_preview_inconsistent")
+        elif wave2_gate_preview is not None:
+            raise ValueError("wave2_gate_preview_undeclared")
+
         # Gate evaluation — delegated to nodes layer (architecture: graph → nodes → engine)
         gate_def = gate_defs.get(logical_name)
         if gate_def is not None:
@@ -120,6 +129,8 @@ def _node_wrapper(
                 assert gate_view is not None
                 validate_wrapper_gate_view(gate_view, gate_state, phase=logical_name)
                 gate_state = {**gate_state, WORK_UNIT_GATE_VIEW_KEY: gate_view}
+            if declares_wave2_preview:
+                gate_state = {**gate_state, WAVE2_GATE_PREVIEW_KEY: wave2_gate_preview}
             gate_update = evaluate_gate_for_node(gate_state, logical_name, gate_def)
             overlap = set(result) & set(gate_update)
             if overlap:
@@ -196,7 +207,7 @@ def build_research_graph(
     builder.add_conditional_edges(
         "wave2_synthesis",
         _route,
-        {"evidence_needed": "targeted_evidence", "pass": "hitl2"},
+        {"evidence_needed": "targeted_evidence", "pass": "hitl2", "exhausted": END},
     )
     builder.add_edge("targeted_evidence", "wave2_synthesis")
     builder.add_conditional_edges(

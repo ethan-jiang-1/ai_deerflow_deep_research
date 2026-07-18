@@ -255,7 +255,7 @@ async def test_scripted_worker_traverses_real_bridge_tool_policy_artifacts_and_l
         update = await TARGETED_SPEC.real_factory(dependencies)(
             state
             | {
-                "synthesis_gaps": ({"gap_id": "gap:cost", "search_required": True},),
+                "unresolved_gaps": ("gap:cost",),
                 "critic_work_items": (),
             }
         )

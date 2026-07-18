@@ -83,13 +83,11 @@ async def test_targeted_seed_publishes_valid_synthesis_and_dispatch_projection(t
     assert len(synthesis.gaps) == 1
     gap = synthesis.gaps[0]
     assert gap.gap_id == "gap:focused-targeted"
-    assert seeded.synthesis_gaps == (
-        {
-            **gap.model_dump(mode="python"),
-            "search_required": True,
-        },
-    )
+    assert gap.search_required is True
+    assert seeded.synthesis_result == synthesis
+    assert seeded.synthesis_gaps == tuple(item.model_dump(mode="python") for item in synthesis.gaps)
     assert "synthesis_gaps" not in seeded.checkpoint
+    assert "unresolved_gaps" not in seeded.checkpoint
     assert validate_research_state(seeded.checkpoint).research_id == seeded.research_id
 
 

@@ -587,6 +587,7 @@ def apply_research_update(
         "terminal_status": frozenset({WriterRole.CONTROLLER, WriterRole.GATE}),
         "terminal_reason": frozenset({WriterRole.CONTROLLER, WriterRole.GATE}),
         "latest_gate_feedback": frozenset({WriterRole.GATE}),
+        "unresolved_gaps": frozenset({WriterRole.GATE}),
         "gate_attempts_by_phase": frozenset({WriterRole.GATE}),
         "repair_budget_by_phase": frozenset({WriterRole.GATE}),
         "route": frozenset({WriterRole.GATE}),

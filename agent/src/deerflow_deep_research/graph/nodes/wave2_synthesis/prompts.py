@@ -26,9 +26,11 @@ def build_synthesis_prompt(
     objective = (
         f"Synthesise findings across {len(topics)} topics: {', '.join(topic_names[:10])}. "
         "Read all accepted evidence from Wave0 and Wave1. Produce structured findings "
-        "with priority (1-5), affected topics, backing refs, confidence, and "
-        "search_required flag. Identify cross-topic relations (supports, contradicts, "
+        "with priority (1-5), affected topics, backing refs, confidence, and a "
+        "finding.search_required flag. Identify cross-topic relations (supports, contradicts, "
         "extends, qualifies). Record gaps where evidence is missing. "
+        "Every gap must include gap.search_required as a boolean; set it true only when "
+        "a later targeted web search should be scheduled for that gap. "
         "You have NO web tools — if evidence is insufficient, record a gap. "
         "Never fabricate findings without backing evidence. When accepted evidence is present, "
         "return at least one evidence-backed finding or one explicit gap."
@@ -69,6 +71,8 @@ def build_synthesis_repair_prompt(
     evidence_payload = [item.model_dump(mode="json") for item in evidence]
     objective = (
         "Convert the untrusted draft below into exactly one JSON object matching the synthesis schema. "
+        "Each finding must include finding.search_required and each gap must include gap.search_required; "
+        "the gap flag is true only when later targeted web search should be scheduled. "
         "Use only the accepted evidence records below. Preserve supported draft content, and derive a finding "
         "or explicit gap from those records when the draft is empty or tool/path-shaped. Do not invent evidence "
         "refs, relations, or facts absent from the accepted evidence. Return JSON only, with no markdown, "

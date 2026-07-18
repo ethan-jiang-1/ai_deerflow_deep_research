@@ -59,7 +59,7 @@ def build_wave1_worker_prompt(
         objective=objective,
         expected_output=json.dumps(expected, sort_keys=True, separators=(",", ":")),
         minimum_tool_calls=1,
-        tool_call_limit=3,
+        tool_call_limit=2,
     )
 
 

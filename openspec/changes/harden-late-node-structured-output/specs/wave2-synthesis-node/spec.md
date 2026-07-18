@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Read-only synthesis agent produces structured findings
-The synthesis agent SHALL read accepted evidence and critic verdicts and produce structured findings with priority, affected topics, backing refs, confidence, and `search_required`, plus canonical gaps with priority, affected topics, and an explicit `search_required` value. The agent SHALL run under zero-tool read-only policy. Prompt instructions and provider-shape normalization SHALL distinguish finding follow-up advice from gap routing authority and SHALL preserve the canonical gap value without inventing it from prose.
+The synthesis agent SHALL read accepted evidence and critic verdicts and produce one or more structured findings with priority, affected topics, backing refs, confidence, and `search_required`, plus canonical gaps with priority, affected topics, and an explicit `search_required` value. Whenever accepted evidence is non-empty, a gaps-only result SHALL fail semantic validation and use the existing one-shot zero-tool repair; gaps SHALL NOT substitute for at least one backed finding. The agent SHALL run under zero-tool read-only policy. Prompt instructions and provider-shape normalization SHALL distinguish finding follow-up advice from gap routing authority and SHALL preserve the canonical gap value without inventing it from prose.
 
 #### Scenario: Agent produces findings from accepted evidence
 - **WHEN** wave2_synthesis runs after wave1 produced accepted submissions
@@ -16,6 +16,10 @@ The synthesis agent SHALL read accepted evidence and critic verdicts and produce
 #### Scenario: Legacy gap remains non-searchable by default
 - **WHEN** a schema-version-1 synthesis artifact omits `search_required` from a gap
 - **THEN** validation accepts the gap with `search_required=false` rather than silently scheduling targeted work
+
+#### Scenario: Accepted evidence cannot produce gaps only
+- **WHEN** accepted evidence exists and the initial synthesis response has zero findings plus one or more valid gaps
+- **THEN** the node performs its existing one zero-tool repair and publishes no synthesis artifact or gate preview unless the repair contains at least one backed finding
 
 #### Scenario: Agent cannot call web tools
 - **WHEN** the synthesis agent attempts to call a web search tool

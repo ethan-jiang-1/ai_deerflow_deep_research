@@ -36,6 +36,7 @@ from .prompts import (
     build_claim_verifier_prompt,
     build_source_diagnostic_prompt,
     build_targeted_worker_prompt,
+    build_targeted_worker_repair_prompt,
     parse_targeted_worker_output,
 )
 
@@ -146,9 +147,20 @@ async def run_gap_workers(state: dict, gap_intents: tuple, dependencies: Any) ->
         )
         if not isinstance(result, NodeExecutionResult) or result.finish_reason is not NodeFinishReason.SUCCESS:
             raise ValueError("targeted_worker_failed")
-        output = parse_targeted_worker_output(result.summary)
-        if output.gap_id != spec.scope[0]:
-            raise ValueError("targeted_gap_identity_mismatch")
+        try:
+            output = _parse_targeted_output_for_gap(result.summary, gap_id=spec.scope[0])
+        except ValueError as initial_error:
+            repaired = await resolved.node_dependencies.capabilities.run_agent(
+                context=resolved.node_dependencies.agent_context,
+                request=build_targeted_worker_repair_prompt(
+                    gap_id=spec.scope[0],
+                    draft=result.summary,
+                    validation_error=_targeted_validation_error_code(initial_error),
+                ),
+            )
+            if not isinstance(repaired, NodeExecutionResult) or repaired.finish_reason is not NodeFinishReason.SUCCESS:
+                raise ValueError("targeted_worker_repair_failed") from initial_error
+            output = _parse_targeted_output_for_gap(repaired.summary, gap_id=spec.scope[0])
 
         metas: list[TargetedSourceMeta] = []
         source_refs: list[SourceRef] = []
@@ -226,24 +238,42 @@ async def run_gap_workers(state: dict, gap_intents: tuple, dependencies: Any) ->
     return {**node_update("targeted_evidence"), **result.parent_update}
 
 
+def _parse_targeted_output_for_gap(text: str, *, gap_id: str):
+    output = parse_targeted_worker_output(text)
+    if output.gap_id != gap_id:
+        raise ValueError("targeted_gap_identity_mismatch")
+    return output
+
+
+def _targeted_validation_error_code(error: ValueError) -> str:
+    message = str(error)
+    for code in (
+        "targeted_worker_output_empty",
+        "targeted_worker_output_json_invalid",
+        "targeted_worker_output_not_object",
+        "targeted_gap_identity_mismatch",
+    ):
+        if code in message:
+            return code
+    return "targeted_worker_output_schema_invalid"
+
+
 def materialize_gap_intents(
-    gaps: tuple[dict, ...] | list[dict] | None,
+    gap_ids: tuple[str, ...] | list[str] | None,
 ) -> tuple:
-    """Build one WorkIntent per search_required gap.
+    """Build one WorkIntent per gate-owned searchable gap id.
 
     @impl TEL-001
     """
+    from deerflow_deep_research.domain.synthesis import GAP_ID_RE
     from deerflow_deep_research.engine.work_units.kernel import WorkIntent
 
+    values = tuple(gap_ids or ())
+    invalid_id = any(not isinstance(value, str) or not GAP_ID_RE.fullmatch(value) for value in values)
+    if len(values) != len(set(values)) or invalid_id:
+        raise ValueError("targeted_gap_projection_invalid")
     intents: list = []
-    for gap in gaps or ():
-        if not isinstance(gap, dict):
-            continue
-        if not gap.get("search_required", False):
-            continue
-        gap_id = gap.get("gap_id", "")
-        if not gap_id:
-            continue
+    for gap_id in values:
         intents.append(
             WorkIntent(
                 worker_role="targeted_worker",

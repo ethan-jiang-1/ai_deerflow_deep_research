@@ -26,5 +26,7 @@ plan 完成后从 `_backlog/plans/` 通过 `git mv` 移入本目录：
 | CLS-005 | 2026-07-17 | [test-assets-demo-design-coverage.md](test-assets-demo-design-coverage.md) | Demo/public-entry design risks absorbed into deterministic and release acceptance assets |
 | CLS-006 | 2026-07-17 | [test-assets-layered-strategy.md](test-assets-layered-strategy.md) | Early layered strategy superseded by the four asset classes, authenticity ladder, and three execution lanes |
 | CLS-007 | 2026-07-17 | [deep-research-test-assets-master-strategy.md](deep-research-test-assets-master-strategy.md) | Three-batch testing strategy completed through deterministic PR, credentialed live, and full-real release gates |
+| CLS-008 | 2026-07-19 | [deep-research-demo-full-pipeline.md](deep-research-demo-full-pipeline.md) | Demo CLI fake + real + TUI full pipeline design; implemented via `add-deep-research-demo-full-pipeline` (archived 2026-07-17) |
+| CLS-009 | 2026-07-19 | [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | Master architecture: DPT isomorphic mapping, 00–18 roadmap — all 18 changes implemented and archived |
 
-**Next available plan ID: CLS-008**
+**Next available plan ID: CLS-010**

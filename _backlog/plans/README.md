@@ -1,6 +1,6 @@
 # Active Plans — 活跃 plan/分析文档列表
 
-> 最后更新: 2026-07-18 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
+> 最后更新: 2026-07-19 | `_backlog/plans/` — 活跃 plan 在此，完成移入 [`../_done/_closed_plans/`](../_done/_closed_plans/)。
 >
 > **plan 没有编号，文件名即标识。完成后文件名不变，位置即状态。**
 
@@ -19,15 +19,11 @@
 
 | Plan | 简述 |
 |------|------|
-| [deerflow-native-deep-research-graph.md](deerflow-native-deep-research-graph.md) | 总体架构、DPT 同构映射、00–18 路线图（00–15 ✅ 已归档，16 起待做） |
 | [deep-research-spec-gates-and-coverage.md](deep-research-spec-gates-and-coverage.md) | 治理：spec 门禁与 requirement-test 覆盖目录（提案，未立 change） |
-| [deep-research-structured-output-linting.md](deep-research-structured-output-linting.md) | 治理：agent YAML/JSON 结构化输出 lint（提案，Phase 2 已随 04 解锁） |
-| [deep-research-16-final-delivery-node.md](deep-research-16-final-delivery-node.md) | final writer、integrity gate 与 workspace-to-outputs artifact publish（← 下一个） |
-| [deep-research-17-runtime-operations.md](deep-research-17-runtime-operations.md) | cancellation、non-interactive、progress 与 operator recovery |
-| [deep-research-demo-full-pipeline.md](deep-research-demo-full-pipeline.md) | Demo CLI fake + CLI real + TUI real 三合一设计 |
-| [deep-research-six-case-live-closure.md](deep-research-six-case-live-closure.md) | 延期的六案 live 聚合闭环、重启条件与 nightly 恢复标准 |
+| [deep-research-structured-output-linting.md](deep-research-structured-output-linting.md) | 治理：agent YAML/JSON 结构化输出 lint（提案，未立 change） |
+| [deep-research-six-case-live-closure.md](deep-research-six-case-live-closure.md) | 延期的六案 live 聚合闭环、重启条件与 nightly 恢复标准（deferred） |
 
-**Next available plan ID: CLS-008**（移入 `_closed_plans/` 时分配）
+**Next available plan ID: CLS-010**（移入 `_closed_plans/` 时分配）
 
 ## 已归档（移至 `_done/_closed_plans/`）
 
@@ -55,6 +51,8 @@
 | test-assets-demo-design-coverage.md | CLS-005 | 2026-07-17 |
 | test-assets-layered-strategy.md | CLS-006 | 2026-07-17 |
 | deep-research-test-assets-master-strategy.md | CLS-007 | 2026-07-17 |
+| deep-research-demo-full-pipeline.md | CLS-008 | 2026-07-19 |
+| deerflow-native-deep-research-graph.md | CLS-009 | 2026-07-19 |
 
 ---
 

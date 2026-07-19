@@ -29,10 +29,11 @@ Defer further credentialed retries. Archive readiness for
 governance gates, while explicitly declining the claim that the six-case live lane
 is green.
 
-The owning `rebalance-deep-research-test-assets` tasks 6.7, 6.8, and 7.4 remain
-open. `.github/workflows/agent-live-evaluation.yml` remains manual-only with the
-unchanged 20-minute timeout. Historical release attestation does not substitute for
-current six-case provider compatibility.
+The archived `rebalance-deep-research-test-assets` tasks 6.7 and 6.8 record the
+completed deferral/cadence handoff, and task 7.4 records its independent deterministic
+closeout. They do not claim a green live aggregate. `.github/workflows/agent-live-evaluation.yml`
+remains manual-only with the unchanged 20-minute timeout. Historical release
+attestation does not substitute for current six-case provider compatibility.
 
 ## Re-entry Triggers
 
@@ -69,24 +70,24 @@ coercion, deadline increases, or selective case reruns.
 - declared case wall-time remains at most 900 seconds and preserves the five-minute
   margin inside the unchanged 20-minute job timeout;
 - model/tool/token/cost-availability/retry/invariant/metric evidence is recorded;
-- `rebalance-deep-research-test-assets` tasks 6.7 and 6.8 are completed and the
-  reviewed six-case nightly schedule is restored;
-- task 7.4 is reassessed without running release E2E unless its separate trigger is
-  actually met.
+- a new reviewed OpenSpec change records the fresh aggregate and restores the reviewed
+  six-case nightly schedule;
+- release E2E is not run unless its separate trigger is actually met.
 
 ## Risks / Trade-offs
 
 - [Risk] Current-provider compatibility remains unproven as a six-case aggregate.
   -> Keep the lane manual-only and make no nightly/release claim from partial runs.
 - [Risk] Deferral becomes invisible debt. -> Keep this plan linked from both
-  authoritative task files and the active-plan index.
+  archived task records and the active-plan index.
 - [Risk] A future retry repeats expensive exploratory loops. -> Retain the exact
   reports, typed failure history, one-shot rule, and lowest-seam diagnosis rule.
 
 ## Implementation Link
 
-The production implementation is owned by
-`openspec/changes/harden-late-node-structured-output`. Live aggregation and cadence
-remain owned by `openspec/changes/rebalance-deep-research-test-assets`. Any future
-production remediation must be proposed as a new OpenSpec change; this plan is not
-implementation authorization.
+The production implementation is recorded at
+`openspec/changes/archive/2026-07-18-harden-late-node-structured-output`. Live
+aggregation and cadence decisions are recorded at
+`openspec/changes/archive/2026-07-19-rebalance-deep-research-test-assets`. Any future
+live closure or production remediation must be proposed as a new OpenSpec change; this
+plan is not implementation authorization.

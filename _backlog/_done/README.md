@@ -27,7 +27,7 @@ _done/
 | `_fixed_bugs/` | 0 | BUG-001 |
 | `_suspened_bugs/` | 0 | — |
 | `_done_todos/` | 0 | DONE-001 |
-| `_closed_plans/` | 7 | CLS-008 |
+| `_closed_plans/` | 9 | CLS-010 |
 
 _Closed plan count follows the indexed CLS records; each future move increments the count and Next ID together._
 

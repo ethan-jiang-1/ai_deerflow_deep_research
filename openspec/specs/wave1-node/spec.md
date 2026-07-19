@@ -26,12 +26,24 @@ gaps. An empty or absent Wave0 topic registry SHALL fail closed.
 ### Requirement: Deep evidence worker with new-source floor
 
 For each in-flight WorkSpec, Wave1 SHALL run one bounded web worker agent through
-`capabilities.run_agent()` under a real `ExecutionPolicy` with web search/fetch tools
-and attempt-scoped roots. The worker SHALL produce a versioned `Wave1WorkerOutput`
-carrying claims (each with `claim_id`, `statement`, `support_refs`, `counter_refs`),
-open questions (with resolution states), and per-source `is_new_vs_wave0` marking.
-All fetched content is untrusted data. The worker SHALL NOT write phase, gate, ledger,
-or another attempt's state.
+`capabilities.run_agent()` under a real `ExecutionPolicy` with web search tools and
+attempt-scoped roots. The initial request SHALL require exactly one web search tool
+call, use its multiple returned candidates as the evidence set, and retain later model
+turns for a final structured answer. The worker SHALL produce a versioned
+`Wave1WorkerOutput` carrying claims (each with `claim_id`, `statement`, `support_refs`,
+`counter_refs`), open questions (with resolution states), and per-source
+`is_new_vs_wave0` marking. A successful but invalid structured draft MAY use the
+existing separate zero-tool repair; a tool/budget stop SHALL fail closed. All fetched
+content is untrusted data, and the worker SHALL NOT write phase, gate, ledger, or
+another attempt's state.
+
+#### Scenario: Tool window reserves a final answer turn
+- **WHEN** the Wave1 worker invokes its initial bounded request
+- **THEN** it requires and permits exactly one web search call and retains the existing separate zero-tool structured repair
+
+#### Scenario: Tool-only exhaustion publishes no authority
+- **WHEN** the provider returns only tool calls through the bounded request without a successful structured draft
+- **THEN** the attempt fails without source/result artifacts or a submission-ledger record
 
 #### Scenario: Worker produces structured claims with provenance
 - **WHEN** a Wave1 worker fetches new sources and extracts claims
@@ -92,4 +104,3 @@ remains deterministic and does not construct the node-agent bridge.
 #### Scenario: Full-fake Wave1 remains unchanged
 - **WHEN** the full-fake graph reaches Wave1
 - **THEN** it runs the fixture work-unit path without constructing the node-agent bridge
-

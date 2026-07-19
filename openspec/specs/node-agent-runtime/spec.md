@@ -19,6 +19,12 @@ The runtime-owned node-agent bridge SHALL implement a pure domain capability pro
 ### Requirement: Phase-agent execution has explicit budgets
 Every node-agent policy SHALL specify a resolved model, exact tools, maximum model calls, total tool calls, tool calls per model response, parallel tool-call limit, total token budget, per-model-call output-token cap, per-tool-result size cap, structured-result size cap, and wall-time budget. Before each text-only model call the runtime SHALL use a deterministic no-network conservative upper bound over the actual messages/tool schemas plus capped model output; non-text content SHALL require an explicit conservative modality estimator or fail admission. It SHALL then reconcile actual usage metadata. Missing usable token accounting SHALL terminate with `usage_unavailable` before tool execution or another model call. Tool results SHALL be bounded before re-entering model context. Exhausting any budget SHALL stop the agent with a typed non-success finish reason and cancel outstanding child work.
 
+Every request-level tool-call limit SHALL be enforced cumulatively before tool
+dispatch, including a model response that proposes parallel calls. If prior calls plus
+the current response exceed the remaining request quota, middleware SHALL deny the
+batch with a typed non-success result; the declared request limit SHALL never be
+exceeded in observed dispatch accounting.
+
 #### Scenario: Work completes within budget
 - **WHEN** ReplayChatModel returns a valid structured result within all configured limits
 - **THEN** the adapter returns a successful normalized result with recorded usage and finish reason
@@ -26,6 +32,10 @@ Every node-agent policy SHALL specify a resolved model, exact tools, maximum mod
 #### Scenario: Budget exhaustion stops execution
 - **WHEN** a fake model exceeds the model-call, tool-call, parallelism, token, tool-result, structured-result, or wall-time limit
 - **THEN** execution terminates without another tool call and reports the exhausted budget as a failure
+
+#### Scenario: Parallel response cannot cross request quota
+- **WHEN** one tool call has already run under a two-call request limit and the next model response proposes two parallel calls
+- **THEN** middleware rejects the response before either new call dispatches and observed request tool calls remain one
 
 #### Scenario: Missing usage cannot disable the token budget
 - **WHEN** a model response omits usable token accounting
@@ -74,4 +84,3 @@ The phase-agent factory SHALL omit `ask_clarification` and clarification middlew
 #### Scenario: Fabricated clarification call is refused
 - **WHEN** a fake model emits an `ask_clarification` tool call despite the schema
 - **THEN** tool policy rejects it and no graph interrupt or user-input artifact is created
-

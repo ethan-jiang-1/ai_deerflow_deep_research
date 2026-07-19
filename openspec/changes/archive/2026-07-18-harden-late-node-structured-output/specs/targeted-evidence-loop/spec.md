@@ -25,7 +25,7 @@ A bounded web worker SHALL search for evidence addressing one assigned gap. The 
 - **THEN** new sources are recorded with backing refs and gap status is updated without a repair call
 
 #### Scenario: Prose answer is repaired once without tools
-- **WHEN** the initial worker uses one or two allowed tool calls but its successful final answer is prose, schema-invalid, or names a different gap
+- **WHEN** the initial worker uses its exactly one allowed web search but its successful final answer is prose, schema-invalid, or names a different gap
 - **THEN** one zero-tool repair request may convert the bounded draft into a valid response for the same assigned gap
 
 #### Scenario: Invalid repair publishes no authority

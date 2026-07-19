@@ -121,7 +121,7 @@ Alternative considered: keep one hand-written test per alias. Rejected because p
 
 ### 5. Add late-node live canaries by seeding existing authorities
 
-Nightly live evaluation will add three bounded scenarios:
+Live evaluation adds three bounded scenarios:
 
 - Wave1 with one validated Wave0 submission and one topic;
 - Wave2 synthesis with a small set of validated accepted Wave0/Wave1 records;
@@ -130,6 +130,16 @@ Nightly live evaluation will add three bounded scenarios:
 Seed builders will create validated checkpoint projections for compact control state and publish ledger/content authority through the existing store interfaces; they will not write fake ledger lines or place sandbox bodies in checkpoint state. The canary then invokes the real focused `NODE_SPEC` interface with `RuntimeNodeAgentBridge` constructed through the current production capability builders and the existing live factory's bounded budget override: Wave1 uses `_build_wave1_capabilities`, Wave2 uses the shared zero-tool `_build_hitl1_capabilities`, and targeted gap work uses `_build_wave0_capabilities`, plus their normal work-unit/synthesis stores. For Wave1, the test separates the reserved `WORK_UNIT_GATE_VIEW_KEY`, applies only `WORK_UNIT_GATE_PREVIEW_FIELDS` through `preview_work_unit_update`, validates the gate view against that projected state, then evaluates `evaluate_gate_for_node(..., real_wave1_gate_def())`. Wave2 first asserts semantic-floor behavior inside the real node, then separately evaluates `evaluate_gate_for_node` with `real_wave2_gate_def()` on the node-updated state. Targeted gap work asserts its subgraph's validated submit/ledger result and does not claim a nonexistent phase gate. These private builders are current implementation anchors, so focused canary tests may change with runtime assembly; they are not promoted to production interfaces. This deliberately proves focused node/provider compatibility with current production dependency construction, not graph-recipe assembly. Each run uses isolated identity, one outer attempt, scenario-specific call/token/time bounds, and redacted structural reporting.
 
 These cases claim `LIVE_REAL_DEPENDENCIES` only at the focused node/runtime-integration seam with seeded authority preconditions. They do not claim public-entry, predecessor-lifecycle, production recipe assembly, or full-pipeline coverage. All six live cases run nightly only when their declared scenario deadlines sum to at most 900 seconds, leaving at least five minutes of the existing 20-minute job timeout for install, preflight, report publication, and cleanup. A focused web case may declare at most 240 seconds and a zero-tool case at most 120 seconds. Measured overruns block nightly enablement; the CI timeout is not raised to make the contract pass. The existing single release E2E remains the only `FULL_REAL_PIPELINE` proof.
+
+The complete-lane attempts did not produce six passing cases under the current
+provider distribution even after responsible deterministic production seams were
+hardened. The reports remain valid red evidence, and every failing path remained
+fail-closed without invalid publication. Further credentialed retries and nightly
+restoration are therefore deferred to
+`_backlog/plans/deep-research-six-case-live-closure.md`. This change completes the
+test assets and the manual-only cadence decision without claiming a green aggregate;
+the unchanged 20-minute workflow may regain a schedule only after the backlog plan's
+one-shot six-pass and margin criteria are met.
 
 Raw live/release reports remain gitignored operational artifacts. The existing successful full-real report will be reduced to one committed redacted release attestation containing only schema version, scenario id, source observation date, `source_report_sha256` of the local source report, attestation base revision, an explicit `run_revision=unknown`, attempt/retry counts, all eight invariant booleans, accepted/citation counts, and aggregate token/tool/time values. Its provenance keeps three scopes distinct: `source_run` facts are derived from the hashed JSON; `source_archive_scan` verdicts cite the committed final scan record at `openspec/changes/archive/2026-07-17-evaluate-harden-deep-research-graph/tasks.md` and preserve that its target set was both live and release reports; and `attestation_scan` verdicts describe deterministic scans of the newly generated committed file. `attestation_base_revision` identifies the repository state inspected while generating the attestation; it is not the run revision and avoids commit self-reference. The source report has no embedded run timestamp or revision, so the attestation SHALL NOT manufacture them from file metadata or a later commit. It contains no invocation ids, provider response shapes, model text, source URLs, host paths, or credentials. A deterministic contract validates this attestation against the release invariant schema and rejects scan verdicts without their declared evidence scope and source locator. The stale committed `NOT READY / full-real not executed` parity report is updated to the achieved state or explicitly superseded so committed evidence cannot contradict itself.
 
@@ -223,7 +233,7 @@ No task may use a broader asset class, seam, or authenticity label merely to sat
 3. Migrate the ten scenario families one risk slice at a time, retaining existing focused tests and binding them to cases/claims at an equal or lower stable seam.
 4. Add minimized provider-shape fixtures and map existing live/release discoveries before adding new live execution.
 5. Replace metrics with the typed validated outcome projection and establish `evidence-v1` semantics before consuming them in new live reports.
-6. Add the three direct late-node live canaries and report-schema assertions; then run the complete six-case lane with fresh identities and persist its redacted aggregate evidence before enabling all six nightly.
+6. Add the three direct late-node live canaries and report-schema assertions; then run the complete six-case lane with fresh identities and persist its redacted aggregate evidence. Enable all six nightly only on a green aggregate with the required margin; otherwise keep the workflow manual-only and defer further credentialed closure to `_backlog/plans/deep-research-six-case-live-closure.md` without claiming success.
 7. Commit the minimized release attestation, reconcile stale evidence documents, synchronize final agent/test documentation with the already-established authority policy, run the complete deterministic/specialized/live validation matrix, and avoid rerunning full-real unless the explicit rerun policy is triggered.
 
 Rollback is test-owned: revert the implementation commits for the new tests, fixtures, commands, workflows, and evidence documents if the new lanes cannot run reliably. No production state, runtime configuration, database, checkpoint, or sandbox migration is required.

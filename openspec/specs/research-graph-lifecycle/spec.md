@@ -38,6 +38,14 @@ import LangGraph. Real topic planning SHALL chain off the real profile: selectin
 SHALL fail closed before graph invocation, because the planner consumes the real
 HITL1 profile constraints.
 
+Real Wave2 synthesis SHALL add exactly one Wave2 route label to the normalized
+topology: `exhausted -> blocked/END`. Existing labels
+`evidence_needed -> targeted_evidence` and `pass -> hitl2`, plus the
+`targeted_evidence -> wave2_synthesis` return edge, SHALL remain unchanged. The
+exhausted edge is the typed blocked path when searchable gaps remain after the
+existing Wave2 gate repair budget or fatigue contract is exhausted; no new top-level
+phase or alternate bypass around synthesis is introduced.
+
 #### Scenario: Full-fake topology resolves explicitly
 - **WHEN** the builder receives the default implementation map
 - **THEN** all eleven stable logical nodes resolve from their public package-root `NODE_SPEC`, every top-level node is reachable from START and can reach a terminal path, and no filesystem discovery occurs
@@ -61,6 +69,10 @@ HITL1 profile constraints.
 #### Scenario: Real topic planning without the real profile chain fails closed
 - **WHEN** a recipe selects `topic_planning=real` without `hitl1=real`
 - **THEN** recipe construction fails with a typed dependency error before the graph is compiled or invoked
+
+#### Scenario: Real Wave2 blocked route is explicit
+- **WHEN** the real Wave2 gate exhausts its bounded repair or fatigue contract while searchable gaps remain
+- **THEN** the builder routes `wave2_synthesis --exhausted--> END`, normalized topology classifies the endpoint as `blocked`, and no targeted or HITL2 bypass occurs
 
 ### Requirement: Deterministic fakes exercise routing and parallel fan-in
 
@@ -366,7 +378,7 @@ real-topic-planning blocked path.
 - **THEN** it returns `schema_unsupported` before node execution or checkpoint mutation
 
 #### Scenario: Topology drift is detected
-- **WHEN** a logical node, edge, route label, or reachability property changes beyond the declared HITL1 `needs_followup`/`exhausted` and topic_planning `exhausted` routes without regenerating the approved semantic snapshot
+- **WHEN** a logical node, edge, route label, or reachability property changes beyond the declared HITL1 `needs_followup`/`exhausted`, topic_planning `exhausted`, and wave2_synthesis `exhausted` routes without regenerating the approved semantic snapshot
 - **THEN** the topology contract fails with the normalized difference
 
 #### Scenario: Memory does not claim restart durability
@@ -665,4 +677,3 @@ SHALL NOT be bumped by this change.
 #### Scenario: Unsupported schema still fails before HITL1 runs
 - **WHEN** a stored checkpoint carries an unsupported `schema_version`
 - **THEN** the handler returns `schema_unsupported` before constructing HITL1 dependencies, writing `profile.json`, or mutating profile fields
-
